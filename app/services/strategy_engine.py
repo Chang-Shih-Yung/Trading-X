@@ -8,6 +8,7 @@ from enum import Enum
 
 from app.services.market_data import MarketDataService
 from app.services.technical_indicators import TechnicalIndicatorsService, IndicatorResult
+from app.services.candlestick_patterns import analyze_candlestick_patterns, PatternResult, PatternType
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.models.models import TradingSignal
@@ -39,10 +40,11 @@ class TradeSignal:
     expires_at: datetime
 
 class StrategyEngine:
-    """進階策略引擎"""
+    """進階策略引擎 - 整合K線形態與多時間框架分析"""
     
     def __init__(self):
         self.market_service = MarketDataService()
+        self.indicators_service = TechnicalIndicatorsService()
         self.running = False
         self.active_signals = {}
         
@@ -50,24 +52,45 @@ class StrategyEngine:
         self.min_risk_reward = settings.MIN_RISK_REWARD_RATIO
         self.risk_percentage = settings.DEFAULT_RISK_PERCENTAGE
         
+        # 新增：多時間框架權重配置
+        self.timeframe_weights = {
+            '1w': 0.40,   # 週線權重最高
+            '1d': 0.35,   # 日線權重次之
+            '4h': 0.15,   # 4小時權重較低
+            '1h': 0.10    # 1小時權重最低
+        }
+        
+        # 新增：分析優先級 - K線形態優先於技術指標
+        self.analysis_priority = {
+            'candlestick_patterns': 0.60,  # K線形態佔60%權重
+            'technical_indicators': 0.40   # 技術指標佔40%權重  
+        }
+        
     async def start_signal_generation(self):
-        """啟動信號生成"""
+        """啟動信號生成 - 多時間框架分析"""
         self.running = True
-        symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'XRP/USDT']
-        timeframes = ['1h', '4h', '1d']
+        symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT']  # 五個主要幣種
+        timeframes = ['1h', '4h', '1d', '1w']  # 增加週線分析
         
         while self.running:
             try:
                 tasks = []
                 for symbol in symbols:
-                    for timeframe in timeframes:
-                        task = asyncio.create_task(
-                            self.analyze_symbol(symbol, timeframe)
-                        )
-                        tasks.append(task)
+                    # 每個幣種進行多時間框架綜合分析
+                    task = asyncio.create_task(
+                        self.multi_timeframe_analysis(symbol, timeframes)
+                    )
+                    tasks.append(task)
                 
                 # 並行分析所有交易對
-                await asyncio.gather(*tasks, return_exceptions=True)
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                # 記錄分析結果
+                for i, result in enumerate(results):
+                    if isinstance(result, Exception):
+                        logger.error(f"分析{symbols[i]}時發生錯誤: {result}")
+                    elif result:
+                        logger.info(f"生成{symbols[i]}交易信號: {result.signal_type.value}, 信心度: {result.confidence:.2f}")
                 
                 # 每5分鐘重新分析
                 await asyncio.sleep(300)
@@ -76,54 +99,185 @@ class StrategyEngine:
                 logger.error(f"策略引擎錯誤: {e}")
                 await asyncio.sleep(60)
     
-    async def analyze_symbol(self, symbol: str, timeframe: str) -> Optional[TradeSignal]:
-        """分析單一交易對"""
+    async def multi_timeframe_analysis(self, symbol: str, timeframes: List[str]) -> Optional[TradeSignal]:
+        """多時間框架綜合分析"""
         try:
-            # 獲取市場數據
-            df = await self.market_service.get_market_data_from_db(
-                symbol, timeframe, limit=200
-            )
+            timeframe_signals = {}
+            pattern_signals = {}
             
-            if df.empty or len(df) < 50:
-                # 如果資料庫沒有數據，從交易所獲取
-                df = await self.market_service.get_historical_data(
-                    symbol, timeframe, limit=200
-                )
-                if not df.empty:
-                    await self.market_service.save_market_data(df)
+            # 1. 對每個時間框架進行分析
+            for tf in timeframes:
+                # 獲取市場數據
+                df = await self.market_service.get_market_data_from_db(symbol, tf, limit=200)
+                
+                if df.empty or len(df) < 50:
+                    # 如果資料庫沒有數據，從交易所獲取
+                    df = await self.market_service.get_historical_data(symbol, tf, limit=200)
+                    if not df.empty:
+                        await self.market_service.save_market_data(df)
+                
+                if df.empty:
+                    continue
+                
+                # 技術指標分析
+                indicators = self.indicators_service.calculate_all_indicators(df)
+                indicator_signal = self._analyze_technical_indicators(indicators, df, tf)
+                
+                # K線形態分析（重點！）
+                pattern_analysis = analyze_candlestick_patterns(df, tf)
+                
+                timeframe_signals[tf] = {
+                    'indicators': indicator_signal,
+                    'patterns': pattern_analysis,
+                    'price': float(df['close'].iloc[-1])
+                }
             
-            if df.empty:
-                return None
+            # 2. 綜合多時間框架信號
+            final_signal = self._combine_timeframe_signals(timeframe_signals, symbol)
             
-            # 計算技術指標
-            indicators = TechnicalIndicatorsService.calculate_all_indicators(df)
+            if final_signal and final_signal.confidence >= 0.6:  # 提高閾值確保高質量信號
+                await self.save_signal(final_signal)
+                logger.info(f"生成高質量信號: {symbol} {final_signal.signal_type.value} 信心度: {final_signal.confidence:.2f}")
             
-            # 生成交易信號
-            signal = await self.generate_signal(df, indicators, symbol, timeframe)
-            
-            if signal and signal.confidence >= 0.7:  # 只處理高置信度信號
-                await self.save_signal(signal)
-                logger.info(f"生成信號: {symbol} {timeframe} {signal.signal_type.value}")
-            
-            return signal
+            return final_signal
             
         except Exception as e:
-            logger.error(f"分析 {symbol} {timeframe} 失敗: {e}")
+            logger.error(f"多時間框架分析 {symbol} 失敗: {e}")
             return None
-    
-    async def generate_signal(
-        self,
-        df: pd.DataFrame,
-        indicators: Dict[str, IndicatorResult],
-        symbol: str,
-        timeframe: str
-    ) -> Optional[TradeSignal]:
-        """生成交易信號 - 進階多重確認策略"""
+
+    def _combine_timeframe_signals(self, timeframe_signals: Dict, symbol: str) -> Optional[TradeSignal]:
+        """綜合多時間框架信號 - K線形態優先策略"""
         
-        current_price = float(df['close'].iloc[-1])
+        if not timeframe_signals:
+            return None
         
-        # 多重時間框架分析
-        multi_timeframe_signals = await self._analyze_multiple_timeframes(symbol, df)
+        # 初始化得分
+        total_bullish_score = 0.0
+        total_bearish_score = 0.0
+        total_weight = 0.0
+        
+        # 關鍵價位信息
+        entry_prices = []
+        stop_losses = []
+        take_profits = []
+        
+        primary_timeframe = None
+        primary_pattern = None
+        confidence_boost = 0.0
+        
+        # 遍歷每個時間框架
+        for tf, signals in timeframe_signals.items():
+            tf_weight = self.timeframe_weights.get(tf, 0.1)
+            
+            # 1. K線形態分析（優先級最高）
+            pattern_data = signals.get('patterns', {})
+            if pattern_data.get('has_pattern', False):
+                primary_pattern = pattern_data['primary_pattern']
+                pattern_score = pattern_data['combined_score']
+                
+                # K線形態權重加成
+                pattern_weight = self.analysis_priority['candlestick_patterns'] * tf_weight
+                
+                if primary_pattern.pattern_type == PatternType.BULLISH:
+                    total_bullish_score += pattern_score * pattern_weight
+                elif primary_pattern.pattern_type == PatternType.BEARISH:
+                    total_bearish_score += pattern_score * pattern_weight
+                
+                # 如果是高級形態（頭肩頂、黃昏十字星等），給予額外信心度加成
+                high_priority_patterns = ['頭肩頂', '黃昏十字星', '黃昏之星', '早晨之星', '早晨十字星']
+                if primary_pattern.pattern_name in high_priority_patterns:
+                    confidence_boost = 0.15  # 15%信心度加成
+                    primary_timeframe = tf
+                
+                # 收集價位信息
+                entry_prices.append(primary_pattern.entry_price)
+                stop_losses.append(primary_pattern.stop_loss)
+                take_profits.append(primary_pattern.take_profit)
+            
+            # 2. 技術指標分析（輔助確認）
+            indicator_signal = signals.get('indicators', {})
+            if indicator_signal:
+                indicator_weight = self.analysis_priority['technical_indicators'] * tf_weight
+                
+                if indicator_signal.get('overall_signal') == 'BUY':
+                    total_bullish_score += indicator_signal.get('confidence', 0.5) * indicator_weight
+                elif indicator_signal.get('overall_signal') == 'SELL':
+                    total_bearish_score += indicator_signal.get('confidence', 0.5) * indicator_weight
+            
+            total_weight += tf_weight
+        
+        # 標準化得分
+        if total_weight > 0:
+            total_bullish_score /= total_weight
+            total_bearish_score /= total_weight
+        
+        # 決定最終信號
+        signal_type = None
+        confidence = 0.0
+        
+        if total_bullish_score > total_bearish_score and total_bullish_score > 0.6:
+            signal_type = SignalType.LONG
+            confidence = total_bullish_score + confidence_boost
+        elif total_bearish_score > total_bullish_score and total_bearish_score > 0.6:
+            signal_type = SignalType.SHORT
+            confidence = total_bearish_score + confidence_boost
+        else:
+            signal_type = SignalType.HOLD
+            confidence = max(total_bullish_score, total_bearish_score)
+        
+        # 確保信心度不超過1.0
+        confidence = min(confidence, 0.98)
+        
+        # 如果沒有足夠的信號強度，返回None
+        if confidence < 0.6:
+            return None
+        
+        # 計算進場參數
+        if entry_prices:
+            avg_entry = np.mean(entry_prices)
+            avg_stop = np.mean(stop_losses) 
+            avg_target = np.mean(take_profits)
+        else:
+            # 如果沒有形態信號，使用技術指標的默認設置
+            current_price = list(timeframe_signals.values())[0]['price']
+            if signal_type == SignalType.LONG:
+                avg_entry = current_price * 1.002
+                avg_stop = current_price * 0.96  # 4%止損
+                avg_target = current_price * 1.12  # 12%獲利
+            else:
+                avg_entry = current_price * 0.998
+                avg_stop = current_price * 1.04  # 4%止損
+                avg_target = current_price * 0.88  # 12%獲利
+        
+        # 計算風險報酬比
+        risk_reward = abs(avg_target - avg_entry) / abs(avg_stop - avg_entry) if avg_stop != avg_entry else 1.0
+        
+        # 生成推理說明
+        reasoning_parts = []
+        if primary_pattern:
+            reasoning_parts.append(f"檢測到{primary_pattern.pattern_name}形態(信心度:{primary_pattern.confidence:.2f})")
+        
+        if primary_timeframe:
+            reasoning_parts.append(f"主要信號來自{primary_timeframe}時間框架")
+        
+        reasoning_parts.append(f"多時間框架綜合分析結果")
+        
+        return TradeSignal(
+            symbol=symbol,
+            timeframe=primary_timeframe or '1d',
+            signal_type=signal_type,
+            entry_price=avg_entry,
+            stop_loss=avg_stop,
+            take_profit=avg_target,
+            risk_reward_ratio=risk_reward,
+            confidence=confidence,
+            signal_strength=confidence,
+            reasoning=' | '.join(reasoning_parts),
+            indicators_used={'pattern_analysis': True, 'multi_timeframe': True},
+            expires_at=datetime.now() + timedelta(hours=24)
+        )
+
+    async def analyze_symbol(self, symbol: str, timeframe: str) -> Optional[TradeSignal]:
         
         # 計算綜合信號強度
         signal_scores = self._calculate_signal_scores(indicators, multi_timeframe_signals)
@@ -132,8 +286,8 @@ class StrategyEngine:
         long_score = signal_scores['long_score']
         short_score = signal_scores['short_score']
         
-        # 信號閾值 (需要足夠強的信號才觸發)
-        signal_threshold = 60
+        # 信號閾值 (降低閾值，更容易觸發信號)
+        signal_threshold = 40  # 從 60 降低到 40
         
         if long_score >= signal_threshold and long_score > short_score:
             return await self._create_long_signal(
@@ -146,46 +300,170 @@ class StrategyEngine:
         
         return None
     
+    def _detect_market_panic(self, indicators: Dict[str, IndicatorResult]) -> float:
+        """檢測市場恐慌情況，返回恐慌倍數"""
+        panic_score = 0
+        multiplier = 1.0
+        
+        # RSI 急速下跌
+        if 'rsi' in indicators:
+            rsi_val = indicators['rsi'].value
+            if rsi_val < 25:  # 極度超賣
+                panic_score += 3
+            elif rsi_val < 30:  # 超賣
+                panic_score += 2
+        
+        # MACD 急轉直下
+        if 'macd' in indicators:
+            macd = indicators['macd']
+            # 假設我們有歷史 MACD 數據比較
+            if macd.signal == "SELL" and macd.strength > 0.7:
+                panic_score += 2
+        
+        # 布林帶下穿
+        if 'bollinger_bands' in indicators:
+            bb = indicators['bollinger_bands']
+            if bb.signal == "SELL" and bb.strength > 0.6:
+                panic_score += 2
+        
+        # 成交量放大確認
+        if 'volume_sma' in indicators:
+            vol = indicators['volume_sma']
+            if vol.strength > 0.7:  # 成交量放大
+                panic_score += 1
+        
+        # 計算恐慌倍數
+        if panic_score >= 6:
+            multiplier = 1.5  # 高度恐慌
+        elif panic_score >= 4:
+            multiplier = 1.3  # 中度恐慌
+        elif panic_score >= 2:
+            multiplier = 1.1  # 輕微恐慌
+        
+        return multiplier
+    
     def _calculate_signal_scores(
         self,
         indicators: Dict[str, IndicatorResult],
         multi_timeframe_signals: Dict
     ) -> Dict[str, float]:
-        """計算綜合信號評分"""
+        """計算綜合信號評分 - 優化權重配置"""
         
         long_score = 0
         short_score = 0
         
-        # 權重配置
+        # 🔥 重新優化的權重配置 - 更敏感的做空信號
         weights = {
-            'trend': 0.3,      # 趨勢指標權重
-            'momentum': 0.25,   # 動量指標權重
-            'volatility': 0.2,  # 波動性指標權重
-            'volume': 0.15,     # 成交量指標權重
-            'support_resistance': 0.1  # 支撐阻力權重
+            'trend': 0.35,      # 趨勢指標權重提高
+            'momentum': 0.30,   # 動量指標權重提高（RSI過熱很重要）
+            'volatility': 0.20,  # 波動性指標（布林帶突破）
+            'volume': 0.10,     # 成交量確認
+            'support_resistance': 0.05  # 支撐阻力輔助
         }
         
-        # 趨勢指標評分
-        trend_indicators = ['EMA', 'MACD', 'ICHIMOKU']
-        trend_long, trend_short = self._score_indicators(indicators, trend_indicators)
+        # 🎯 增強趨勢判斷
+        trend_long_total = 0
+        trend_short_total = 0
+        trend_count = 0
         
-        # 動量指標評分
-        momentum_indicators = ['RSI', 'STOCH', 'WILLR']
-        momentum_long, momentum_short = self._score_indicators(indicators, momentum_indicators)
+        # EMA 趨勢
+        if 'ema' in indicators:
+            ema = indicators['ema']
+            if ema.signal == "BUY":
+                trend_long_total += ema.strength * 100
+            elif ema.signal == "SELL":
+                trend_short_total += ema.strength * 100
+            trend_count += 1
         
-        # 波動性指標評分
-        volatility_indicators = ['BBANDS', 'ATR']
-        vol_long, vol_short = self._score_indicators(indicators, volatility_indicators)
+        # MACD 動量
+        if 'macd' in indicators:
+            macd = indicators['macd']
+            if macd.signal == "BUY":
+                trend_long_total += macd.strength * 100
+            elif macd.signal == "SELL":
+                trend_short_total += macd.strength * 100
+            trend_count += 1
         
-        # 成交量指標評分
-        volume_indicators = ['OBV', 'VWAP']
-        volume_long, volume_short = self._score_indicators(indicators, volume_indicators)
+        trend_long = trend_long_total / max(trend_count, 1)
+        trend_short = trend_short_total / max(trend_count, 1)
         
-        # 支撐阻力評分
-        sr_indicators = ['PIVOT', 'FIBONACCI']
-        sr_long, sr_short = self._score_indicators(indicators, sr_indicators)
+        # 🚀 增強動量判斷 - 對超買超賣更敏感
+        momentum_long_total = 0
+        momentum_short_total = 0
+        momentum_count = 0
         
-        # 計算加權總分
+        # RSI 超買超賣
+        if 'rsi' in indicators:
+            rsi = indicators['rsi']
+            rsi_val = rsi.value
+            
+            # 🔥 更激進的 RSI 閾值
+            if rsi_val >= 65:  # 降低超買閾值
+                momentum_short_total += min((rsi_val - 65) / 35 * 100, 100)
+            elif rsi_val <= 35:  # 提高超賣閾值
+                momentum_long_total += min((35 - rsi_val) / 35 * 100, 100)
+            momentum_count += 1
+        
+        # Stochastic
+        if 'stochastic' in indicators:
+            stoch = indicators['stochastic']
+            if stoch.signal == "BUY":
+                momentum_long_total += stoch.strength * 100
+            elif stoch.signal == "SELL":
+                momentum_short_total += stoch.strength * 100
+            momentum_count += 1
+        
+        # Williams %R
+        if 'williams_r' in indicators:
+            willr = indicators['williams_r']
+            if willr.signal == "BUY":
+                momentum_long_total += willr.strength * 100
+            elif willr.signal == "SELL":
+                momentum_short_total += willr.strength * 100
+            momentum_count += 1
+        
+        momentum_long = momentum_long_total / max(momentum_count, 1)
+        momentum_short = momentum_short_total / max(momentum_count, 1)
+        
+        # 🎯 波動性指標
+        volatility_long_total = 0
+        volatility_short_total = 0
+        volatility_count = 0
+        
+        if 'bollinger_bands' in indicators:
+            bb = indicators['bollinger_bands']
+            if bb.signal == "BUY":
+                volatility_long_total += bb.strength * 100
+            elif bb.signal == "SELL":
+                volatility_short_total += bb.strength * 100
+            volatility_count += 1
+        
+        vol_long = volatility_long_total / max(volatility_count, 1)
+        vol_short = volatility_short_total / max(volatility_count, 1)
+        
+        # 🔊 成交量確認
+        volume_long = 0
+        volume_short = 0
+        
+        if 'volume_sma' in indicators:
+            vol_sma = indicators['volume_sma']
+            if vol_sma.signal == "BUY":
+                volume_long = vol_sma.strength * 100
+            elif vol_sma.signal == "SELL":
+                volume_short = vol_sma.strength * 100
+        
+        # 📊 支撐阻力
+        sr_long = 0
+        sr_short = 0
+        
+        if 'support_resistance' in indicators:
+            sr = indicators['support_resistance']
+            if sr.signal == "BUY":
+                sr_long = sr.strength * 100
+            elif sr.signal == "SELL":
+                sr_short = sr.strength * 100
+        
+        # 🎯 計算加權總分
         long_score = (
             trend_long * weights['trend'] +
             momentum_long * weights['momentum'] +
@@ -202,18 +480,24 @@ class StrategyEngine:
             sr_short * weights['support_resistance']
         )
         
-        # 多重時間框架確認加分
-        if multi_timeframe_signals.get('higher_tf_bullish', False):
-            long_score += 10
-        if multi_timeframe_signals.get('higher_tf_bearish', False):
-            short_score += 10
+        # 🚨 市場恐慌加成 - 檢測急跌
+        panic_multiplier = self._detect_market_panic(indicators)
+        if panic_multiplier > 1:
+            short_score *= panic_multiplier
+            logger.info(f"市場恐慌檢測，做空信號加強 {panic_multiplier:.2f}x")
         
-        # 市場結構確認
+        # 🔥 多重時間框架確認加分
+        if multi_timeframe_signals.get('higher_tf_bullish', False):
+            long_score += 15
+        if multi_timeframe_signals.get('higher_tf_bearish', False):
+            short_score += 20  # 給做空更多加分
+        
+        # 🎯 市場結構確認
         market_structure = self._analyze_market_structure(indicators)
         if market_structure == 'BULLISH':
-            long_score += 15
+            long_score += 10
         elif market_structure == 'BEARISH':
-            short_score += 15
+            short_score += 15  # 空頭結構給更多分數
         
         return {
             'long_score': min(long_score, 100),
@@ -222,7 +506,8 @@ class StrategyEngine:
             'trend_short': trend_short,
             'momentum_long': momentum_long,
             'momentum_short': momentum_short,
-            'market_structure': market_structure
+            'market_structure': market_structure,
+            'panic_multiplier': panic_multiplier
         }
     
     def _score_indicators(

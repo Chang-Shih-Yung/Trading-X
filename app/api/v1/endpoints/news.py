@@ -179,44 +179,80 @@ async def fetch_cryptopanic_news():
         return []
 
 async def fetch_blockchain_news():
-    """獲取區塊鏈相關新聞"""
+    """獲取區塊鏈相關新聞 - 使用真實新聞源"""
     try:
-        # 使用 JSONPlaceholder 作為示例 (實際可替換為真實API)
-        api_url = "https://jsonplaceholder.typicode.com/posts"
+        # 使用 CoinGecko 新聞API (免費)
+        api_url = "https://api.coingecko.com/api/v3/news"
         
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(api_url)
             
             if response.status_code == 200:
-                posts = response.json()
+                data = response.json()
                 news_list = []
                 
-                # 將通用posts轉換為加密貨幣新聞格式
-                crypto_keywords = ["Bitcoin", "Ethereum", "Blockchain", "DeFi", "NFT"]
-                
-                for i, post in enumerate(posts[:10]):
-                    keyword = crypto_keywords[i % len(crypto_keywords)]
+                for item in data.get("data", [])[:5]:  # 取前5則新聞
                     news_list.append({
-                        "id": f"bc_{post['id']}",
-                        "title": f"{keyword} {post['title'][:50]}...",
-                        "summary": post['body'][:150] + "...",
-                        "url": f"https://blockchain-news.com/article/{post['id']}",
-                        "source": "Blockchain News",
-                        "publishedAt": (datetime.now() - timedelta(hours=i*2)).isoformat(),
+                        "id": f"cg_{item.get('id', 'unknown')}",
+                        "title": item.get("title", "無標題")[:100],
+                        "summary": item.get("description", "暫無摘要")[:200] + "...",
+                        "url": item.get("url", "#"),
+                        "source": item.get("author", "CoinGecko"),
+                        "publishedAt": item.get("published_at", datetime.now().isoformat()),
+                        "category": "crypto",
+                        "image": item.get("thumb_2x")
+                    })
+                
+                return news_list
+            
+        # 如果API失敗，返回備用真實新聞
+        return await fetch_backup_real_news()
+        
+    except Exception as e:
+        logger.error(f"CoinGecko 新聞獲取失敗: {e}")
+        return await fetch_backup_real_news()
+
+async def fetch_backup_real_news():
+    """備用真實新聞源"""
+    try:
+        # 使用 CryptoPanic 公開API
+        api_url = "https://cryptopanic.com/api/posts/"
+        params = {"public": "true", "kind": "news"}
+        
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(api_url, params=params)
+            
+            if response.status_code == 200:
+                data = response.json()
+                news_list = []
+                
+                for item in data.get("results", [])[:5]:
+                    # 確保URL是有效的
+                    url = item.get("url", "")
+                    if not url or url == "#":
+                        url = f"https://cryptopanic.com/news/{item.get('id', '')}"
+                    
+                    news_list.append({
+                        "id": f"cp_backup_{item.get('id')}",
+                        "title": item.get("title", "")[:100],
+                        "summary": item.get("title", "")[:150] + "...",
+                        "url": url,
+                        "source": "CryptoPanic",
+                        "publishedAt": item.get("published_at", datetime.now().isoformat()),
                         "category": "crypto",
                         "image": None
                     })
                 
                 return news_list
-            
+        
         return []
         
     except Exception as e:
-        logger.error(f"Blockchain 新聞獲取失敗: {e}")
+        logger.error(f"備用新聞源失敗: {e}")
         return []
 
 def get_mock_news():
-    """獲取模擬新聞數據"""
+    """獲取模擬新聞數據 - 使用真實網站URL"""
     current_time = datetime.now()
     
     mock_news = [
@@ -224,7 +260,7 @@ def get_mock_news():
             "id": "mock_1",
             "title": "Bitcoin 突破 $45,000 關鍵阻力位，分析師看好後市",
             "summary": "比特幣在機構投資者持續流入的推動下，成功突破 $45,000 的關鍵技術阻力位。技術分析師表示，下一個目標價位可能在 $48,000 至 $50,000 之間...",
-            "url": "https://example.com/news/bitcoin-45k",
+            "url": "https://www.coindesk.com/markets/",
             "source": "CryptoDaily",
             "publishedAt": current_time.isoformat(),
             "category": "crypto",
@@ -234,7 +270,7 @@ def get_mock_news():
             "id": "mock_2",
             "title": "以太坊 London 硬分叉後，ETH 銷毀量創歷史新高",
             "summary": "自 London 硬分叉實施 EIP-1559 以來，以太坊網路已銷毀超過 300 萬枚 ETH，總價值超過 $75 億美元。這一機制有效減少了 ETH 的通脹率...",
-            "url": "https://example.com/news/eth-burn",
+            "url": "https://ethereum.org/en/",
             "source": "ETH News",
             "publishedAt": (current_time - timedelta(hours=2)).isoformat(),
             "category": "crypto",
@@ -244,7 +280,7 @@ def get_mock_news():
             "id": "mock_3",
             "title": "美國 SEC 批准首支比特幣現貨 ETF",
             "summary": "美國證券交易委員會正式批准了首支比特幣現貨 ETF，標誌著加密貨幣市場進入新的里程碑。預計將帶來大量機構資金流入...",
-            "url": "https://example.com/news/btc-etf",
+            "url": "https://www.sec.gov/",
             "source": "Financial Times",
             "publishedAt": (current_time - timedelta(hours=4)).isoformat(),
             "category": "regulation",
@@ -254,7 +290,7 @@ def get_mock_news():
             "id": "mock_4",
             "title": "DeFi 鎖倉總價值突破 $1000 億美元",
             "summary": "去中心化金融 (DeFi) 協議的總鎖倉價值 (TVL) 再次突破 $1000 億美元大關，顯示 DeFi 生態系統的持續成長和用戶採用率提升...",
-            "url": "https://example.com/news/defi-tvl",
+            "url": "https://defipulse.com/",
             "source": "DeFi Pulse",
             "publishedAt": (current_time - timedelta(hours=6)).isoformat(),
             "category": "defi",
@@ -264,7 +300,7 @@ def get_mock_news():
             "id": "mock_5",
             "title": "NFT 市場交易量回升，藝術類項目表現突出",
             "summary": "本週 NFT 市場交易量較上週增長 35%，其中藝術類和遊戲類 NFT 項目表現最為突出。分析師認為市場正在從低迷中復甦...",
-            "url": "https://example.com/news/nft-recovery",
+            "url": "https://opensea.io/",
             "source": "NFT Today",
             "publishedAt": (current_time - timedelta(hours=8)).isoformat(),
             "category": "nft",
@@ -487,6 +523,8 @@ async def analyze_sentiment(text: str):
     except Exception as e:
         logger.error(f"情緒分析失敗: {e}")
         raise HTTPException(status_code=500, detail="情緒分析失敗")
+
+
 
 # 可以添加更多免費API整合
 async def fetch_coinmarketcap_news():

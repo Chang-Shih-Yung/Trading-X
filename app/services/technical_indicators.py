@@ -66,26 +66,37 @@ class TechnicalIndicatorsService:
             type=IndicatorType.TREND
         )
         
-        # MACD 指標
+        # MACD 指標 - 增強敏感度
         macd_data = ta.macd(df['close'], fast=12, slow=26, signal=9)
         if macd_data is not None and not macd_data.empty:
             macd_line = macd_data.iloc[-1, 0] if not pd.isna(macd_data.iloc[-1, 0]) else 0
             signal_line = macd_data.iloc[-1, 1] if not pd.isna(macd_data.iloc[-1, 1]) else 0
             histogram = macd_data.iloc[-1, 2] if not pd.isna(macd_data.iloc[-1, 2]) else 0
             
+            # 🚀 更敏感的 MACD 判斷
             if macd_line > signal_line and histogram > 0:
                 macd_signal = "BUY"
-                macd_strength = min(abs(histogram) * 10, 1.0)
+                # 增強信號強度計算
+                macd_strength = min(abs(histogram) * 20 + 0.3, 1.0)
             elif macd_line < signal_line and histogram < 0:
                 macd_signal = "SELL"
-                macd_strength = min(abs(histogram) * 10, 1.0)
+                # 對做空信號給予更高強度
+                macd_strength = min(abs(histogram) * 25 + 0.4, 1.0)
             else:
-                macd_signal = "NEUTRAL"
-                macd_strength = 0.2
+                # 即使沒有明確交叉，也根據位置給予方向性
+                if macd_line > 0 and signal_line > 0:
+                    macd_signal = "BUY"
+                    macd_strength = 0.3
+                elif macd_line < 0 and signal_line < 0:
+                    macd_signal = "SELL"
+                    macd_strength = 0.4  # 空頭環境給更高權重
+                else:
+                    macd_signal = "NEUTRAL"
+                    macd_strength = 0.1
         else:
             macd_line = signal_line = histogram = 0
             macd_signal = "NEUTRAL"
-            macd_strength = 0.2
+            macd_strength = 0.1
             
         results['macd'] = IndicatorResult(
             value=macd_line,
@@ -104,19 +115,26 @@ class TechnicalIndicatorsService:
         
         results = {}
         
-        # RSI 指標
+        # RSI 指標 - 更敏感的超買超賣設定
         rsi = ta.rsi(df['close'], length=14)
         rsi_val = rsi.iloc[-1] if not pd.isna(rsi.iloc[-1]) else 50
         
-        if rsi_val > 70:
+        # 🔥 更激進的 RSI 閾值設定
+        if rsi_val > 65:  # 降低超買閾值從 70 到 65
             rsi_signal = "SELL"
-            rsi_strength = min((rsi_val - 70) / 30, 1.0)
-        elif rsi_val < 30:
+            rsi_strength = min((rsi_val - 65) / 35, 1.0)  # 調整計算公式
+        elif rsi_val < 35:  # 提高超賣閾值從 30 到 35
             rsi_signal = "BUY"
-            rsi_strength = min((30 - rsi_val) / 30, 1.0)
+            rsi_strength = min((35 - rsi_val) / 35, 1.0)  # 調整計算公式
         else:
             rsi_signal = "NEUTRAL"
-            rsi_strength = 0.2
+            # 即使在中性區間也給予一定的方向性
+            if rsi_val > 55:
+                rsi_strength = 0.3  # 偏向超買
+            elif rsi_val < 45:
+                rsi_strength = 0.3  # 偏向超賣
+            else:
+                rsi_strength = 0.1
             
         results['rsi'] = IndicatorResult(
             value=rsi_val,

@@ -15,6 +15,11 @@ const router = createRouter({
             component: () => import('@/views/Signals.vue')
         },
         {
+            path: '/signal-history',
+            name: 'SignalHistory',
+            component: () => import('@/views/SignalHistory.vue')
+        },
+        {
             path: '/market',
             name: 'Market',
             component: () => import('@/views/Market.vue')

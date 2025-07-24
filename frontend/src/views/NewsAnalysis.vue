@@ -166,8 +166,16 @@
         <div v-else class="space-y-6">
           <div v-for="article in filteredNews" :key="article.id" class="border-b pb-4 last:border-b-0">
             <div class="flex justify-between items-start mb-2">
-              <h3 class="text-lg font-semibold text-gray-900 hover:text-blue-600 cursor-pointer flex-1" @click="openArticle(article.url)">
+              <h3 
+                class="text-lg font-semibold flex-1 cursor-pointer hover:text-blue-600 transition-colors"
+                :class="getUrlStatusClass(article.url)"
+                @click="openArticle(article.url, article)"
+                :title="getUrlStatusText(article.url)"
+              >
+                <span v-if="article.translated" class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded mr-2">中文</span>
                 {{ article.title }}
+                <span v-if="!isValidUrl(article.url)" class="text-xs text-gray-400 ml-2">📄</span>
+                <span v-else class="text-xs text-green-500 ml-2">🔗</span>
               </h3>
               <div class="flex items-center space-x-2 ml-4">
                 <span class="text-xs px-2 py-1 rounded-full" :class="getCategoryColor(article.category)">
@@ -176,10 +184,36 @@
                 <img v-if="article.image" :src="article.image" alt="新聞圖片" class="w-12 h-12 rounded object-cover">
               </div>
             </div>
-            <p class="text-gray-600 mb-2">{{ article.summary }}</p>
-            <div class="flex justify-between items-center text-sm text-gray-500">
-              <span class="font-medium">{{ article.source }}</span>
-              <span>{{ formatDate(article.publishedAt) }}</span>
+            <p class="text-gray-600 mb-3">{{ article.summary }}</p>
+            <div class="flex justify-between items-center text-sm">
+              <div class="flex items-center space-x-2 text-gray-500">
+                <span class="font-medium">{{ article.source }}</span>
+                <span>{{ formatDate(article.publishedAt) }}</span>
+              </div>
+              <div class="flex items-center space-x-2">
+                <button 
+                  @click="translateArticle(article)" 
+                  :disabled="loading.translate === article.id"
+                  class="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:opacity-50 transition-colors"
+                >
+                  <span v-if="loading.translate === article.id">翻譯中...</span>
+                  <span v-else-if="article.translated">還原</span>
+                  <span v-else>🈚️ 中文</span>
+                </button>
+                <button 
+                  @click="copyNewsLink(article)" 
+                  class="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                >
+                  📋 複製連結
+                </button>
+                <button 
+                  v-if="isValidUrl(article.url)"
+                  @click="openArticleSafely(article.url, article.title)"
+                  class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
+                >
+                  🔗 開啟
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -202,6 +236,9 @@ interface NewsArticle {
   category: string
   sentiment?: 'positive' | 'negative' | 'neutral'
   image?: string
+  translated?: boolean
+  original_title?: string
+  original_summary?: string
 }
 
 interface OnchainMetric {
@@ -227,7 +264,8 @@ const loading = reactive({
   news: false,
   aiSummary: false,
   onchain: false,
-  economic: false
+  economic: false,
+  translate: ''
 })
 
 const aiSummary = reactive({
@@ -351,9 +389,129 @@ const filterNews = () => {
   // 篩選邏輯已在 computed 中處理
 }
 
-const openArticle = (url: string) => {
-  if (url !== '#') {
-    window.open(url, '_blank')
+const openArticle = (url: string, article?: NewsArticle) => {
+  // 檢查URL有效性
+  if (!url || url === '#' || url === '' || url.includes('example.com')) {
+    // 如果是無效URL，顯示提示並返回
+    alert('此新聞暫時無法跳轉，請稍後再試')
+    return
+  }
+  
+  // 檢查是否為有效的HTTP/HTTPS URL
+  try {
+    const urlObj = new URL(url)
+    if (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') {
+      // 在新標籤頁中安全地開啟連結
+      const newWindow = window.open(url, '_blank', 'noopener,noreferrer')
+      if (!newWindow) {
+        // 如果彈出視窗被阻擋
+        const shouldCopy = confirm(`彈出視窗被瀏覽器阻擋。\n\n是否要複製連結？\n${url}`)
+        if (shouldCopy) {
+          copyToClipboard(url, article?.title || '新聞連結')
+        }
+      }
+    } else {
+      alert('無效的網址格式')
+    }
+  } catch (error) {
+    // URL格式錯誤
+    console.error('URL解析錯誤:', error)
+    alert('網址格式有誤，無法開啟')
+  }
+}
+
+const openArticleSafely = (url: string, title: string) => {
+  try {
+    const newWindow = window.open(url, '_blank', 'noopener,noreferrer')
+    if (!newWindow) {
+      const shouldCopy = confirm(`彈出視窗被阻擋，是否複製連結？\n\n標題：${title}\n連結：${url}`)
+      if (shouldCopy) {
+        copyToClipboard(url, title)
+      }
+    }
+  } catch (error) {
+    console.error('開啟連結失敗:', error)
+    copyToClipboard(url, title)
+  }
+}
+
+const copyToClipboard = async (text: string, title?: string) => {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text)
+      alert(`✅ 連結已複製到剪貼簿！\n\n${title || '新聞連結'}`)
+    } else {
+      // 降級方案：使用舊方法
+      const textArea = document.createElement('textarea')
+      textArea.value = text
+      textArea.style.position = 'fixed'
+      textArea.style.left = '-999999px'
+      textArea.style.top = '-999999px'
+      document.body.appendChild(textArea)
+      textArea.focus()
+      textArea.select()
+      
+      try {
+        document.execCommand('copy')
+        alert(`✅ 連結已複製到剪貼簿！\n\n${title || '新聞連結'}`)
+      } catch (err) {
+        console.error('複製失敗:', err)
+        alert(`❌ 複製失敗，請手動複製：\n\n${text}`)
+      } finally {
+        document.body.removeChild(textArea)
+      }
+    }
+  } catch (error) {
+    console.error('複製到剪貼簿失敗:', error)
+    alert(`❌ 複製失敗，請手動複製：\n\n${text}`)
+  }
+}
+
+const copyNewsLink = async (article: NewsArticle) => {
+  await copyToClipboard(article.url, article.title)
+}
+
+const translateArticle = async (article: NewsArticle) => {
+  if (article.translated) {
+    // 還原到原始內容
+    article.title = article.original_title || article.title
+    article.summary = article.original_summary || article.summary
+    article.translated = false
+    return
+  }
+  
+  loading.translate = article.id
+  
+  try {
+    const response = await axios.post(`/api/v1/news/translate`, null, {
+      params: {
+        news_id: article.id,
+        target_language: 'zh-TW'
+      }
+    })
+    
+    // 保存原始內容
+    if (!article.original_title) {
+      article.original_title = article.title
+      article.original_summary = article.summary
+    }
+    
+    // 更新為翻譯內容
+    article.title = response.data.title
+    article.summary = response.data.summary
+    article.translated = true
+    
+    // 在新聞列表中更新該文章
+    const index = news.value.findIndex(n => n.id === article.id)
+    if (index !== -1) {
+      news.value[index] = { ...article }
+    }
+    
+  } catch (error) {
+    console.error('翻譯失敗:', error)
+    alert('翻譯服務暫時不可用，請稍後再試')
+  } finally {
+    loading.translate = ''
   }
 }
 
@@ -384,6 +542,26 @@ const getCategoryText = (category: string) => {
 const formatDate = (dateString: string) => {
   const date = new Date(dateString)
   return date.toLocaleString('zh-TW')
+}
+
+const isValidUrl = (url: string) => {
+  if (!url || url === '#' || url === '' || url.includes('example.com')) {
+    return false
+  }
+  try {
+    const urlObj = new URL(url)
+    return urlObj.protocol === 'http:' || urlObj.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+const getUrlStatusClass = (url: string) => {
+  return isValidUrl(url) ? 'text-gray-900' : 'text-gray-500'
+}
+
+const getUrlStatusText = (url: string) => {
+  return isValidUrl(url) ? '點擊查看完整新聞' : '預覽模式 - 暫無外部連結'
 }
 
 onMounted(() => {

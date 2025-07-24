@@ -76,8 +76,10 @@ class MarketDataService:
         if df.empty:
             return
         
-        async with AsyncSessionLocal() as session:
-            try:
+        try:
+            async with AsyncSessionLocal() as session:
+                # 批量插入以提高性能
+                market_data_objects = []
                 for _, row in df.iterrows():
                     market_data = MarketData(
                         symbol=row['symbol'],
@@ -89,14 +91,16 @@ class MarketDataService:
                         close=float(row['close']),
                         volume=float(row['volume'])
                     )
-                    session.add(market_data)
+                    market_data_objects.append(market_data)
                 
+                # 批量添加
+                session.add_all(market_data_objects)
                 await session.commit()
-                logger.info(f"儲存 {len(df)} 筆市場數據")
+                logger.info(f"成功儲存 {len(df)} 筆市場數據")
                 
-            except Exception as e:
-                await session.rollback()
-                logger.error(f"儲存市場數據失敗: {e}")
+        except Exception as e:
+            logger.error(f"儲存市場數據失敗: {e}")
+            # 不要重新拋出異常，避免中斷主流程
     
     async def get_latest_price(self, symbol: str, exchange: str = "binance") -> Optional[float]:
         """獲取最新價格"""
@@ -244,6 +248,14 @@ class MarketDataService:
                 if not task.done():
                     task.cancel()
         
+        # 安全地關閉交易所連接
         for exchange in self.exchanges.values():
-            await exchange.close()
+            try:
+                if hasattr(exchange, 'close'):
+                    await exchange.close()
+                else:
+                    logger.warning(f"交易所 {exchange.id} 不支援 close() 方法")
+            except Exception as e:
+                logger.warning(f"關閉交易所 {exchange.id} 時發生錯誤: {e}")
+        
         logger.info("市場數據服務已停止")
