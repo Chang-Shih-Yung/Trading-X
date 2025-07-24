@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>短線信號分析測試</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .signal-card {
+      border: 1px solid #ddd;
+      margin: 10px 0;
+      padding: 15px;
+      border-radius: 8px;
+    }
+
+    .urgent {
+      border-left: 4px solid #ef4444;
+    }
+
+    .high {
+      border-left: 4px solid #f97316;
+    }
+
+    .medium {
+      border-left: 4px solid #eab308;
+    }
+
+    .progress-bar {
+      height: 6px;
+      background-color: #e5e7eb;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      transition: width 0.3s ease;
+    }
+
+    .red {
+      background-color: #ef4444;
+    }
+
+    .orange {
+      background-color: #f97316;
+    }
+
+    .green {
+      background-color: #22c55e;
+    }
+
+    .flex {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      margin: 4px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background-color: #3b82f6;
+      color: white;
+    }
+
+    .btn-secondary {
+      background-color: #6b7280;
+      color: white;
+    }
+
+    h1,
+    h2 {
+      color: #1f2937;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: #f3f4f6;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .stat-number {
+      font-size: 24px;
+      font-weight: bold;
+      color: #1f2937;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      color: #6b7280;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <div class="container">
+      <h1>⚡ 短線信號分析中心測試</h1>
+
+      <!-- 統計區域 -->
+      <div class="stats">
+        <div class="stat-card">
+          <div class="stat-number">{{ stats.totalSignals }}</div>
+          <div class="stat-label">短線信號</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">{{ stats.avgConfidence }}%</div>
+          <div class="stat-label">平均信心度</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">{{ stats.urgentCount }}</div>
+          <div class="stat-label">緊急信號</div>
+        </div>
+      </div>
+
+      <!-- 篩選器 -->
+      <div style="margin: 20px 0; padding: 15px; background: #f9fafb; border-radius: 8px;">
+        <label>時間框架:
+          <select v-model="filter.timeframe" @change="updateStats">
+            <option value="all">全部短線</option>
+            <option value="1m">1分鐘</option>
+            <option value="5m">5分鐘</option>
+            <option value="15m">15分鐘</option>
+          </select>
+        </label>
+
+        <label style="margin-left: 20px;">緊急度:
+          <select v-model="filter.urgency" @change="updateStats">
+            <option value="all">全部</option>
+            <option value="urgent">緊急</option>
+            <option value="high">高</option>
+            <option value="medium">中等</option>
+          </select>
+        </label>
+
+        <button class="btn btn-primary" @click="refreshSignals">刷新信號</button>
+      </div>
+
+      <!-- 信號列表 -->
+      <div v-if="filteredSignals.length > 0">
+        <div v-for="signal in filteredSignals" :key="signal.id" :class="['signal-card', signal.urgency_level]">
+          <div class="flex">
+            <div>
+              <h3>{{ signal.symbol }} <span style="color: #059669;">{{ signal.signal_type }}</span></h3>
+              <p>時間框架: {{ signal.primary_timeframe }}</p>
+              <p>進場價: ${{ signal.entry_price?.toFixed(4) }}</p>
+            </div>
+            <div>
+              <div>信心度: {{ Math.round(signal.confidence * 100) }}%</div>
+              <div>緊急度: {{ signal.urgency_level }}</div>
+              <div>剩餘: {{ getValidity(signal).text }}</div>
+            </div>
+          </div>
+
+          <!-- 時效性進度條 -->
+          <div class="progress-bar" style="margin-top: 10px;">
+            <div class="progress-fill" :class="getValidityClass(signal)"
+              :style="{ width: getValidity(signal).percentage + '%' }"></div>
+          </div>
+
+          <div style="margin-top: 10px;">
+            <button class="btn btn-primary" @click="executeQuick(signal)">快速執行</button>
+            <button class="btn btn-secondary" @click="viewDetail(signal)">查看詳情</button>
+          </div>
+        </div>
+      </div>
+
+      <div v-else style="text-align: center; padding: 40px; color: #6b7280;">
+        <h3>目前沒有短線交易信號</h3>
+        <p>系統正在掃描15分鐘內的交易機會</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { createApp, ref, computed, reactive } = Vue
+
+    createApp({
+      setup() {
+        // 模擬短線信號數據
+        const mockSignals = ref([
+          {
+            id: 1,
+            symbol: 'BTC/USDT',
+            signal_type: 'BUY',
+            primary_timeframe: '5m',
+            entry_price: 67850.25,
+            confidence: 0.85,
+            urgency_level: 'urgent',
+            created_at: new Date(Date.now() - 3 * 60 * 1000).toISOString() // 3分鐘前
+          },
+          {
+            id: 2,
+            symbol: 'ETH/USDT',
+            signal_type: 'SELL',
+            primary_timeframe: '1m',
+            entry_price: 3420.75,
+            confidence: 0.92,
+            urgency_level: 'high',
+            created_at: new Date(Date.now() - 1 * 60 * 1000).toISOString() // 1分鐘前
+          },
+          {
+            id: 3,
+            symbol: 'BNB/USDT',
+            signal_type: 'BUY',
+            primary_timeframe: '15m',
+            entry_price: 635.50,
+            confidence: 0.78,
+            urgency_level: 'medium',
+            created_at: new Date(Date.now() - 8 * 60 * 1000).toISOString() // 8分鐘前
+          }
+        ])
+
+        const filter = reactive({
+          timeframe: 'all',
+          urgency: 'all'
+        })
+
+        const stats = reactive({
+          totalSignals: 0,
+          avgConfidence: 0,
+          urgentCount: 0
+        })
+
+        const filteredSignals = computed(() => {
+          let filtered = mockSignals.value
+
+          if (filter.timeframe !== 'all') {
+            filtered = filtered.filter(signal => signal.primary_timeframe === filter.timeframe)
+          }
+
+          if (filter.urgency !== 'all') {
+            filtered = filtered.filter(signal => signal.urgency_level === filter.urgency)
+          }
+
+          return filtered
+        })
+
+        const updateStats = () => {
+          const signals = filteredSignals.value
+          stats.totalSignals = signals.length
+          stats.avgConfidence = signals.length > 0
+            ? Math.round(signals.reduce((sum, signal) => sum + signal.confidence * 100, 0) / signals.length)
+            : 0
+          stats.urgentCount = signals.filter(signal => signal.urgency_level === 'urgent').length
+        }
+
+        const getValidity = (signal) => {
+          const createdTime = new Date(signal.created_at)
+          const now = new Date()
+          const minutesElapsed = (now.getTime() - createdTime.getTime()) / (1000 * 60)
+
+          let validityMinutes = 15
+          if (signal.primary_timeframe === '1m') validityMinutes = 5
+          else if (signal.primary_timeframe === '5m') validityMinutes = 10
+          else if (signal.primary_timeframe === '15m') validityMinutes = 15
+
+          const remainingMinutes = Math.max(0, validityMinutes - minutesElapsed)
+          const percentage = (remainingMinutes / validityMinutes) * 100
+
+          let text = ''
+          if (remainingMinutes > 1) {
+            text = `${Math.round(remainingMinutes)}分鐘`
+          } else if (remainingMinutes > 0) {
+            text = '即將過期'
+          } else {
+            text = '已過期'
+          }
+
+          return { percentage: Math.round(percentage), text }
+        }
+
+        const getValidityClass = (signal) => {
+          const validity = getValidity(signal)
+          if (validity.percentage <= 30) return 'red'
+          if (validity.percentage <= 60) return 'orange'
+          return 'green'
+        }
+
+        const executeQuick = (signal) => {
+          alert(`執行快速交易: ${signal.symbol} ${signal.signal_type}`)
+        }
+
+        const viewDetail = (signal) => {
+          const details = `
+短線信號詳情:
+幣種: ${signal.symbol}
+類型: ${signal.signal_type}
+時間框架: ${signal.primary_timeframe}
+進場價格: $${signal.entry_price?.toFixed(4)}
+信心度: ${Math.round(signal.confidence * 100)}%
+緊急度: ${signal.urgency_level}
+剩餘時效: ${getValidity(signal).text}
+                    `
+          alert(details)
+        }
+
+        const refreshSignals = () => {
+          // 模擬刷新信號
+          updateStats()
+          alert(`短線信號已刷新，發現 ${stats.totalSignals} 個短線交易機會`)
+        }
+
+        // 初始化統計
+        updateStats()
+
+        // 每秒更新時效性
+        setInterval(updateStats, 1000)
+
+        return {
+          mockSignals,
+          filter,
+          stats,
+          filteredSignals,
+          updateStats,
+          getValidity,
+          getValidityClass,
+          executeQuick,
+          viewDetail,
+          refreshSignals
+        }
+      }
+    }).mount('#app')
+  </script>
+</body>
+
+</html>

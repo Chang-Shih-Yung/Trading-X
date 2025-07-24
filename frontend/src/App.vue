@@ -8,13 +8,9 @@
             <span class="text-gray-300 ml-2">進階交易策略系統</span>
           </div>
           <div class="flex items-center space-x-4">
-            <router-link 
-              v-for="item in navigation" 
-              :key="item.name"
-              :to="item.href"
+            <router-link v-for="item in navigation" :key="item.name" :to="item.href"
               class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
-              :class="{'bg-gray-700': $route.path === item.href}"
-            >
+              :class="{ 'bg-gray-700': $route.path === item.href }">
               {{ item.name }}
             </router-link>
           </div>
@@ -34,6 +30,7 @@ import { reactive } from 'vue'
 const navigation = reactive([
   { name: '儀表板', href: '/' },
   { name: '交易信號', href: '/signals' },
+  { name: '信號歷史', href: '/signal-history' },
   { name: '市場數據', href: '/market' },
   { name: '新聞分析', href: '/news' },
   { name: '回測', href: '/backtest' },
