@@ -1,29 +1,74 @@
-# 進階交易策略系統 Trading X
+# 🚀 Trading X - 進階交易策略系統
 
-## 專案概述
+![Trading X](https://via.placeholder.com/800x200/1f2937/ffffff?text=Trading+X+-+Advanced+Trading+Strategy+System)
 
-這是一個完整的進階交易策略系統，整合即時行情數據、多重技術指標分析、AI 策略輔助和自動化交易信號。
+## 📖 專案簡介
 
-## 系統架構
+Trading X 是一個功能完整的加密貨幣交易策略系統，提供實時市場數據分析、技術指標計算、交易信號生成、新聞分析和回測功能。
 
-### 🔍 [1] 資料來源與行情引擎
+### ✨ 主要特色
 
-- ✅ 即時 K 線數據串接（Binance/OKX API）
-- ✅ 歷史行情數據處理（OHLCV）
-- ✅ 時間軸快取系統
-- ✅ 多時間框架支援
+- 🔥 **實時市場數據** - 整合多個交易所 API，提供即時價格和交易數據
+- 📊 **技術分析** - 內建多種技術指標（MA、RSI、MACD、布林帶等）
+- 🎯 **智能信號** - 自動生成買賣信號和風險評估
+- 📰 **新聞分析** - 多源新聞聚合，包含市場情緒分析
+- 🔄 **回測系統** - 歷史數據回測，驗證策略效果
+- 📱 **響應式界面** - 現代化 Web 界面，支援桌機和手機
+- 🚀 **高性能** - 異步處理，支援高併發請求
 
-### 📈 [2] 技術指標計算模組
+## 🛠️ 技術架構
 
-- **核心指標**：
-  - 支撐/壓力點（Pivot Points）
-  - 布林通道（Bollinger Bands）
-  - ATR（Average True Range）
-  - MACD / RSI
-  - EMA/SMA 移動平均
-  - 成交量指標
-  - 斐波那契回調
-  - 一目均衡表
+### 後端技術棧
+
+- **框架**: FastAPI (Python 3.9+)
+- **數據庫**: SQLAlchemy 2.0 + SQLite
+- **API**: RESTful API with automatic OpenAPI documentation
+- **異步**: 完全異步處理，支援高併發
+- **市場數據**: CCXT 整合多家交易所
+- **新聞來源**: CoinTelegraph RSS, CryptoPanic API, 區塊鏈新聞聚合
+
+### 前端技術棧
+
+- **框架**: Vue.js 3 + TypeScript
+- **構建工具**: Vite
+- **樣式**: Tailwind CSS
+- **HTTP 客戶端**: Axios
+- **路由**: Vue Router 4
+- **狀態管理**: Composition API
+
+## 🚀 快速開始
+
+### Windows 用戶
+
+1. 下載專案到本地
+2. 雙擊 `start_all.ps1` 一鍵啟動
+3. 瀏覽器訪問 http://localhost:3000
+
+詳細指南：[Windows 安裝指南](WINDOWS_SETUP_GUIDE.md) | [快速開始](QUICK_START.md)
+
+### macOS/Linux 用戶
+
+```bash
+# 克隆專案
+git clone https://github.com/Chang-Shih-Yung/Trading-X.git
+cd Trading-X
+
+# 安裝後端依賴並啟動
+pip install -r requirements.txt
+python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+# 安裝前端依賴並啟動（新終端）
+cd frontend
+npm install
+npm run dev
+```
+
+- ATR（Average True Range）
+- MACD / RSI
+- EMA/SMA 移動平均
+- 成交量指標
+- 斐波那契回調
+- 一目均衡表
 
 ### 🧠 [3] 盈虧比策略引擎
 
