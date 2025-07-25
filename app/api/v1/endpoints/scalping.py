@@ -5,8 +5,9 @@
 
 from fastapi import APIRouter, HTTPException, Query, Depends, BackgroundTasks
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 import asyncio
+import random
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -91,6 +92,9 @@ async def get_enhanced_scalping_signals(
         # 轉換為響應格式
         signals_data = []
         for signal in enhanced_signals:
+            # 計算信號時效性（後端統一計算）
+            validity_info = _calculate_signal_validity(signal.timeframe, signal.created_at)
+            
             signal_dict = {
                 "id": signal.id,
                 "symbol": signal.symbol,
@@ -125,6 +129,9 @@ async def get_enhanced_scalping_signals(
                 "volatility_level": signal.volatility_level,
                 "atr_adjusted": signal.atr_adjusted,
                 "market_condition_adjusted": signal.market_condition_adjusted,
+                
+                # 時效性信息（後端計算）
+                "validity_info": validity_info,
                 
                 # 相容前端的欄位
                 "is_scalping": True,

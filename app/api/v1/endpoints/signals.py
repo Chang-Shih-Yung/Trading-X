@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import desc, and_, select, func
+from sqlalchemy import desc, and_, select, func, text
 from typing import List, Optional
 from datetime import datetime, timedelta
 from pydantic import BaseModel
@@ -532,6 +532,65 @@ async def get_top_signals(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"獲取頂級信號失敗: {str(e)}")
 
+@router.get("/expired")
+async def get_expired_signals(
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(default=100, description="返回的最大記錄數")
+):
+    """獲取已過期的信號"""
+    try:
+        now = datetime.now()
+        cutoff_time = now - timedelta(hours=24)
+        
+        # 使用原始SQL查詢以避免模型欄位不匹配問題
+        sql = """
+        SELECT 
+            id, symbol, timeframe, signal_type, signal_strength, confidence,
+            entry_price, stop_loss, take_profit, risk_reward_ratio,
+            reasoning, status, created_at, expires_at, indicators_used
+        FROM trading_signals 
+        WHERE status = 'ARCHIVED'
+        ORDER BY created_at DESC 
+        LIMIT :limit
+        """
+        
+        result = await db.execute(text(sql), {"limit": limit})
+        rows = result.fetchall()
+        
+        logger.info(f"找到 {len(rows)} 個過期信號")
+        
+        # 手動構建響應數據
+        response_data = []
+        for row in rows:
+            response_data.append({
+                "id": row[0],
+                "symbol": row[1],
+                "signal_type": row[3],
+                "direction": row[3],  # 使用signal_type作為direction
+                "signal_strength": row[4],
+                "confidence": row[5],
+                "entry_price": row[6],
+                "current_price": row[6],  # 使用entry_price作為current_price
+                "stop_loss": row[7],
+                "take_profit": row[8],
+                "risk_reward_ratio": row[9],
+                "primary_timeframe": row[2],
+                "strategy_name": "傳統技術分析",
+                "reasoning": row[10],
+                "created_at": row[12],
+                "expires_at": row[13],
+                "is_scalping": True,
+                "archive_reason": "expired",
+                "urgency_level": "medium",
+                "key_indicators": row[14] if row[14] else {}
+            })
+        
+        return response_data
+        
+    except Exception as e:
+        logger.error(f"獲取過期信號失敗: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"獲取過期信號失敗: {str(e)}")
+
 @router.get("/{signal_id}", response_model=SignalResponse)
 async def get_signal(
     signal_id: int,
@@ -896,3 +955,71 @@ def _generate_market_advice(
     }
     
     return advice
+
+class ArchiveSignalRequest(BaseModel):
+    """歸檔信號請求模型"""
+    signals: List[dict]
+
+@router.post("/archive-expired")
+async def archive_expired_signals(
+    request: ArchiveSignalRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """接收前端歸檔的過期短線信號"""
+    try:
+        archived_count = 0
+        
+        for signal_data in request.signals:
+            # 使用原始SQL檢查信號是否已存在，避免模型欄位不匹配
+            check_sql = "SELECT id FROM trading_signals WHERE id = :signal_id"
+            existing_result = await db.execute(text(check_sql), {"signal_id": signal_data.get('id')})
+            
+            if existing_result.fetchone():
+                logger.info(f"信號 ID {signal_data.get('id')} 已存在，跳過歸檔")
+                continue
+            
+            # 使用原始SQL插入信號，避免模型欄位不匹配
+            insert_sql = """
+            INSERT INTO trading_signals (
+                id, symbol, timeframe, signal_type, signal_strength, 
+                confidence, entry_price, stop_loss, take_profit, 
+                risk_reward_ratio, reasoning, status, created_at, expires_at, indicators_used
+            ) VALUES (:id, :symbol, :timeframe, :signal_type, :signal_strength, 
+                     :confidence, :entry_price, :stop_loss, :take_profit, 
+                     :risk_reward_ratio, :reasoning, :status, :created_at, :expires_at, :indicators_used)
+            """
+            
+            await db.execute(text(insert_sql), {
+                "id": signal_data.get('id'),
+                "symbol": signal_data.get('symbol'),
+                "timeframe": signal_data.get('primary_timeframe', '15m'),
+                "signal_type": signal_data.get('signal_type'),
+                "signal_strength": signal_data.get('signal_strength', 0.7),
+                "confidence": signal_data.get('confidence'),
+                "entry_price": signal_data.get('entry_price'),
+                "stop_loss": signal_data.get('stop_loss'),
+                "take_profit": signal_data.get('take_profit'),
+                "risk_reward_ratio": signal_data.get('risk_reward_ratio'),
+                "reasoning": signal_data.get('reasoning', '短線信號過期歸檔'),
+                "status": 'ARCHIVED',
+                "created_at": signal_data.get('timestamp', datetime.now().isoformat()),
+                "expires_at": signal_data.get('archived_at', datetime.now().isoformat()),
+                "indicators_used": str(signal_data.get('key_indicators', {}))
+            })
+            archived_count += 1
+            
+            logger.info(f"歸檔短線信號: {signal_data.get('symbol')} {signal_data.get('signal_type')} (ID: {signal_data.get('id')})")
+        
+        await db.commit()
+        
+        logger.info(f"成功歸檔 {archived_count} 個過期短線信號到數據庫")
+        
+        return {
+            "message": f"成功歸檔 {archived_count} 個過期信號",
+            "archived_count": archived_count
+        }
+        
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"歸檔過期信號失敗: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"歸檔過期信號失敗: {str(e)}")

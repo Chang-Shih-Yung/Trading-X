@@ -38,6 +38,7 @@ class TradingSignal(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     symbol = Column(String(20), nullable=False, index=True)
+    timeframe = Column(String(10), nullable=False, index=True)  # 添加timeframe字段以匹配舊表
     signal_type = Column(String(20), nullable=False, index=True)  # LONG, SHORT, SCALPING_LONG, SCALPING_SHORT
     signal_strength = Column(Float, nullable=False)   # 0-1
     confidence = Column(Float, nullable=False)        # 0-1
@@ -58,6 +59,7 @@ class TradingSignal(Base):
     urgency_level = Column(String(20), nullable=True, index=True)  # urgent, high, medium, low
     reasoning = Column(Text, nullable=True)
     key_indicators = Column(JSON, nullable=True)
+    indicators_used = Column(JSON, nullable=True)  # 添加以匹配舊表
     
     # 市場分析相關（新增）
     market_condition = Column(JSON, nullable=True)  # 市場狀況分析
@@ -75,6 +77,7 @@ class TradingSignal(Base):
     market_condition_adjusted = Column(Boolean, default=False)
     
     # 狀態管理
+    status = Column(String(20), nullable=True, index=True)  # 添加status字段以匹配舊表
     is_active = Column(Boolean, default=True, index=True)
     is_scalping = Column(Boolean, default=False, index=True)  # 是否為短線信號
     
