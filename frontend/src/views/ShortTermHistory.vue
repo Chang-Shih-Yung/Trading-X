@@ -886,18 +886,18 @@ const manualRecalculate = () => {
   try {
     // 獲取原始統計
     const originalCounts = {
-      success: savedShortTermHistory.value.filter(s => s.result === 'success').length,
-      failure: savedShortTermHistory.value.filter(s => s.result === 'failure').length,
-      breakeven: savedShortTermHistory.value.filter(s => s.result === 'breakeven').length
+      success: savedShortTermHistory.value.filter(s => s.trade_result === 'success').length,
+      failure: savedShortTermHistory.value.filter(s => s.trade_result === 'failure').length,
+      breakeven: savedShortTermHistory.value.filter(s => s.trade_result === 'breakeven').length
     }
     
     // 重新計算每個信號的結果
     savedShortTermHistory.value.forEach(signal => {
       const newResult = calculateUpdatedTradeResult(signal)
-      const oldResult = signal.result
+      const oldResult = signal.trade_result
       
       if (oldResult !== newResult) {
-        signal.result = newResult
+        signal.trade_result = newResult
         console.log(`📊 ${signal.symbol} 結果變更: ${oldResult} → ${newResult} (利潤: ${signal.profit_percent}%)`)
       }
     })
@@ -907,9 +907,9 @@ const manualRecalculate = () => {
     
     // 獲取新統計
     const newCounts = {
-      success: savedShortTermHistory.value.filter(s => s.result === 'success').length,
-      failure: savedShortTermHistory.value.filter(s => s.result === 'failure').length,
-      breakeven: savedShortTermHistory.value.filter(s => s.result === 'breakeven').length
+      success: savedShortTermHistory.value.filter(s => s.trade_result === 'success').length,
+      failure: savedShortTermHistory.value.filter(s => s.trade_result === 'failure').length,
+      breakeven: savedShortTermHistory.value.filter(s => s.trade_result === 'breakeven').length
     }
     
     // 顯示變更統計
@@ -960,7 +960,7 @@ isLoading.value = true
         
         // 重新計算結果
         const newResult = calculateUpdatedTradeResult(signal)
-        ;(signal as any).result = newResult
+        signal.trade_result = newResult
         
         console.log(`🔧 修正 ${signal.symbol} 做空利潤: ${oldProfit}% -> ${signal.profit_percent}%，結果: ${newResult}`)
         fixedCount++
