@@ -10,6 +10,11 @@ const router = createRouter({
             component: Dashboard
         },
         {
+            path: '/enhanced',
+            name: 'EnhancedDashboard',
+            component: () => import('@/views/EnhancedDashboard.vue')
+        },
+        {
             path: '/signals',
             name: 'Signals',
             component: () => import('@/views/Signals.vue')
@@ -18,6 +23,11 @@ const router = createRouter({
             path: '/signal-history',
             name: 'SignalHistory',
             component: () => import('@/views/SignalHistory.vue')
+        },
+        {
+            path: '/shortterm-history',
+            name: 'ShortTermHistory',
+            component: () => import('@/views/ShortTermHistory.vue')
         },
         {
             path: '/market',

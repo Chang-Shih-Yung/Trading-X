@@ -20,6 +20,23 @@ class SignalStatusEnum(str, Enum):
     TRIGGERED = "TRIGGERED"
     EXPIRED = "EXPIRED"
 
+class MarketTrendEnum(str, Enum):
+    BULL = "BULL"
+    BEAR = "BEAR"
+    NEUTRAL = "NEUTRAL"
+    SIDEWAYS = "SIDEWAYS"
+
+class MarketTrendResponse(BaseModel):
+    symbol: str = Field(..., description="交易對")
+    trend: MarketTrendEnum = Field(..., description="市場趨勢")
+    strength: float = Field(..., ge=0, le=1, description="趨勢強度")
+    duration_days: int = Field(..., description="趨勢持續天數")
+    confidence: float = Field(..., ge=0, le=1, description="判斷信心度")
+    key_levels: Dict[str, float] = Field(..., description="關鍵支撐阻力位")
+    volatility: str = Field(..., description="波動性")
+    momentum: str = Field(..., description="動量")
+    timestamp: datetime = Field(..., description="分析時間")
+
 class SignalBase(BaseModel):
     symbol: str = Field(..., description="交易對")
     timeframe: str = Field(..., description="時間框架")

@@ -23,6 +23,24 @@ class SignalType(Enum):
     CLOSE = "CLOSE"
     HOLD = "HOLD"
 
+class MarketTrend(Enum):
+    """市場趨勢類型"""
+    BULL = "BULL"
+    BEAR = "BEAR"
+    NEUTRAL = "NEUTRAL"
+    SIDEWAYS = "SIDEWAYS"
+
+@dataclass
+class MarketCondition:
+    """市場狀況結構"""
+    trend: MarketTrend
+    strength: float  # 趨勢強度 0-1
+    duration_days: int  # 趨勢持續天數
+    confidence: float  # 判斷信心度 0-1
+    key_levels: Dict[str, float]  # 關鍵支撐阻力位
+    volatility: str  # 高/中/低波動
+    momentum: str  # 強/中/弱動量
+
 @dataclass
 class TradeSignal:
     """交易信號結構"""
@@ -52,6 +70,10 @@ class StrategyEngine:
         self.min_risk_reward = settings.MIN_RISK_REWARD_RATIO
         self.risk_percentage = settings.DEFAULT_RISK_PERCENTAGE
         
+        # 牛熊市趨勢緩存
+        self.market_conditions = {}
+        self.last_trend_analysis = {}
+        
         # 新增：多時間框架權重配置
         self.timeframe_weights = {
             '1w': 0.40,   # 週線權重最高
@@ -64,6 +86,23 @@ class StrategyEngine:
         self.analysis_priority = {
             'candlestick_patterns': 0.60,  # K線形態佔60%權重
             'technical_indicators': 0.40   # 技術指標佔40%權重  
+        }
+        
+        # 牛熊市策略參數調整
+        self.bull_market_params = {
+            'confidence_threshold': 0.65,  # 牛市較低信心度門檻
+            'risk_reward_min': 1.5,        # 牛市較低風險回報比
+            'stop_loss_pct': 0.035,        # 牛市較緊止損 3.5%
+            'take_profit_pct': 0.08,       # 牛市較緊止盈 8%
+            'long_bias': 0.15              # 做多傾向加成
+        }
+        
+        self.bear_market_params = {
+            'confidence_threshold': 0.75,  # 熊市較高信心度門檻
+            'risk_reward_min': 2.5,        # 熊市較高風險回報比
+            'stop_loss_pct': 0.025,        # 熊市較緊止損 2.5%
+            'take_profit_pct': 0.06,       # 熊市較保守止盈 6%
+            'short_bias': 0.15             # 做空傾向加成
         }
         
     async def start_signal_generation(self):
@@ -99,9 +138,203 @@ class StrategyEngine:
                 logger.error(f"策略引擎錯誤: {e}")
                 await asyncio.sleep(60)
     
-    async def multi_timeframe_analysis(self, symbol: str, timeframes: List[str]) -> Optional[TradeSignal]:
-        """多時間框架綜合分析"""
+    async def analyze_market_trend(self, symbol: str) -> MarketCondition:
+        """分析市場趨勢 - 牛熊市判斷"""
         try:
+            # 獲取長期歷史數據進行趨勢分析
+            daily_data = await self.market_service.get_historical_data(symbol, '1d', limit=90)  # 90天數據
+            weekly_data = await self.market_service.get_historical_data(symbol, '1w', limit=26) # 26週數據
+            
+            if daily_data.empty or weekly_data.empty:
+                return MarketCondition(
+                    trend=MarketTrend.NEUTRAL,
+                    strength=0.5,
+                    duration_days=0,
+                    confidence=0.3,
+                    key_levels={},
+                    volatility="中",
+                    momentum="中"
+                )
+            
+            # 1. 價格趨勢分析
+            current_price = daily_data['close'].iloc[-1]
+            ma20 = daily_data['close'].rolling(20).mean().iloc[-1]
+            ma50 = daily_data['close'].rolling(50).mean().iloc[-1]
+            ma200 = weekly_data['close'].rolling(20).mean().iloc[-1] if len(weekly_data) >= 20 else current_price
+            
+            # 2. 動量分析
+            price_change_30d = (current_price - daily_data['close'].iloc[-30]) / daily_data['close'].iloc[-30]
+            price_change_7d = (current_price - daily_data['close'].iloc[-7]) / daily_data['close'].iloc[-7]
+            
+            # 3. 波動性分析
+            volatility_30d = daily_data['close'].pct_change().rolling(30).std().iloc[-1]
+            
+            # 4. 趨勢強度計算
+            trend_score = 0.0
+            trend_indicators = []
+            
+            # 移動平均線排列
+            if current_price > ma20 > ma50:
+                trend_score += 0.3
+                trend_indicators.append("均線多頭排列")
+            elif current_price < ma20 < ma50:
+                trend_score -= 0.3
+                trend_indicators.append("均線空頭排列")
+            
+            # 價格相對於長期均線位置
+            if current_price > ma200 * 1.1:  # 高於年線10%
+                trend_score += 0.25
+                trend_indicators.append("強勢突破年線")
+            elif current_price < ma200 * 0.9:  # 低於年線10%
+                trend_score -= 0.25
+                trend_indicators.append("弱勢跌破年線")
+            
+            # 短期動量
+            if price_change_7d > 0.05:  # 7天漲超過5%
+                trend_score += 0.2
+                trend_indicators.append("短期強勢")
+            elif price_change_7d < -0.05:  # 7天跌超過5%
+                trend_score -= 0.2
+                trend_indicators.append("短期弱勢")
+            
+            # 中期動量
+            if price_change_30d > 0.15:  # 30天漲超過15%
+                trend_score += 0.25
+                trend_indicators.append("中期牛市")
+            elif price_change_30d < -0.15:  # 30天跌超過15%
+                trend_score -= 0.25
+                trend_indicators.append("中期熊市")
+            
+            # 5. 確定趨勢類型
+            if trend_score > 0.5:
+                trend = MarketTrend.BULL
+                strength = min(trend_score, 1.0)
+            elif trend_score < -0.5:
+                trend = MarketTrend.BEAR
+                strength = min(abs(trend_score), 1.0)
+            elif abs(trend_score) <= 0.2:
+                trend = MarketTrend.SIDEWAYS
+                strength = 0.3
+            else:
+                trend = MarketTrend.NEUTRAL
+                strength = abs(trend_score)
+            
+            # 6. 波動性分級
+            if volatility_30d > 0.05:
+                volatility = "高"
+            elif volatility_30d > 0.03:
+                volatility = "中"
+            else:
+                volatility = "低"
+            
+            # 7. 動量分級
+            momentum_score = (price_change_7d * 0.3 + price_change_30d * 0.7)
+            if momentum_score > 0.1:
+                momentum = "強"
+            elif momentum_score > 0.02:
+                momentum = "中"
+            elif momentum_score > -0.02:
+                momentum = "中"
+            elif momentum_score > -0.1:
+                momentum = "弱"
+            else:
+                momentum = "極弱"
+            
+            # 8. 關鍵支撐阻力位
+            recent_high = daily_data['high'].rolling(20).max().iloc[-1]
+            recent_low = daily_data['low'].rolling(20).min().iloc[-1]
+            
+            key_levels = {
+                'support': recent_low,
+                'resistance': recent_high,
+                'ma20': ma20,
+                'ma50': ma50,
+                'ma200': ma200
+            }
+            
+            # 9. 信心度計算
+            confidence = 0.5 + abs(trend_score) * 0.4  # 基礎信心度
+            if len(trend_indicators) >= 3:
+                confidence += 0.1  # 多重確認加成
+            if volatility == "低":
+                confidence += 0.05  # 低波動加成
+            
+            confidence = min(confidence, 0.95)
+            
+            # 10. 趨勢持續天數估算
+            duration_days = self._estimate_trend_duration(daily_data, trend)
+            
+            market_condition = MarketCondition(
+                trend=trend,
+                strength=strength,
+                duration_days=duration_days,
+                confidence=confidence,
+                key_levels=key_levels,
+                volatility=volatility,
+                momentum=momentum
+            )
+            
+            # 緩存結果（5分鐘有效）
+            self.market_conditions[symbol] = market_condition
+            self.last_trend_analysis[symbol] = datetime.now()
+            
+            logger.info(f"{symbol} 市場趨勢分析: {trend.value} 強度:{strength:.2f} 信心度:{confidence:.2f}")
+            
+            return market_condition
+            
+        except Exception as e:
+            logger.error(f"市場趨勢分析失敗 {symbol}: {e}")
+            return MarketCondition(
+                trend=MarketTrend.NEUTRAL,
+                strength=0.5,
+                duration_days=0,
+                confidence=0.3,
+                key_levels={},
+                volatility="中",
+                momentum="中"
+            )
+    
+    def _estimate_trend_duration(self, data: pd.DataFrame, trend: MarketTrend) -> int:
+        """估算趨勢持續天數"""
+        if len(data) < 10:
+            return 0
+        
+        try:
+            ma20 = data['close'].rolling(20).mean()
+            current_price = data['close'].iloc[-1]
+            
+            if trend == MarketTrend.BULL:
+                # 尋找價格持續高於MA20的天數
+                above_ma = data['close'] > ma20
+                duration = 0
+                for i in range(len(above_ma)-1, -1, -1):
+                    if above_ma.iloc[i]:
+                        duration += 1
+                    else:
+                        break
+                return duration
+            
+            elif trend == MarketTrend.BEAR:
+                # 尋找價格持續低於MA20的天數
+                below_ma = data['close'] < ma20
+                duration = 0
+                for i in range(len(below_ma)-1, -1, -1):
+                    if below_ma.iloc[i]:
+                        duration += 1
+                    else:
+                        break
+                return duration
+            
+            return 0
+        except:
+            return 0
+    
+    async def multi_timeframe_analysis(self, symbol: str, timeframes: List[str]) -> Optional[TradeSignal]:
+        """多時間框架綜合分析 - 整合牛熊市判斷"""
+        try:
+            # 0. 首要步驟：分析市場趨勢（牛熊市判斷）
+            market_condition = await self.get_or_analyze_market_trend(symbol)
+            
             timeframe_signals = {}
             pattern_signals = {}
             
@@ -132,20 +365,277 @@ class StrategyEngine:
                     'price': float(df['close'].iloc[-1])
                 }
             
-            # 2. 綜合多時間框架信號
-            final_signal = self._combine_timeframe_signals(timeframe_signals, symbol)
+            # 2. 綜合多時間框架信號 - 加入市場趨勢判斷
+            final_signal = self._combine_timeframe_signals_with_trend(timeframe_signals, symbol, market_condition)
             
-            if final_signal and final_signal.confidence >= 0.6:  # 提高閾值確保高質量信號
-                await self.save_signal(final_signal)
-                logger.info(f"生成高質量信號: {symbol} {final_signal.signal_type.value} 信心度: {final_signal.confidence:.2f}")
+            if final_signal:
+                # 根據牛熊市調整信心度門檻
+                confidence_threshold = self._get_confidence_threshold(market_condition)
+                
+                if final_signal.confidence >= confidence_threshold:
+                    await self.save_signal(final_signal)
+                    logger.info(f"生成{market_condition.trend.value}市場信號: {symbol} {final_signal.signal_type.value} 信心度: {final_signal.confidence:.2f}")
+                    return final_signal
             
-            return final_signal
+            return None
             
         except Exception as e:
             logger.error(f"多時間框架分析 {symbol} 失敗: {e}")
             return None
+    
+    async def get_or_analyze_market_trend(self, symbol: str) -> MarketCondition:
+        """獲取或分析市場趨勢（帶緩存）"""
+        # 檢查緩存是否有效（5分鐘內的分析結果）
+        if symbol in self.market_conditions and symbol in self.last_trend_analysis:
+            last_analysis_time = self.last_trend_analysis[symbol]
+            if (datetime.now() - last_analysis_time).total_seconds() < 300:  # 5分鐘緩存
+                return self.market_conditions[symbol]
+        
+        # 重新分析
+        return await self.analyze_market_trend(symbol)
+    
+    def _get_confidence_threshold(self, market_condition: MarketCondition) -> float:
+        """根據市場狀況獲取信心度門檻"""
+        if market_condition.trend == MarketTrend.BULL:
+            return self.bull_market_params['confidence_threshold']
+        elif market_condition.trend == MarketTrend.BEAR:
+            return self.bear_market_params['confidence_threshold']
+        else:
+            return 0.7  # 中性/橫盤市場使用標準門檻
 
-    def _combine_timeframe_signals(self, timeframe_signals: Dict, symbol: str) -> Optional[TradeSignal]:
+    def _combine_timeframe_signals_with_trend(self, timeframe_signals: Dict, symbol: str, market_condition: MarketCondition) -> Optional[TradeSignal]:
+        """綜合多時間框架信號 - 整合牛熊市判斷的高敏感度設計"""
+        
+        if not timeframe_signals:
+            return None
+        
+        # 初始化得分
+        total_bullish_score = 0.0
+        total_bearish_score = 0.0
+        total_weight = 0.0
+        
+        # 關鍵價位信息
+        entry_prices = []
+        stop_losses = []
+        take_profits = []
+        
+        primary_timeframe = None
+        primary_pattern = None
+        confidence_boost = 0.0
+        
+        # 【關鍵】牛熊市敏感度調整 - 根據市場趨勢調整權重
+        trend_bias = 0.0
+        if market_condition.trend == MarketTrend.BULL:
+            trend_bias = self.bull_market_params['long_bias']  # 牛市做多偏向
+            logger.info(f"{symbol} 牛市環境，做多偏向 +{trend_bias:.2f}")
+        elif market_condition.trend == MarketTrend.BEAR:
+            trend_bias = -self.bear_market_params['short_bias']  # 熊市做空偏向
+            logger.info(f"{symbol} 熊市環境，做空偏向 {trend_bias:.2f}")
+        
+        # 遍歷每個時間框架
+        for tf, signals in timeframe_signals.items():
+            tf_weight = self.timeframe_weights.get(tf, 0.1)
+            
+            # 1. K線形態分析（優先級最高）
+            pattern_data = signals.get('patterns', {})
+            if pattern_data.get('has_pattern', False):
+                primary_pattern = pattern_data['primary_pattern']
+                pattern_score = pattern_data['combined_score']
+                
+                # K線形態權重加成
+                pattern_weight = self.analysis_priority['candlestick_patterns'] * tf_weight
+                
+                if primary_pattern.pattern_type == PatternType.BULLISH:
+                    bullish_adjustment = pattern_score * pattern_weight
+                    # 【核心】牛市環境下，看多形態獲得額外加成
+                    if market_condition.trend == MarketTrend.BULL:
+                        bullish_adjustment *= (1 + market_condition.strength * 0.3)
+                        logger.debug(f"{symbol} {tf} 牛市看多形態加成: {bullish_adjustment:.3f}")
+                    total_bullish_score += bullish_adjustment
+                    
+                elif primary_pattern.pattern_type == PatternType.BEARISH:
+                    bearish_adjustment = pattern_score * pattern_weight
+                    # 【核心】熊市環境下，看空形態獲得額外加成
+                    if market_condition.trend == MarketTrend.BEAR:
+                        bearish_adjustment *= (1 + market_condition.strength * 0.3)
+                        logger.debug(f"{symbol} {tf} 熊市看空形態加成: {bearish_adjustment:.3f}")
+                    total_bearish_score += bearish_adjustment
+                
+                # 如果是高級形態，給予額外信心度加成
+                high_priority_patterns = ['頭肩頂', '黃昏十字星', '黃昏之星', '早晨之星', '早晨十字星']
+                if primary_pattern.pattern_name in high_priority_patterns:
+                    confidence_boost = 0.15
+                    primary_timeframe = tf
+                
+                # 收集價位信息
+                entry_prices.append(primary_pattern.entry_price)
+                stop_losses.append(primary_pattern.stop_loss)
+                take_profits.append(primary_pattern.take_profit)
+            
+            # 2. 技術指標分析（輔助確認）
+            indicator_signal = signals.get('indicators', {})
+            if indicator_signal:
+                indicator_weight = self.analysis_priority['technical_indicators'] * tf_weight
+                
+                if indicator_signal.get('overall_signal') == 'BUY':
+                    buy_adjustment = indicator_signal.get('confidence', 0.5) * indicator_weight
+                    # 牛市環境下，買入信號獲得加成
+                    if market_condition.trend == MarketTrend.BULL:
+                        buy_adjustment *= (1 + market_condition.strength * 0.2)
+                    total_bullish_score += buy_adjustment
+                    
+                elif indicator_signal.get('overall_signal') == 'SELL':
+                    sell_adjustment = indicator_signal.get('confidence', 0.5) * indicator_weight
+                    # 熊市環境下，賣出信號獲得加成
+                    if market_condition.trend == MarketTrend.BEAR:
+                        sell_adjustment *= (1 + market_condition.strength * 0.2)
+                    total_bearish_score += sell_adjustment
+            
+            total_weight += tf_weight
+        
+        # 標準化得分
+        if total_weight > 0:
+            total_bullish_score /= total_weight
+            total_bearish_score /= total_weight
+        
+        # 【關鍵】應用牛熊市偏向調整
+        total_bullish_score += max(0, trend_bias)  # 牛市加成做多
+        total_bearish_score += max(0, -trend_bias)  # 熊市加成做空
+        
+        # 決定最終信號 - 根據市場環境調整門檻
+        signal_type = None
+        confidence = 0.0
+        
+        # 牛市環境：降低做多門檻，提高做空門檻
+        if market_condition.trend == MarketTrend.BULL:
+            long_threshold = 0.55  # 牛市做多門檻降低
+            short_threshold = 0.75  # 牛市做空門檻提高
+        # 熊市環境：提高做多門檻，降低做空門檻
+        elif market_condition.trend == MarketTrend.BEAR:
+            long_threshold = 0.75  # 熊市做多門檻提高
+            short_threshold = 0.55  # 熊市做空門檻降低
+        # 中性/橫盤市場：使用標準門檻
+        else:
+            long_threshold = 0.65
+            short_threshold = 0.65
+        
+        if total_bullish_score > total_bearish_score and total_bullish_score > long_threshold:
+            signal_type = SignalType.LONG
+            confidence = total_bullish_score + confidence_boost
+            logger.info(f"{symbol} 生成做多信號 (牛熊敏感): 得分{total_bullish_score:.3f} > 門檻{long_threshold}")
+            
+        elif total_bearish_score > total_bullish_score and total_bearish_score > short_threshold:
+            signal_type = SignalType.SHORT
+            confidence = total_bearish_score + confidence_boost
+            logger.info(f"{symbol} 生成做空信號 (牛熊敏感): 得分{total_bearish_score:.3f} > 門檻{short_threshold}")
+            
+        else:
+            signal_type = SignalType.HOLD
+            confidence = max(total_bullish_score, total_bearish_score)
+        
+        # 市場條件加成：強趨勢市場額外信心度
+        if market_condition.strength > 0.7:
+            confidence += 0.05
+            logger.debug(f"{symbol} 強趨勢市場信心度加成 +0.05")
+        
+        # 確保信心度不超過1.0
+        confidence = min(confidence, 0.98)
+        
+        # 根據市場環境調整信心度門檻
+        min_confidence = self._get_confidence_threshold(market_condition)
+        if confidence < min_confidence:
+            logger.debug(f"{symbol} 信心度 {confidence:.3f} 低於 {market_condition.trend.value} 市場門檻 {min_confidence:.3f}")
+            return None
+        
+        # 計算進場參數 - 根據牛熊市調整
+        if entry_prices:
+            avg_entry = np.mean(entry_prices)
+            avg_stop = np.mean(stop_losses) 
+            avg_target = np.mean(take_profits)
+        else:
+            # 根據市場環境調整風險管理參數
+            current_price = list(timeframe_signals.values())[0]['price']
+            
+            if market_condition.trend == MarketTrend.BULL:
+                # 牛市參數：較緊止損，較寬止盈
+                stop_pct = self.bull_market_params['stop_loss_pct']
+                profit_pct = self.bull_market_params['take_profit_pct']
+            elif market_condition.trend == MarketTrend.BEAR:
+                # 熊市參數：較緊止損，較保守止盈
+                stop_pct = self.bear_market_params['stop_loss_pct']
+                profit_pct = self.bear_market_params['take_profit_pct']
+            else:
+                # 中性市場：標準參數
+                stop_pct = 0.03
+                profit_pct = 0.06
+            
+            if signal_type == SignalType.LONG:
+                avg_entry = current_price * 1.002
+                avg_stop = current_price * (1 - stop_pct)
+                avg_target = current_price * (1 + profit_pct)
+            else:
+                avg_entry = current_price * 0.998
+                avg_stop = current_price * (1 + stop_pct)
+                avg_target = current_price * (1 - profit_pct)
+        
+        # 計算風險回報比
+        risk_amount = abs(avg_entry - avg_stop)
+        reward_amount = abs(avg_target - avg_entry)
+        risk_reward_ratio = reward_amount / risk_amount if risk_amount > 0 else 0
+        
+        # 根據市場環境檢查最小風險回報比
+        min_rr = self._get_min_risk_reward(market_condition)
+        if risk_reward_ratio < min_rr:
+            logger.debug(f"{symbol} 風險回報比 {risk_reward_ratio:.2f} 低於 {market_condition.trend.value} 市場要求 {min_rr:.2f}")
+            return None
+        
+        # 計算信號過期時間
+        expires_at = datetime.now() + timedelta(hours=24)
+        
+        # 構建推理說明
+        reasoning_parts = [
+            f"多時間框架分析 ({len(timeframe_signals)}個時間軸)",
+            f"{market_condition.trend.value}市場環境 (強度:{market_condition.strength:.2f})",
+            f"信心度: {confidence:.2f}"
+        ]
+        
+        if primary_pattern:
+            reasoning_parts.append(f"關鍵形態: {primary_pattern.pattern_name}")
+        
+        reasoning = " | ".join(reasoning_parts)
+        
+        # 創建交易信號
+        signal = TradeSignal(
+            symbol=symbol,
+            timeframe=primary_timeframe or '4h',
+            signal_type=signal_type,
+            entry_price=avg_entry,
+            stop_loss=avg_stop,
+            take_profit=avg_target,
+            risk_reward_ratio=risk_reward_ratio,
+            confidence=confidence,
+            signal_strength=max(total_bullish_score, total_bearish_score),
+            reasoning=reasoning,
+            indicators_used={
+                'market_trend': market_condition.trend.value,
+                'trend_strength': market_condition.strength,
+                'bullish_score': total_bullish_score,
+                'bearish_score': total_bearish_score,
+                'trend_bias': trend_bias
+            },
+            expires_at=expires_at
+        )
+        
+        return signal
+    
+    def _get_min_risk_reward(self, market_condition: MarketCondition) -> float:
+        """根據市場狀況獲取最小風險回報比"""
+        if market_condition.trend == MarketTrend.BULL:
+            return self.bull_market_params['risk_reward_min']
+        elif market_condition.trend == MarketTrend.BEAR:
+            return self.bear_market_params['risk_reward_min']
+        else:
+            return 2.0  # 中性/橫盤市場使用標準比例
         """綜合多時間框架信號 - K線形態優先策略"""
         
         if not timeframe_signals:

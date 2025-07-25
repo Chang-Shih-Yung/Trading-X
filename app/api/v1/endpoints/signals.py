@@ -1,15 +1,111 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import desc, and_, select, func
 from typing import List, Optional
 from datetime import datetime, timedelta
+from pydantic import BaseModel
+import logging
 
 from app.core.database import get_db
 from app.models.models import TradingSignal
 from app.services.strategy_engine import StrategyEngine
-from app.schemas.signals import SignalResponse, SignalCreate, SignalFilter, AnalyzeRequest
+from app.schemas.signals import SignalResponse, SignalCreate, SignalFilter, AnalyzeRequest, MarketTrendResponse
+
+# 初始化logger
+logger = logging.getLogger(__name__)
+
+# 新增請求模型
+class InstantAdviceRequest(BaseModel):
+    symbols: List[str] = ["BTCUSDT", "ETHUSDT", "BNBUSDT"]
+    analysis_depth: str = "comprehensive"
 
 router = APIRouter()
+
+@router.get("/market-trend/{symbol}")
+async def get_market_trend(symbol: str):
+    """獲取指定交易對的市場趨勢分析"""
+    try:
+        engine = StrategyEngine()
+        trend_analysis = await engine.analyze_market_trend(symbol)
+        
+        return MarketTrendResponse(
+            symbol=symbol,
+            trend=trend_analysis.trend.value,
+            strength=trend_analysis.strength,
+            duration_days=trend_analysis.duration_days,
+            confidence=trend_analysis.confidence,
+            key_levels=trend_analysis.key_levels,
+            volatility=trend_analysis.volatility,
+            momentum=trend_analysis.momentum,
+            timestamp=datetime.now()
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"市場趨勢分析失敗: {str(e)}")
+
+@router.get("/market-overview")
+async def get_market_overview():
+    """獲取市場總覽 - 主要幣種的牛熊市狀況"""
+    try:
+        symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT']
+        engine = StrategyEngine()
+        
+        market_overview = {}
+        bull_count = 0
+        bear_count = 0
+        neutral_count = 0
+        
+        for symbol in symbols:
+            try:
+                trend_analysis = await engine.analyze_market_trend(symbol)
+                market_overview[symbol] = {
+                    'trend': trend_analysis.trend.value,
+                    'strength': trend_analysis.strength,
+                    'confidence': trend_analysis.confidence,
+                    'volatility': trend_analysis.volatility,
+                    'momentum': trend_analysis.momentum
+                }
+                
+                if trend_analysis.trend.value == 'BULL':
+                    bull_count += 1
+                elif trend_analysis.trend.value == 'BEAR':
+                    bear_count += 1
+                else:
+                    neutral_count += 1
+                    
+            except Exception as e:
+                # 單個交易對分析失敗不影響整體
+                print(f"分析 {symbol} 失敗: {e}")
+                market_overview[symbol] = {
+                    'trend': 'NEUTRAL',
+                    'strength': 0.5,
+                    'confidence': 0.3,
+                    'volatility': '中',
+                    'momentum': '中'
+                }
+                neutral_count += 1
+        
+        # 計算整體市場情緒
+        total_symbols = len(symbols)
+        if bull_count > total_symbols * 0.6:
+            overall_sentiment = 'BULLISH_MARKET'
+        elif bear_count > total_symbols * 0.6:
+            overall_sentiment = 'BEARISH_MARKET'
+        else:
+            overall_sentiment = 'MIXED_MARKET'
+        
+        return {
+            'overall_sentiment': overall_sentiment,
+            'bull_count': bull_count,
+            'bear_count': bear_count,
+            'neutral_count': neutral_count,
+            'symbols': market_overview,
+            'timestamp': datetime.now(),
+            'analysis_summary': f"{bull_count}牛/{bear_count}熊/{neutral_count}中性"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"市場總覽獲取失敗: {str(e)}")
 
 @router.get("/", response_model=List[SignalResponse])
 async def get_signals(
@@ -645,3 +741,158 @@ async def get_signal_performance(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"獲取表現統計失敗: {str(e)}")
+
+@router.post("/generate-instant-advice")
+async def generate_instant_trading_advice(request: InstantAdviceRequest):
+    """
+    生成當下即時中長線交易建議
+    基於牛熊市判斷，提供從當前點位出發的中長線策略建議
+    """
+    try:
+        # 從請求體中提取參數
+        symbols = request.symbols
+        analysis_depth = request.analysis_depth
+        
+        engine = StrategyEngine()
+        advice_signals = []
+        
+        for symbol in symbols:
+            try:
+                # 1. 分析市場趨勢（牛熊市判斷）
+                market_trend = await engine.analyze_market_trend(symbol)
+                
+                # 2. 根據牛熊市選擇分析週期
+                if market_trend.trend.value == "BULL":
+                    # 牛市：看日週期以上的K線
+                    timeframes = ["1d", "3d", "1w"]
+                    trend_context = "牛市環境"
+                    base_confidence = 0.75
+                elif market_trend.trend.value == "BEAR":
+                    # 熊市：看3日週期以上
+                    timeframes = ["3d", "1w", "1M"]
+                    trend_context = "熊市環境"
+                    base_confidence = 0.65
+                else:
+                    # 中性市場：平衡分析
+                    timeframes = ["1d", "3d", "1w"]
+                    trend_context = "震盪市場"
+                    base_confidence = 0.70
+                
+                # 3. 獲取當前價格
+                from app.services.market_data import MarketDataService
+                market_service = MarketDataService()
+                current_price = await market_service.get_latest_price(symbol, "binance")
+                
+                if current_price is None:
+                    continue
+                
+                # 4. 基於市場條件生成建議
+                advice = _generate_market_advice(
+                    symbol, current_price, market_trend, timeframes, 
+                    trend_context, base_confidence
+                )
+                
+                advice_signals.append(advice)
+                
+            except Exception as e:
+                logger.error(f"生成 {symbol} 即時建議失敗: {e}")
+                continue
+        
+        logger.info(f"成功生成 {len(advice_signals)} 個即時中長線建議")
+        return {
+            "advice_signals": advice_signals,
+            "generation_time": datetime.now().isoformat(),
+            "analysis_method": "牛熊市導向中長線分析",
+            "total_symbols": len(advice_signals)
+        }
+        
+    except Exception as e:
+        logger.error(f"生成即時交易建議失敗: {e}")
+        raise HTTPException(status_code=500, detail=f"生成即時交易建議失敗: {str(e)}")
+
+def _generate_market_advice(
+    symbol: str, 
+    current_price: float, 
+    market_trend, 
+    timeframes: List[str],
+    trend_context: str,
+    base_confidence: float
+) -> dict:
+    """生成基於市場條件的交易建議"""
+    import random
+    
+    # 根據趨勢強度調整建議
+    if market_trend.strength > 0.7:
+        confidence_adjustment = 0.1
+        strength_desc = "強勢"
+    elif market_trend.strength > 0.4:
+        confidence_adjustment = 0.05
+        strength_desc = "中等"
+    else:
+        confidence_adjustment = -0.05
+        strength_desc = "弱勢"
+    
+    final_confidence = min(0.95, base_confidence + confidence_adjustment)
+    
+    # 決定信號方向（基於趨勢）
+    if market_trend.trend.value == "BULL":
+        signal_type = "LONG"
+        entry_strategy = "趨勢順勢做多"
+        # 牛市中適當的入場價格（當前價格附近）
+        entry_price = current_price * random.uniform(0.98, 1.02)
+        stop_loss = entry_price * 0.92  # 8%止損
+        take_profit = entry_price * 1.15  # 15%止盈
+    elif market_trend.trend.value == "BEAR":
+        signal_type = "SHORT"
+        entry_strategy = "趨勢順勢做空"
+        entry_price = current_price * random.uniform(0.98, 1.02)
+        stop_loss = entry_price * 1.08  # 8%止損
+        take_profit = entry_price * 0.85  # 15%止盈
+    else:
+        # 中性市場：區間交易
+        signal_type = random.choice(["LONG", "SHORT"])
+        entry_strategy = "區間震盪交易"
+        entry_price = current_price * random.uniform(0.99, 1.01)
+        if signal_type == "LONG":
+            stop_loss = entry_price * 0.95  # 5%止損
+            take_profit = entry_price * 1.08  # 8%止盈
+        else:
+            stop_loss = entry_price * 1.05  # 5%止損
+            take_profit = entry_price * 0.92  # 8%止盈
+    
+    # 計算風險回報比
+    risk_reward_ratio = abs(take_profit - entry_price) / abs(entry_price - stop_loss)
+    
+    # 生成建議信號
+    advice = {
+        "id": f"advice_{symbol}_{int(datetime.now().timestamp())}",
+        "symbol": symbol,
+        "signal_type": signal_type,
+        "entry_price": round(entry_price, 6),
+        "current_price": round(current_price, 6),
+        "stop_loss": round(stop_loss, 6),
+        "take_profit": round(take_profit, 6),
+        "risk_reward_ratio": round(risk_reward_ratio, 2),
+        "confidence": round(final_confidence, 3),
+        "primary_timeframe": timeframes[0],
+        "confirmed_timeframes": timeframes,
+        "strategy_name": f"{trend_context}中長線策略",
+        "entry_strategy": entry_strategy,
+        "reasoning": f"{trend_context} - {strength_desc}趨勢，建議{signal_type}操作",
+        "market_analysis": {
+            "trend": market_trend.trend.value,
+            "strength": market_trend.strength,
+            "confidence": market_trend.confidence,
+            "duration_days": market_trend.duration_days,
+            "volatility": market_trend.volatility,
+            "momentum": market_trend.momentum
+        },
+        "risk_management": f"止損:{abs((stop_loss-entry_price)/entry_price*100):.1f}%, 止盈:{abs((take_profit-entry_price)/entry_price*100):.1f}%",
+        "time_horizon": "中長線(3-30天)",
+        "created_at": datetime.now().isoformat(),
+        "expires_at": (datetime.now() + timedelta(hours=24)).isoformat(),  # 24小時有效期
+        "is_manual_advice": True,  # 標記為手動生成建議
+        "advice_type": "instant_medium_term"
+    }
+    
+    return advice

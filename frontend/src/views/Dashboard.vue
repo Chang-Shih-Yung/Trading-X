@@ -7,49 +7,46 @@
     <CustomNotification v-if="notification.show" :type="notification.type" :title="notification.title"
       :message="notification.message" @close="hideNotification" />
 
+    <!-- 短線刷新確認彈窗 -->
+    <ConfirmDialog
+      v-model:show="showRefreshConfirm"
+      title="確認刷新短線信號"
+      message="您確定要強制刷新短線信號嗎？"
+      :details="refreshConfirmDetails"
+      confirm-text="確認刷新"
+      cancel-text="取消"
+      type="warning"
+      @confirm="confirmRefreshShortTermSignals"
+      @cancel="showRefreshConfirm = false"
+    />
+
     <div class="mx-auto max-w-7xl">
       <!-- 標題 -->
       <div class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-900">TradingX 量化交易儀表板</h1>
-        <p class="mt-2 text-gray-600">實時市場監控與交易信號分析</p>
+        <h1 class="text-3xl font-bold text-gray-900">Service X</h1>
+        <p class="mt-2 text-gray-600">Trading Signals and Market Analysis</p>
       </div>
 
       <!-- 系統狀態 - 實時 API 服務狀態 -->
       <div class="mb-6 bg-white shadow rounded-lg p-6">
         <h2 class="text-lg font-semibold text-gray-900 mb-4">🚀 系統服務狀態</h2>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div class="flex items-center space-x-2">
-            <div :class="serviceStatus.market_data ? 'bg-green-500' : 'bg-red-500'" class="w-3 h-3 rounded-full"></div>
-            <span class="text-sm">市場數據服務</span>
-            <span :class="serviceStatus.market_data ? 'text-green-600' : 'text-red-600'" class="text-xs font-medium">
-              {{ serviceStatus.market_data ? '正常' : '異常' }}
-            </span>
-          </div>
-          <div class="flex items-center space-x-2">
-            <div :class="serviceStatus.strategy_engine ? 'bg-green-500' : 'bg-red-500'" class="w-3 h-3 rounded-full">
-            </div>
-            <span class="text-sm">策略引擎</span>
-            <span :class="serviceStatus.strategy_engine ? 'text-green-600' : 'text-red-600'"
-              class="text-xs font-medium">
-              {{ serviceStatus.strategy_engine ? '正常' : '異常' }}
-            </span>
-          </div>
-          <div class="flex items-center space-x-2">
-            <div :class="serviceStatus.backtest_service ? 'bg-green-500' : 'bg-red-500'" class="w-3 h-3 rounded-full">
-            </div>
-            <span class="text-sm">回測服務</span>
-            <span :class="serviceStatus.backtest_service ? 'text-green-600' : 'text-red-600'"
-              class="text-xs font-medium">
-              {{ serviceStatus.backtest_service ? '正常' : '異常' }}
-            </span>
-          </div>
-          <div class="flex items-center space-x-2">
-            <div :class="serviceStatus.database ? 'bg-green-500' : 'bg-red-500'" class="w-3 h-3 rounded-full"></div>
-            <span class="text-sm">資料庫</span>
-            <span :class="serviceStatus.database ? 'text-green-600' : 'text-red-600'" class="text-xs font-medium">
-              {{ serviceStatus.database ? '正常' : '異常' }}
-            </span>
-          </div>
+          <ServiceStatus 
+            :status="serviceStatus.market_data" 
+            label="市場數據服務"
+          />
+          <ServiceStatus 
+            :status="serviceStatus.strategy_engine" 
+            label="策略引擎"
+          />
+          <ServiceStatus 
+            :status="serviceStatus.backtest_service" 
+            label="回測服務"
+          />
+          <ServiceStatus 
+            :status="serviceStatus.database" 
+            label="資料庫"
+          />
         </div>
       </div>
 
@@ -148,10 +145,6 @@
                 class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
                 🎯 智能去重
               </span>
-              <span v-if="scalpingSignalsCache.data.length > 0"
-                class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                💾 暫存: {{ Math.round((Date.now() - scalpingSignalsCache.timestamp) / 1000) }}秒前
-              </span>
             </div>
           </div>
           <div class="flex items-center space-x-4">
@@ -172,9 +165,27 @@
               <div class="text-2xl font-bold text-blue-600">{{ shortTermStats.strategiesUsed }}</div>
               <div class="text-xs text-orange-500">策略種類</div>
             </div>
-            <button @click="refreshShortTermSignals"
+            <button @click="showRefreshConfirm = true"
               class="px-3 py-1 bg-orange-500 text-white rounded hover:bg-orange-600 text-sm">
               刷新短線
+            </button>
+            <button @click="navigateToShortTermHistory"
+              class="flex items-center px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm">
+              <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                  clip-rule="evenodd"></path>
+              </svg>
+              <span>短線歷史</span>
+            </button>
+            <button @click="testExpiredSignals"
+              class="flex items-center px-3 py-1 bg-orange-500 text-white rounded hover:bg-orange-600 text-sm">
+              <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd"
+                  d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
+                  clip-rule="evenodd"></path>
+              </svg>
+              <span>測試歸檔</span>
             </button>
           </div>
         </div>
@@ -211,10 +222,6 @@
               <option value="low">低(<60%)</option>
             </select>
           </div>
-          <button @click="refreshShortTermSignals"
-            class="px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white text-sm rounded transition-colors">
-            刷新
-          </button>
         </div>
 
         <!-- 短線信號卡片網格 -->
@@ -226,6 +233,11 @@
             <div class="flex justify-between items-center mb-3">
               <div class="flex items-center space-x-2">
                 <h4 class="font-bold text-lg text-gray-900">{{ signal.symbol }}</h4>
+                <!-- 💎 突破信號特殊標記 -->
+                <span v-if="isBreakoutSignal(signal)"
+                  class="px-2 py-1 text-xs font-bold bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-full animate-pulse shadow-lg">
+                  🚀 突破
+                </span>
                 <!-- 做多/做空標示 -->
                 <span :class="{
                   'bg-green-100 text-green-800': getSignalDirection(signal.signal_type) === 'LONG',
@@ -239,6 +251,10 @@
                 </span>
               </div>
               <div class="flex items-center space-x-1">
+                <!-- 💎 動態止盈顯示 -->
+                <span class="text-xs text-orange-600 font-bold bg-orange-50 px-2 py-1 rounded">
+                  目標: {{ calculateDynamicStopProfit(signal).toFixed(1) }}%
+                </span>
                 <!-- 緊急度標示 -->
                 <span v-if="signal.urgency_level === 'urgent'"
                   class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
@@ -269,113 +285,157 @@
                     ({{ signal.price_change_percent > 0 ? '+' : '' }}{{ signal.price_change_percent.toFixed(2) }}%)
                   </span>
                 </div>
+                <!-- 價格偏離風險警示 -->
+                <div v-if="signal.current_price && signal.entry_price" class="mt-1">
+                  <span 
+                    v-if="signal.price_deviation_risk"
+                    :class="getPriceDeviationBadgeClass(signal.price_deviation_risk.level)"
+                    class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                  >
+                    {{ signal.price_deviation_risk.warning }}
+                  </span>
+                  <span 
+                    v-else
+                    :class="getPriceDeviationBadgeClass(calculatePriceDeviationRisk(signal).level)"
+                    class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                  >
+                    {{ calculatePriceDeviationRisk(signal).warning }}
+                  </span>
+                </div>
+                
+                <!-- 市場條件影響評級 -->
+                <div v-if="signal.market_condition_impact" class="mt-1">
+                  <StatusBadge 
+                    type="status" 
+                    :value="signal.market_condition_impact.overall_rating" 
+                    :text="`${signal.market_condition_impact.rating_text} - ${signal.market_condition_impact.condition_text}`"
+                  />
+                </div>
               </div>
             </div>
 
-            <!-- 信心度條 -->
-            <div class="mb-3">
-              <div class="flex justify-between items-center mb-1">
-                <span class="text-xs text-gray-500">信心度</span>
-                <span class="text-xs font-bold">{{ Math.round(signal.confidence * 100) }}%</span>
-              </div>
-              <div class="w-full bg-gray-200 rounded-full h-2">
-                <div :style="{ width: (signal.confidence * 100) + '%' }" :class="{
-                  'bg-green-500': signal.confidence >= 0.8,
-                  'bg-yellow-500': signal.confidence >= 0.6,
-                  'bg-red-500': signal.confidence < 0.6
-                }" class="h-2 rounded-full transition-all duration-500"></div>
-              </div>
+            <!-- 信心度數字顯示 - 替代長條圖 -->
+            <div class="mb-3 flex justify-between items-center">
+              <span class="text-xs text-gray-500">信心度</span>
+              <StatusBadge 
+                type="confidence" 
+                :value="Math.round(signal.confidence * 100)" 
+                :text="`${Math.round(signal.confidence * 100)}%`"
+              />
             </div>
 
             <!-- 信號來源和策略 -->
             <div class="mb-3 flex items-center justify-between">
-              <span v-if="signal.is_scalping"
-                class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                🔥 專用短線
-              </span>
-              <span v-else
-                class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                📊 中長線篩選
-              </span>
+              <StatusBadge 
+                v-if="signal.is_scalping"
+                type="strategy" 
+                value="scalping" 
+                text="🔥 專用短線"
+                icon="🔥"
+              />
+              <StatusBadge 
+                v-else
+                type="strategy" 
+                value="swing" 
+                text="📊 中長線篩選"
+                icon="📊"
+              />
               <span v-if="signal.strategy_name" class="text-xs text-gray-600 font-medium">
                 {{ signal.strategy_name }}
               </span>
             </div>
 
-            <!-- 技術指標詳情 -->
-            <div v-if="signal.key_indicators || signal.is_scalping" class="mb-3 p-2 bg-gray-50 rounded">
-              <div class="text-xs font-medium text-gray-700 mb-2">📊 技術指標</div>
+            <!-- 技術指標詳情 - 可收合 -->
+            <div v-if="signal.key_indicators || signal.is_scalping" class="mb-3">
+              <button 
+                @click="toggleIndicatorExpansion(signal.id)"
+                class="w-full flex items-center justify-between p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors"
+              >
+                <div class="text-xs font-medium text-gray-700">📊 技術指標</div>
+                <svg 
+                  :class="expandedIndicators.has(signal.id) ? 'rotate-180' : ''"
+                  class="w-4 h-4 text-gray-400 transition-transform duration-200" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </button>
 
-              <!-- 短線專用指標 -->
-              <div v-if="signal.is_scalping" class="grid grid-cols-2 gap-2 text-xs">
-                <div class="bg-white p-2 rounded border">
-                  <div class="text-gray-500">策略類型</div>
-                  <div class="font-medium text-blue-600">{{ getSignalTypeText(signal.signal_type) }}</div>
-                </div>
-                <div class="bg-white p-2 rounded border">
-                  <div class="text-gray-500">風險回報</div>
-                  <div class="font-medium" :class="{
-                    'text-green-600': (signal.risk_reward_ratio || 0) >= 2,
-                    'text-yellow-600': (signal.risk_reward_ratio || 0) >= 1.5,
-                    'text-red-600': (signal.risk_reward_ratio || 0) < 1.5
-                  }">1:{{ signal.risk_reward_ratio?.toFixed(1) || 'N/A' }}</div>
+              <!-- 收合的技術指標內容 -->
+              <div v-if="expandedIndicators.has(signal.id)" class="mt-2 p-2 bg-gray-50 rounded">
+                <!-- 短線專用指標 -->
+                <div v-if="signal.is_scalping" class="grid grid-cols-2 gap-2 text-xs">
+                  <div class="bg-white p-2 rounded border">
+                    <div class="text-gray-500">策略類型</div>
+                    <div class="font-medium text-blue-600">{{ getSignalTypeText(signal.signal_type) }}</div>
+                  </div>
+                  <div class="bg-white p-2 rounded border">
+                    <div class="text-gray-500">風險回報</div>
+                    <StatusBadge 
+                      type="risk" 
+                      :value="signal.risk_reward_ratio || 0" 
+                      :text="`1:${signal.risk_reward_ratio?.toFixed(1) || 'N/A'}`"
+                    />
+                  </div>
+
+                  <!-- 真實技術指標 -->
+                  <div class="bg-white p-2 rounded border">
+                    <div class="text-gray-500">RSI (7)</div>
+                    <div class="font-medium" :class="{
+                      'text-red-600': (signal.key_indicators?.rsi_7 || 50) > 70,
+                      'text-green-600': (signal.key_indicators?.rsi_7 || 50) < 30,
+                      'text-gray-600': (signal.key_indicators?.rsi_7 || 50) >= 30 && (signal.key_indicators?.rsi_7 || 50) <= 70
+                    }">{{ signal.key_indicators?.rsi_7?.toFixed(1) || '50.0' }}</div>
+                  </div>
+                  <div class="bg-white p-2 rounded border">
+                    <div class="text-gray-500">EMA偏離</div>
+                    <div class="font-medium" :class="{
+                      'text-green-600': (signal.key_indicators?.ema_deviation || 0) > 0,
+                      'text-red-600': (signal.key_indicators?.ema_deviation || 0) < 0
+                    }">{{ (signal.key_indicators?.ema_deviation || 0) > 0 ? '+' : '' }}{{
+                      signal.key_indicators?.ema_deviation?.toFixed(2) || '0.00' }}%</div>
+                  </div>
+                  <div class="bg-white p-2 rounded border">
+                    <div class="text-gray-500">成交量比</div>
+                    <div class="font-medium" :class="{
+                      'text-orange-600': (signal.key_indicators?.volume_ratio || 1) > 2,
+                      'text-blue-600': (signal.key_indicators?.volume_ratio || 1) > 1.5,
+                      'text-gray-600': (signal.key_indicators?.volume_ratio || 1) <= 1.5
+                    }">{{ signal.key_indicators?.volume_ratio?.toFixed(1) || '1.0' }}x</div>
+                  </div>
+                  <div class="bg-white p-2 rounded border">
+                    <div class="text-gray-500">ATR %</div>
+                    <div class="font-medium text-purple-600">{{ signal.key_indicators?.atr_percent?.toFixed(2) || '0.00'
+                    }}%</div>
+                  </div>
+
+                  <!-- 擴展顯示更多指標 -->
+                  <div v-if="signal.key_indicators?.vwap_deviation !== undefined" class="bg-white p-2 rounded border">
+                    <div class="text-gray-500">VWAP偏離</div>
+                    <div class="font-medium" :class="{
+                      'text-blue-600': Math.abs(signal.key_indicators.vwap_deviation) > 0.5,
+                      'text-gray-600': Math.abs(signal.key_indicators.vwap_deviation) <= 0.5
+                    }">{{ signal.key_indicators.vwap_deviation > 0 ? '+' : '' }}{{
+                      signal.key_indicators.vwap_deviation.toFixed(2) }}%</div>
+                  </div>
+                  <div v-if="signal.key_indicators?.stoch_k !== undefined" class="bg-white p-2 rounded border">
+                    <div class="text-gray-500">Stoch %K</div>
+                    <div class="font-medium" :class="{
+                      'text-red-600': signal.key_indicators.stoch_k > 80,
+                      'text-green-600': signal.key_indicators.stoch_k < 20,
+                      'text-gray-600': signal.key_indicators.stoch_k >= 20 && signal.key_indicators.stoch_k <= 80
+                    }">{{ signal.key_indicators.stoch_k.toFixed(1) }}</div>
+                  </div>
                 </div>
 
-                <!-- 真實技術指標 -->
-                <div class="bg-white p-2 rounded border">
-                  <div class="text-gray-500">RSI (7)</div>
-                  <div class="font-medium" :class="{
-                    'text-red-600': (signal.key_indicators?.rsi_7 || 50) > 70,
-                    'text-green-600': (signal.key_indicators?.rsi_7 || 50) < 30,
-                    'text-gray-600': (signal.key_indicators?.rsi_7 || 50) >= 30 && (signal.key_indicators?.rsi_7 || 50) <= 70
-                  }">{{ signal.key_indicators?.rsi_7?.toFixed(1) || '50.0' }}</div>
-                </div>
-                <div class="bg-white p-2 rounded border">
-                  <div class="text-gray-500">EMA偏離</div>
-                  <div class="font-medium" :class="{
-                    'text-green-600': (signal.key_indicators?.ema_deviation || 0) > 0,
-                    'text-red-600': (signal.key_indicators?.ema_deviation || 0) < 0
-                  }">{{ (signal.key_indicators?.ema_deviation || 0) > 0 ? '+' : '' }}{{
-                    signal.key_indicators?.ema_deviation?.toFixed(2) || '0.00' }}%</div>
-                </div>
-                <div class="bg-white p-2 rounded border">
-                  <div class="text-gray-500">成交量比</div>
-                  <div class="font-medium" :class="{
-                    'text-orange-600': (signal.key_indicators?.volume_ratio || 1) > 2,
-                    'text-blue-600': (signal.key_indicators?.volume_ratio || 1) > 1.5,
-                    'text-gray-600': (signal.key_indicators?.volume_ratio || 1) <= 1.5
-                  }">{{ signal.key_indicators?.volume_ratio?.toFixed(1) || '1.0' }}x</div>
-                </div>
-                <div class="bg-white p-2 rounded border">
-                  <div class="text-gray-500">ATR %</div>
-                  <div class="font-medium text-purple-600">{{ signal.key_indicators?.atr_percent?.toFixed(2) || '0.00'
-                  }}%</div>
-                </div>
-
-                <!-- 擴展顯示更多指標 -->
-                <div v-if="signal.key_indicators?.vwap_deviation !== undefined" class="bg-white p-2 rounded border">
-                  <div class="text-gray-500">VWAP偏離</div>
-                  <div class="font-medium" :class="{
-                    'text-blue-600': Math.abs(signal.key_indicators.vwap_deviation) > 0.5,
-                    'text-gray-600': Math.abs(signal.key_indicators.vwap_deviation) <= 0.5
-                  }">{{ signal.key_indicators.vwap_deviation > 0 ? '+' : '' }}{{
-                    signal.key_indicators.vwap_deviation.toFixed(2) }}%</div>
-                </div>
-                <div v-if="signal.key_indicators?.stoch_k !== undefined" class="bg-white p-2 rounded border">
-                  <div class="text-gray-500">Stoch %K</div>
-                  <div class="font-medium" :class="{
-                    'text-red-600': signal.key_indicators.stoch_k > 80,
-                    'text-green-600': signal.key_indicators.stoch_k < 20,
-                    'text-gray-600': signal.key_indicators.stoch_k >= 20 && signal.key_indicators.stoch_k <= 80
-                  }">{{ signal.key_indicators.stoch_k.toFixed(1) }}</div>
-                </div>
-              </div>
-
-              <!-- 常規指標 -->
-              <div v-else-if="signal.key_indicators" class="text-xs">
-                <div v-for="(value, key) in signal.key_indicators" :key="key" class="flex justify-between py-1">
-                  <span class="text-gray-500">{{ key }}:</span>
-                  <span class="font-medium">{{ value }}</span>
+                <!-- 常規指標 -->
+                <div v-else-if="signal.key_indicators" class="text-xs">
+                  <div v-for="(value, key) in signal.key_indicators" :key="key" class="flex justify-between py-1">
+                    <span class="text-gray-500">{{ key }}:</span>
+                    <span class="font-medium">{{ value }}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -385,25 +445,25 @@
               <div class="flex justify-between items-center">
                 <span class="text-xs text-gray-500">剩餘時效</span>
                 <span :class="{
-                  'text-red-600': getShortTermValidity(signal).percentage <= 30,
-                  'text-orange-600': getShortTermValidity(signal).percentage <= 60,
-                  'text-green-600': getShortTermValidity(signal).percentage > 60
+                  'text-red-600': getSignalValidity(signal).percentage <= 30,
+                  'text-orange-600': getSignalValidity(signal).percentage <= 60,
+                  'text-green-600': getSignalValidity(signal).percentage > 60
                 }" class="text-xs font-bold">
-                  {{ getShortTermValidity(signal).text }}
+                  {{ getSignalValidity(signal).text }}
                 </span>
               </div>
               <div class="w-full bg-gray-200 rounded-full h-1 mt-1">
-                <div :style="{ width: getShortTermValidity(signal).percentage + '%' }" :class="{
-                  'bg-red-500': getShortTermValidity(signal).percentage <= 30,
-                  'bg-orange-500': getShortTermValidity(signal).percentage <= 60,
-                  'bg-green-500': getShortTermValidity(signal).percentage > 60
+                <div :style="{ width: getSignalValidity(signal).percentage + '%' }" :class="{
+                  'bg-red-500': getSignalValidity(signal).percentage <= 30,
+                  'bg-orange-500': getSignalValidity(signal).percentage <= 60,
+                  'bg-green-500': getSignalValidity(signal).percentage > 60
                 }" class="h-1 rounded-full transition-all duration-300"></div>
               </div>
             </div>
 
             <!-- 快速操作按鈕 -->
             <div class="flex space-x-2">
-              <button @click="executeQuickTrade(signal)" :disabled="getShortTermValidity(signal).percentage <= 10"
+              <button @click="executeQuickTrade(signal)" :disabled="!getSignalValidity(signal).can_execute"
                 class="flex-1 px-3 py-1 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-300 text-white text-xs font-medium rounded transition-colors">
                 快速執行
               </button>
@@ -557,6 +617,218 @@
             <div v-if="getFilteredSignalHistory().length === 0" class="text-center text-gray-500 py-8">
               <div class="text-2xl mb-2">📭</div>
               <p>暫無歷史記錄</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 中長線即時建議卡片 -->
+        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 shadow rounded-lg p-6 border-l-4 border-blue-500">
+          <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center">
+              <div class="p-3 rounded-full bg-blue-100">
+                <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <div class="ml-4">
+                <h2 class="text-xl font-bold text-blue-800">📊 中長線即時建議 (牛熊市導向)</h2>
+                <p class="text-sm text-blue-600">基於當下即時點位的牛熊市判斷，提供中長線策略建議</p>
+              </div>
+            </div>
+            <div class="flex items-center space-x-4">
+              <!-- 即時建議統計 -->
+              <div class="text-center">
+                <div class="text-2xl font-bold text-blue-600">{{ adviceStats.totalAdvice }}</div>
+                <div class="text-xs text-blue-500">建議總數</div>
+              </div>
+              <div class="text-center">
+                <div class="text-2xl font-bold text-green-600">{{ adviceStats.bullishAdvice }}</div>
+                <div class="text-xs text-blue-500">做多建議</div>
+              </div>
+              <div class="text-center">
+                <div class="text-2xl font-bold text-red-600">{{ adviceStats.bearishAdvice }}</div>
+                <div class="text-xs text-blue-500">做空建議</div>
+              </div>
+              <div class="text-center">
+                <div class="text-2xl font-bold text-purple-600">{{ adviceStats.avgConfidence }}%</div>
+                <div class="text-xs text-blue-500">平均信心度</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 操作按鈕區 -->
+          <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center space-x-3">
+              <button @click="generateInstantAdvice" :disabled="isGeneratingAdvice"
+                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-medium rounded-lg transition-colors flex items-center">
+                <span v-if="isGeneratingAdvice" class="animate-spin mr-2">⏳</span>
+                <span v-else class="mr-2">🚀</span>
+                {{ isGeneratingAdvice ? '生成中...' : '生成即時建議' }}
+              </button>
+              <button @click="clearAllInstantAdvice" :disabled="instantAdviceSignals.length === 0"
+                class="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white font-medium rounded-lg transition-colors">
+                🗑️ 清除所有建議
+              </button>
+            </div>
+            <div class="text-sm text-gray-600">
+              💡 提示：建議基於牛市看日週期以上，熊市看3日週期以上的K線分析
+            </div>
+          </div>
+
+          <!-- 即時建議信號列表 -->
+          <div v-if="instantAdviceSignals.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div v-for="advice in instantAdviceSignals" :key="advice.id"
+              class="bg-white border border-blue-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+              
+              <!-- 頭部信息 -->
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center">
+                  <span class="font-bold text-gray-800">{{ advice.symbol }}</span>
+                  <span :class="{
+                    'bg-green-100 text-green-800 border-green-200': advice.signal_type === 'LONG',
+                    'bg-red-100 text-red-800 border-red-200': advice.signal_type === 'SHORT'
+                  }" class="ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full border">
+                    {{ advice.signal_type === 'LONG' ? '做多' : advice.signal_type === 'SHORT' ? '做空' : '未知' }}
+                  </span>
+                </div>
+                <button @click="removeInstantAdvice(advice.id)"
+                  class="text-red-500 hover:text-red-700 transition-colors">
+                  ❌
+                </button>
+              </div>
+
+              <!-- 價格信息 -->
+              <div class="grid grid-cols-2 gap-2 mb-3 text-sm">
+                <div class="bg-gray-50 p-2 rounded">
+                  <div class="text-xs text-gray-500">當前價</div>
+                  <div class="font-bold">${{ advice.current_price?.toFixed(4) || 'N/A' }}</div>
+                </div>
+                <div class="bg-blue-50 p-2 rounded">
+                  <div class="text-xs text-gray-500">建議進場</div>
+                  <div class="font-bold text-blue-600">${{ advice.entry_price?.toFixed(4) || 'N/A' }}</div>
+                </div>
+              </div>
+
+              <!-- 風險管理 -->
+              <div class="grid grid-cols-2 gap-2 mb-3 text-xs">
+                <div class="bg-red-50 p-2 rounded">
+                  <div class="text-gray-500">止損</div>
+                  <div class="font-bold text-red-600">${{ advice.stop_loss?.toFixed(4) }}</div>
+                </div>
+                <div class="bg-green-50 p-2 rounded">
+                  <div class="text-gray-500">止盈</div>
+                  <div class="font-bold text-green-600">${{ advice.take_profit?.toFixed(4) }}</div>
+                </div>
+              </div>
+
+              <!-- 信心度和時間框架 -->
+              <div class="flex justify-between items-center mb-3">
+                <div class="flex items-center space-x-2">
+                  <span class="text-xs text-gray-500">信心度:</span>
+                  <span :class="{
+                    'bg-green-100 text-green-800': advice.confidence >= 0.8,
+                    'bg-yellow-100 text-yellow-800': advice.confidence >= 0.6 && advice.confidence < 0.8,
+                    'bg-red-100 text-red-800': advice.confidence < 0.6
+                  }" class="inline-flex px-2 py-1 text-xs font-semibold rounded-full">
+                    {{ Math.round(advice.confidence * 100) }}%
+                  </span>
+                </div>
+                <span class="text-xs text-gray-600">{{ advice.time_horizon || '中長線' }}</span>
+              </div>
+
+              <!-- 時效性顯示 -->
+              <div class="mb-3 p-2 rounded" :class="{
+                'bg-green-50 border border-green-200': calculateAdviceValidity(advice).percentage > 50,
+                'bg-yellow-50 border border-yellow-200': calculateAdviceValidity(advice).percentage <= 50 && calculateAdviceValidity(advice).percentage > 20,
+                'bg-red-50 border border-red-200': calculateAdviceValidity(advice).percentage <= 20
+              }">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-gray-600">剩餘時效:</span>
+                  <span :class="{
+                    'text-green-700 font-medium': calculateAdviceValidity(advice).percentage > 50,
+                    'text-yellow-700 font-medium': calculateAdviceValidity(advice).percentage <= 50 && calculateAdviceValidity(advice).percentage > 20,
+                    'text-red-700 font-bold': calculateAdviceValidity(advice).percentage <= 20
+                  }">
+                    {{ calculateAdviceValidity(advice).text }}
+                  </span>
+                </div>
+                <div class="mt-1 w-full bg-gray-200 rounded-full h-1">
+                  <div 
+                    :style="{ width: calculateAdviceValidity(advice).percentage + '%' }"
+                    :class="{
+                      'bg-green-500': calculateAdviceValidity(advice).percentage > 50,
+                      'bg-yellow-500': calculateAdviceValidity(advice).percentage <= 50 && calculateAdviceValidity(advice).percentage > 20,
+                      'bg-red-500': calculateAdviceValidity(advice).percentage <= 20
+                    }"
+                    class="h-1 rounded-full transition-all duration-300">
+                  </div>
+                </div>
+              </div>
+
+              <!-- 市場分析信息 -->
+              <div v-if="advice.market_analysis" class="bg-gray-50 p-3 rounded text-xs mb-3">
+                <div class="font-medium text-gray-700 mb-2">📊 市場分析</div>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                  <div class="flex items-center justify-between">
+                    <span class="text-gray-600">趨勢:</span>
+                    <span :class="{
+                      'text-green-600 font-medium': advice.market_analysis.trend === 'BULL',
+                      'text-red-600 font-medium': advice.market_analysis.trend === 'BEAR',
+                      'text-gray-600': advice.market_analysis.trend === 'NEUTRAL'
+                    }">
+                      {{ advice.market_analysis.trend === 'BULL' ? '牛市' : 
+                         advice.market_analysis.trend === 'BEAR' ? '熊市' : '中性' }}
+                    </span>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span class="text-gray-600">強度:</span>
+                    <span class="font-medium text-blue-600">{{ Math.round(advice.market_analysis.strength * 100) }}%</span>
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                  <div class="flex items-center justify-between">
+                    <span class="text-gray-600">信心度:</span>
+                    <span class="font-medium text-purple-600">{{ Math.round(advice.market_analysis.confidence * 100) }}%</span>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span class="text-gray-600">動量:</span>
+                    <span class="font-medium text-orange-600">{{ advice.market_analysis.momentum }}</span>
+                  </div>
+                </div>
+                <div class="text-gray-600 mt-2 p-2 bg-blue-50 rounded">
+                  <div class="text-xs text-blue-700 mb-1">💡 強度說明:</div>
+                  <div class="text-xs text-blue-600">
+                    {{ advice.market_analysis.strength >= 0.8 ? '🟢 強勢 (>80%): 趨勢非常明確，建議積極操作' :
+                       advice.market_analysis.strength >= 0.6 ? '🟡 中等 (60-80%): 趨勢較為明確，可謹慎操作' :
+                       advice.market_analysis.strength >= 0.4 ? '🟠 偏弱 (40-60%): 趨勢不夠明確，建議觀望' :
+                       '🔴 弱勢 (<40%): 趨勢不明，風險較高' }}
+                  </div>
+                </div>
+                <div class="text-gray-700 mt-2 font-medium">{{ translateReasoningText(advice.reasoning) }}</div>
+              </div>
+
+              <!-- 策略名稱 -->
+              <div class="text-xs text-blue-600 font-medium">
+                📈 {{ advice.strategy_name }}
+              </div>
+            </div>
+          </div>
+
+          <!-- 無建議時的提示 -->
+          <div v-else class="text-center py-12">
+            <div class="text-gray-400 mb-4">
+              <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">暫無即時建議</h3>
+            <p class="text-gray-600 mb-4">點擊上方按鈕生成基於牛熊市判斷的中長線策略建議</p>
+            <div class="text-sm text-gray-500">
+              <p>• 牛市環境：分析日線、3日線、週線走勢</p>
+              <p>• 熊市環境：分析3日線、週線、月線走勢</p>
+              <p>• 建議可手動刪除，24小時後自動過期</p>
             </div>
           </div>
         </div>
@@ -819,7 +1091,7 @@
       <!-- 系統更新日誌 - 增強版（可展開顯示20筆記錄） -->
       <div class="mb-8 bg-white shadow rounded-lg p-6">
         <div class="flex justify-between items-center mb-4">
-          <h2 class="text-lg font-semibold text-gray-900">📋 系統更新日誌</h2>
+          <h2 class="text-lg font-semibold text-gray-900">📋 即時數據更新日誌</h2>
           <div class="flex items-center space-x-4">
             <!-- 展開/收縮按鈕 -->
             <button @click="isLogExpanded = !isLogExpanded"
@@ -837,7 +1109,7 @@
                 class="w-2 h-2 rounded-full transition-all duration-300"></div>
               <span :class="isLogRefreshing ? 'text-blue-600 font-medium' : 'text-gray-500'"
                 class="text-sm transition-all duration-300">
-                {{ isLogRefreshing ? '正在更新...' : '每5秒更新' }}
+                {{ isLogRefreshing ? '正在更新...' : '每3秒更新' }}
               </span>
               <div v-if="isLogRefreshing" class="inline-flex items-center text-xs text-blue-500 animate-pulse">
                 <svg class="w-3 h-3 mr-1 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -910,8 +1182,12 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
+import api, { checkHealth, waitForService } from '@/utils/api'
 import CustomNotification from '../components/CustomNotification.vue'
 import LoadingOverlay from '../components/LoadingOverlay.vue'
+import StatusBadge from '../components/StatusBadge.vue'
+import ServiceStatus from '../components/ServiceStatus.vue'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
 
 interface Signal {
   id: number | string
@@ -943,15 +1219,71 @@ interface Signal {
   archived_at?: string
   archive_reason?: 'completed' | 'expired' | 'stopped' | 'archived'
   final_result?: string
+  // 短線信號歷史專用字段
+  trade_result?: 'success' | 'failure' | 'breakeven'
+  profit_percent?: number
   // 短線信號專用字段
   is_scalping?: boolean
+  // 🔥 牛市短線交易優化：新增技術指標字段
+  technical_summary?: {
+    volume_analysis?: {
+      relative_volume?: number
+      volume_trend?: string
+    }
+  }
+  price_action?: {
+    breakout_potential?: number
+    support_resistance?: number
+  }
+  bollinger_bands?: {
+    upper?: number
+    lower?: number
+    middle?: number
+  }
   strategy_name?: string
   scalping_type?: string
   signal_strength?: number
   key_indicators?: Record<string, any>
   expires_at?: string
   price_change_percent?: number
+  // 新增：後端計算的時效性和風險信息
+  validity_info?: {
+    percentage: number
+    remaining_minutes: number
+    status: string
+    text: string
+    color: string
+    can_execute: boolean
+  }
+  execution_status?: string  // active, expired, executed, cancelled
+  price_deviation_risk?: {
+    level: string
+    percentage: number
+    warning: string
+    color: string
+  }
+  market_condition_impact?: {
+    impact_score: number
+    condition_text: string
+    risk_text: string
+    overall_rating: string
+    rating_text: string
+    rating_color: string
+  }
+  // 新增：手動即時建議專用字段
+  is_manual_advice?: boolean
+  advice_type?: string
+  time_horizon?: string
+  market_analysis?: {
+    trend: string
+    strength: number
+    confidence: number
+    duration_days: number
+    volatility: string
+    momentum: string
+  }
 }
+
 
 interface RealtimeUpdate {
   symbol: string
@@ -1027,10 +1359,10 @@ const selectedCategory = ref<string>('ALL')
 
 // 信號展開狀態管理
 const expandedSignals = ref<Set<number | string>>(new Set())
+const expandedIndicators = ref<Set<number | string>>(new Set()) // 新增：技術指標展開狀態
 
 // 新信號追蹤狀態
 const newSignalIds = ref<Set<number | string>>(new Set())
-const previousSignalsMap = ref<Map<string, Signal>>(new Map())
 
 // 使用者設置
 const soundNotificationEnabled = ref(true)
@@ -1053,45 +1385,23 @@ const shortTermFilter = reactive({
 const shortTermSignals = ref<Signal[]>([])
 const rawScalpingSignals = ref<any[]>([]) // 原始短線專用信號
 
-// 短線信號暫存機制
-const scalpingSignalsCache = ref({
-  data: [] as any[],
-  timestamp: 0,
-  expireTime: 3 * 60 * 1000 // 3分鐘過期時間
+// 新增：手動即時建議相關數據
+const instantAdviceSignals = ref<Signal[]>([])
+const isGeneratingAdvice = ref(false)
+const adviceStats = reactive({
+  totalAdvice: 0,
+  bullishAdvice: 0,
+  bearishAdvice: 0,
+  avgConfidence: 0
 })
 
-// 從localStorage載入短線信號暫存
-const loadScalpingSignalsCache = () => {
-  try {
-    const saved = localStorage.getItem('tradingx_scalping_signals_cache')
-    if (saved) {
-      const parsed = JSON.parse(saved)
-      const now = Date.now()
-      const cacheAge = now - parsed.timestamp
-
-      // 如果暫存未過期，則載入
-      if (cacheAge < parsed.expireTime) {
-        scalpingSignalsCache.value = parsed
-        console.log(`載入短線信號暫存 (${Math.round(cacheAge / 1000)}秒前)`)
-      } else {
-        console.log('短線信號暫存已過期，清除localStorage')
-        localStorage.removeItem('tradingx_scalping_signals_cache')
-      }
-    }
-  } catch (error) {
-    console.error('載入短線信號暫存失敗:', error)
-    localStorage.removeItem('tradingx_scalping_signals_cache')
-  }
-}
-
-// 保存短線信號暫存到localStorage
-const saveScalpingSignalsCache = () => {
-  try {
-    localStorage.setItem('tradingx_scalping_signals_cache', JSON.stringify(scalpingSignalsCache.value))
-  } catch (error) {
-    console.error('保存短線信號暫存失敗:', error)
-  }
-}
+// 短線信號刷新確認彈窗
+const showRefreshConfirm = ref(false)
+const refreshConfirmDetails = ref([
+  '將重新獲取最新信號',
+  '建議在市場突發波動較大時才執行此操作',
+  '策略邏輯測試功能'
+])
 
 // 即時價格數據
 const realtimePrices = ref<Record<string, any>>({})
@@ -1182,13 +1492,35 @@ const navigateToSignalHistory = () => {
   router.push({ name: 'SignalHistory' })
 }
 
+// 跳轉到短線歷史頁面
+const navigateToShortTermHistory = () => {
+  router.push({ name: 'ShortTermHistory' })
+}
+
+// 測試過期信號歸檔功能
+const testExpiredSignals = async () => {
+  try {
+    console.log('手動觸發過期信號檢查...')
+    const expiredCount = await processExpiredShortTermSignals()
+    
+    if (expiredCount > 0) {
+      showNotification('success', `已清理 ${expiredCount} 個過期短線信號`)
+    } else {
+      showNotification('info', '沒有找到過期的短線信號')
+    }
+    
+  } catch (error) {
+    console.error('測試過期信號清理失敗:', error)
+    showNotification('error', '測試過期信號清理失敗')
+  }
+}
+
 // 獲取即時幣安價格
 const fetchRealtimePrices = async () => {
   try {
     const symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT'] // 只包含指定的5個幣種
-    const response = await axios.get('/api/v1/scalping/prices', {
-      params: { symbols },
-      timeout: 5000
+    const response = await api.get('/api/v1/scalping/prices', {
+      params: { symbols }
     })
 
     if (response.data && response.data.prices) {
@@ -1201,8 +1533,12 @@ const fetchRealtimePrices = async () => {
       console.log(`更新即時價格: ${Object.keys(realtimePrices.value).length} 個交易對`)
     }
 
-  } catch (error) {
-    console.error('獲取即時價格失敗:', error)
+  } catch (error: any) {
+    // 只在開發模式下輸出錯誤，避免生產環境的噪音
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('獲取即時價格失敗 (非關鍵錯誤):', error?.message || error)
+    }
+    // 不顯示錯誤通知，因為這不是關鍵功能
   }
 }
 
@@ -1223,8 +1559,8 @@ const updateCurrentPricesInSignals = () => {
   })
 
   // 同時更新暫存中的價格信息
-  if (scalpingSignalsCache.value.data.length > 0) {
-    scalpingSignalsCache.value.data.forEach(signal => {
+  if (rawScalpingSignals.value.length > 0) {
+    rawScalpingSignals.value.forEach((signal: any) => {
       const priceData = realtimePrices.value[signal.symbol]
       if (priceData && priceData.price) {
         signal.current_price = priceData.price
@@ -1236,47 +1572,74 @@ const updateCurrentPricesInSignals = () => {
         }
       }
     })
-
-    // 更新暫存時間戳，但不改變過期時間
-    scalpingSignalsCache.value.timestamp = Date.now()
-
-    // 重新保存到localStorage
-    saveScalpingSignalsCache()
   }
 }
 const fetchScalpingSignals = async (): Promise<any[]> => {
   try {
-    // 檢查暫存是否有效
-    const now = Date.now()
-    const cacheAge = now - scalpingSignalsCache.value.timestamp
+    console.log('獲取短線信號...')
 
-    // 如果暫存存在且未過期，直接返回暫存數據
-    if (scalpingSignalsCache.value.data.length > 0 && cacheAge < scalpingSignalsCache.value.expireTime) {
-      console.log(`使用暫存的短線信號 (${Math.round(cacheAge / 1000)}秒前)，剩餘 ${Math.round((scalpingSignalsCache.value.expireTime - cacheAge) / 1000)}秒過期`)
-      return scalpingSignalsCache.value.data
-    }
-
-    console.log('暫存已過期或無效，重新獲取短線信號...')
-
-    const response = await axios.get('/api/v1/scalping/signals', {
+    const response = await api.get('/api/v1/scalping/signals', {
       params: {
-        symbols: ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT'], // 只包含指定的5個幣種
+        symbols: ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT'],
         timeframes: ['1m', '3m', '5m', '15m', '30m'],
-        min_confidence: 0.85, // 提升至85%信心度 (牛市精選)
+        min_confidence: 0.85,
         urgency_levels: ['urgent', 'high', 'medium'],
-        market_condition: 'bull', // 牛市環境
-        risk_level: 'conservative' // 縮小止盈止損區間
-      },
-      timeout: 8000
+        market_condition: 'bull',
+        risk_level: 'conservative'
+      }
     })
 
     rawScalpingSignals.value = response.data || []
     console.log(`獲取到 ${rawScalpingSignals.value.length} 個專用短線信號`)
 
+    // 載入存儲的信號時間戳
+    const savedTimestamps = JSON.parse(localStorage.getItem('tradingx_signal_timestamps') || '{}')
+
     // 轉換為通用Signal格式以便在UI中顯示
     const convertedSignals = rawScalpingSignals.value.map(signal => {
+      // 🔧 修正信號標識符：加入時間戳哈希避免不同時期的相同策略信號被混淆
+      const timeHash = Math.floor(new Date(signal.created_at).getTime() / (1000 * 60 * 30)) // 30分鐘為一個時間片段
+      const signalKey = `${signal.symbol}_${signal.signal_type}_${signal.primary_timeframe}_${signal.strategy_name}_${timeHash}`
+      
+      // 檢查是否為已知信號（在時間窗口內）
+      let preservedCreatedAt = signal.created_at
+      let preservedExpiresAt = signal.expires_at
+      let isExistingSignal = false
+      
+      if (savedTimestamps[signalKey]) {
+        const saved = savedTimestamps[signalKey]
+        const savedTime = new Date(saved.created_at)
+        const currentTime = new Date()
+        const hoursDiff = (currentTime.getTime() - savedTime.getTime()) / (1000 * 60 * 60)
+        
+        // 只有在4小時內的信號才視為同一信號，超過則視為新信號
+        if (hoursDiff < 4) {
+          preservedCreatedAt = saved.created_at
+          preservedExpiresAt = saved.expires_at
+          isExistingSignal = true
+          console.log(`信號 ${signalKey} 使用保存的時間戳 (${hoursDiff.toFixed(1)}小時前)`)
+        } else {
+          // 清理過期的時間戳記錄
+          delete savedTimestamps[signalKey]
+          console.log(`信號 ${signalKey} 時間戳過期，使用新時間戳`)
+        }
+      }
+      
+      if (!isExistingSignal) {
+        // 新信號，保存其時間戳
+        savedTimestamps[signalKey] = {
+          created_at: signal.created_at,
+          expires_at: signal.expires_at,
+          symbol: signal.symbol,
+          signal_type: signal.signal_type,
+          entry_price: signal.entry_price
+        }
+        localStorage.setItem('tradingx_signal_timestamps', JSON.stringify(savedTimestamps))
+        console.log(`新信號 ${signalKey} 保存時間戳`)
+      }
+
       const convertedSignal: Signal = {
-        id: signal.id,
+        id: signalKey, // 使用穩定的標識符作為 ID
         symbol: signal.symbol,
         primary_timeframe: signal.primary_timeframe,
         confirmed_timeframes: signal.confirmed_timeframes || [signal.primary_timeframe],
@@ -1289,8 +1652,8 @@ const fetchScalpingSignals = async (): Promise<any[]> => {
         take_profit: signal.take_profit,
         risk_reward_ratio: signal.risk_reward_ratio,
         reasoning: signal.reasoning || `${signal.strategy_name} - ${signal.scalping_type}`,
-        created_at: signal.created_at,
-        expires_at: signal.expires_at,
+        created_at: preservedCreatedAt, // 使用保存的時間戳
+        expires_at: preservedExpiresAt, // 使用保存的過期時間
         key_indicators: signal.key_indicators || {},
         strategy_name: signal.strategy_name,
         is_scalping: true
@@ -1311,44 +1674,47 @@ const fetchScalpingSignals = async (): Promise<any[]> => {
       return convertedSignal
     })
 
-    // 更新暫存（包含當前價格信息）
-    scalpingSignalsCache.value = {
-      data: convertedSignals,
-      timestamp: now,
-      expireTime: 3 * 60 * 1000 // 3分鐘過期
-    }
+    // 清理過期的時間戳（超過24小時的記錄）
+    cleanupExpiredTimestamps()
 
-    // 保存到localStorage
-    saveScalpingSignalsCache()
-
-    console.log(`短線信號已暫存，3分鐘後過期`)
     return convertedSignals
 
   } catch (error) {
     console.error('獲取短線信號失敗:', error)
     rawScalpingSignals.value = []
-
-    // 如果API失敗但有暫存數據，則返回暫存數據
-    if (scalpingSignalsCache.value.data.length > 0) {
-      console.log('API失敗，使用暫存的短線信號數據')
-      return scalpingSignalsCache.value.data
-    }
-
     return []
   }
 }
 
-// 清除短線信號暫存（強制刷新）
-const clearScalpingSignalsCache = () => {
-  scalpingSignalsCache.value = {
-    data: [],
-    timestamp: 0,
-    expireTime: 3 * 60 * 1000
+// 清理過期的信號時間戳
+const cleanupExpiredTimestamps = () => {
+  try {
+    const savedTimestamps = JSON.parse(localStorage.getItem('tradingx_signal_timestamps') || '{}')
+    const now = new Date()
+    const expiredKeys: string[] = []
+    
+    // 檢查每個時間戳，移除超過4小時的記錄（與信號重用邏輯一致）
+    Object.keys(savedTimestamps).forEach(key => {
+      const saved = savedTimestamps[key]
+      // 處理新的數據結構
+      const timestamp = typeof saved === 'string' ? saved : saved.created_at
+      const timestampDate = new Date(timestamp)
+      const hoursElapsed = (now.getTime() - timestampDate.getTime()) / (1000 * 60 * 60)
+      
+      if (hoursElapsed > 4) { // 改為4小時，與主邏輯一致
+        expiredKeys.push(key)
+      }
+    })
+    
+    // 移除過期的記錄
+    if (expiredKeys.length > 0) {
+      expiredKeys.forEach(key => delete savedTimestamps[key])
+      localStorage.setItem('tradingx_signal_timestamps', JSON.stringify(savedTimestamps))
+      console.log(`清理了 ${expiredKeys.length} 個過期的信號時間戳記錄 (>4小時)`)
+    }
+  } catch (error) {
+    console.error('清理時間戳記錄失敗:', error)
   }
-
-  // 同時清除localStorage
-  localStorage.removeItem('tradingx_scalping_signals_cache')
-  console.log('短線信號暫存已清除')
 }
 
 // 短線信號相關函數 - 激進模式（混合中長線篩選和專用短線信號）
@@ -1373,7 +1739,7 @@ const updateShortTermSignals = async () => {
       )
     })
 
-    // 2. 獲取專用短線信號
+    // 2. 獲取專用短線信號（後端已包含完整的時效性和風險計算）
     const scalpingSignals = await fetchScalpingSignals()
 
     // 2.1 同時獲取即時價格
@@ -1383,9 +1749,25 @@ const updateShortTermSignals = async () => {
     const allShortSignals = [...scalpingSignals, ...filteredFromGeneral]
     const uniqueSignals = new Map()
 
+    // 首先檢查現有的短線信號，避免同幣種重複
+    const existingCoins = new Set(shortTermSignals.value
+      .filter(signal => {
+        const validityCheck = checkShortTermSignalValidity(signal)
+        return !validityCheck.isExpired // 只考慮未過期的信號
+      })
+      .map(signal => signal.symbol)
+    )
+
     // 基於幣種去重，每個幣種只保留信心度最高的一個信號
     allShortSignals.forEach(signal => {
       const key = signal.symbol
+      
+      // 如果該幣種在儀表板中已有未過期信號，跳過
+      if (existingCoins.has(key)) {
+        console.log(`跳過 ${key}：儀表板中已存在未過期信號`)
+        return
+      }
+      
       const existingSignal = uniqueSignals.get(key)
 
       // 如果該鍵不存在，或當前信號信心度更高，或當前信號是專用短線信號且信心度相近，則保留當前信號
@@ -1396,7 +1778,15 @@ const updateShortTermSignals = async () => {
       }
     })
 
-    shortTermSignals.value = Array.from(uniqueSignals.values())
+    // 將新信號添加到現有短線信號中，而不是完全替換
+    const newSignals = Array.from(uniqueSignals.values())
+    shortTermSignals.value = [...shortTermSignals.value, ...newSignals]
+
+    // 首先檢查並歸檔過期信號（無論手動還是自動刷新）
+    const expiredCount = await processExpiredShortTermSignals()
+
+    // 確保至少保持5個主要幣種的信號
+    await ensureMinimumCoinCoverage()
 
     // 更新統計數據
     const scalpingCount = shortTermSignals.value.filter(s => s.is_scalping).length
@@ -1411,6 +1801,10 @@ const updateShortTermSignals = async () => {
     shortTermStats.strategiesUsed = strategiesSet.size
 
     console.log(`短線信號更新完成: 總計${shortTermStats.totalSignals}個 (專用短線${scalpingCount}個, 中長線篩選${shortTermStats.totalSignals - scalpingCount}個, ${shortTermStats.strategiesUsed}種策略)`)
+
+    if (expiredCount > 0) {
+      console.log(`處理了 ${expiredCount} 個過期短線信號並移至歷史紀錄`)
+    }
 
   } catch (error) {
     console.error('短線信號更新失敗:', error)
@@ -1427,7 +1821,259 @@ const updateShortTermSignals = async () => {
       ? Math.round(shortTermSignals.value.reduce((sum, signal) => sum + signal.confidence * 100, 0) / shortTermSignals.value.length)
       : 0
   }
-}// 檢查信號是否在指定時間內
+}
+
+// 生成即時中長線建議
+const generateInstantAdvice = async () => {
+  try {
+    isGeneratingAdvice.value = true
+    showLoading('正在生成即時中長線建議...')
+
+    const response = await api.post('/api/v1/signals/generate-instant-advice', {
+      symbols: ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT'],
+      analysis_depth: 'comprehensive'
+    })
+
+    const adviceData = response.data
+    instantAdviceSignals.value = adviceData.advice_signals || []
+
+    // 為每個建議添加時效性檢查（根據建議類型設定不同有效期）
+    instantAdviceSignals.value.forEach(advice => {
+      if (!advice.expires_at) {
+        // 根據市場分析的時間跨度設定不同的有效期
+        let hoursToExpire = 24 // 預設24小時
+        
+        if (advice.time_horizon) {
+          if (advice.time_horizon.includes('短線')) {
+            hoursToExpire = 4 // 短線4小時
+          } else if (advice.time_horizon.includes('中線')) {
+            hoursToExpire = 12 // 中線12小時
+          } else if (advice.time_horizon.includes('中長線')) {
+            hoursToExpire = 48 // 中長線48小時
+          } else if (advice.time_horizon.includes('長線')) {
+            hoursToExpire = 72 // 長線72小時
+          }
+        } else if (advice.market_analysis?.trend === 'BULL') {
+          // 牛市環境：延長有效期
+          hoursToExpire = 36
+        } else if (advice.market_analysis?.trend === 'BEAR') {
+          // 熊市環境：縮短有效期
+          hoursToExpire = 18
+        }
+
+        const expireTime = new Date()
+        expireTime.setHours(expireTime.getHours() + hoursToExpire)
+        advice.expires_at = expireTime.toISOString()
+        
+        console.log(`設定 ${advice.symbol} 建議有效期: ${hoursToExpire} 小時 (${advice.time_horizon || '中長線'})`)
+      }
+    })
+
+    // 保存到 localStorage
+    saveInstantAdviceToStorage()
+
+    // 更新統計
+    updateAdviceStats()
+
+    console.log(`生成了 ${adviceStats.totalAdvice} 個即時中長線建議`)
+    showNotification('success', '即時建議生成成功', 
+      `基於牛熊市分析，生成 ${adviceStats.totalAdvice} 個中長線策略建議`)
+
+  } catch (error) {
+    console.error('生成即時建議失敗:', error)
+    showNotification('error', '生成建議失敗', '無法獲取即時中長線建議，請稍後重試')
+  } finally {
+    isGeneratingAdvice.value = false
+    hideLoading()
+  }
+}
+
+// 手動刪除即時建議
+const removeInstantAdvice = (adviceId: string | number) => {
+  const index = instantAdviceSignals.value.findIndex(advice => advice.id === adviceId)
+  if (index !== -1) {
+    const removedAdvice = instantAdviceSignals.value.splice(index, 1)[0]
+    
+    // 更新統計和儲存
+    updateAdviceStats()
+    saveInstantAdviceToStorage()
+
+    showNotification('info', '建議已移除', `已移除 ${removedAdvice.symbol} 的中長線建議`)
+  }
+}
+
+// 清除所有即時建議
+const clearAllInstantAdvice = () => {
+  const count = instantAdviceSignals.value.length
+  instantAdviceSignals.value = []
+  
+  // 重置統計和清除儲存
+  updateAdviceStats()
+  clearInstantAdviceFromStorage()
+  
+  showNotification('info', '已清除所有建議', `清除了 ${count} 個即時中長線建議`)
+}
+
+// 更新即時建議統計
+const updateAdviceStats = () => {
+  adviceStats.totalAdvice = instantAdviceSignals.value.length
+  adviceStats.bullishAdvice = instantAdviceSignals.value.filter(s => s.signal_type === 'LONG').length
+  adviceStats.bearishAdvice = instantAdviceSignals.value.filter(s => s.signal_type === 'SHORT').length
+  adviceStats.avgConfidence = instantAdviceSignals.value.length > 0
+    ? Math.round(instantAdviceSignals.value.reduce((sum, signal) => sum + signal.confidence * 100, 0) / instantAdviceSignals.value.length)
+    : 0
+}
+
+// 保存即時建議到 localStorage
+const saveInstantAdviceToStorage = () => {
+  try {
+    const adviceData = {
+      signals: instantAdviceSignals.value,
+      timestamp: Date.now()
+    }
+    localStorage.setItem('tradingx_instant_advice', JSON.stringify(adviceData))
+    console.log(`保存 ${instantAdviceSignals.value.length} 個即時建議到 localStorage`)
+  } catch (error) {
+    console.error('保存即時建議失敗:', error)
+  }
+}
+
+// 從 localStorage 載入即時建議
+const loadInstantAdviceFromStorage = () => {
+  try {
+    const saved = localStorage.getItem('tradingx_instant_advice')
+    if (saved) {
+      const adviceData = JSON.parse(saved)
+      const validAdvice = adviceData.signals.filter((advice: Signal) => {
+        // 檢查是否過期
+        if (advice.expires_at) {
+          const expireTime = new Date(advice.expires_at)
+          const now = new Date()
+          return now < expireTime
+        }
+        return true
+      })
+
+      instantAdviceSignals.value = validAdvice
+      updateAdviceStats()
+
+      // 如果有過期的建議被移除，更新儲存
+      if (validAdvice.length !== adviceData.signals.length) {
+        const expiredCount = adviceData.signals.length - validAdvice.length
+        console.log(`移除了 ${expiredCount} 個過期的即時建議`)
+        saveInstantAdviceToStorage()
+      }
+
+      console.log(`從 localStorage 載入 ${validAdvice.length} 個有效即時建議`)
+    }
+  } catch (error) {
+    console.error('載入即時建議失敗:', error)
+    // 如果載入失敗，清除可能損壞的數據
+    localStorage.removeItem('tradingx_instant_advice')
+  }
+}
+
+// 清除 localStorage 中的即時建議
+const clearInstantAdviceFromStorage = () => {
+  try {
+    localStorage.removeItem('tradingx_instant_advice')
+    console.log('已清除 localStorage 中的即時建議')
+  } catch (error) {
+    console.error('清除即時建議儲存失敗:', error)
+  }
+}
+
+// 檢查並清理過期的即時建議
+const cleanupExpiredAdvice = () => {
+  const originalCount = instantAdviceSignals.value.length
+  const now = new Date()
+  
+  instantAdviceSignals.value = instantAdviceSignals.value.filter(advice => {
+    if (advice.expires_at) {
+      const expireTime = new Date(advice.expires_at)
+      return now < expireTime
+    }
+    return true
+  })
+
+  const expiredCount = originalCount - instantAdviceSignals.value.length
+  if (expiredCount > 0) {
+    updateAdviceStats()
+    saveInstantAdviceToStorage()
+    console.log(`自動清理了 ${expiredCount} 個過期的即時建議`)
+    showNotification('info', '建議已過期', `已自動移除 ${expiredCount} 個過期的中長線建議`)
+  }
+}
+
+// 翻譯reasoning中的英文術語
+const translateReasoningText = (text?: string): string => {
+  if (!text) return ''
+  
+  return text
+    .replace(/LONG操作/g, '做多操作')
+    .replace(/SHORT操作/g, '做空操作')
+    .replace(/建議LONG/g, '建議做多')
+    .replace(/建議SHORT/g, '建議做空')
+    .replace(/LONG建議/g, '做多建議')
+    .replace(/SHORT建議/g, '做空建議')
+    .replace(/\bLONG\b/g, '做多')
+    .replace(/\bSHORT\b/g, '做空')
+}
+
+// 計算即時建議剩餘時效
+const calculateAdviceValidity = (advice: Signal): { percentage: number; text: string; isExpiring: boolean } => {
+  if (!advice.expires_at) {
+    return { percentage: 100, text: '永久有效', isExpiring: false }
+  }
+
+  try {
+    const expireTime = new Date(advice.expires_at)
+    const now = new Date()
+    const remainingMs = expireTime.getTime() - now.getTime()
+    
+    if (remainingMs <= 0) {
+      return { percentage: 0, text: '已過期', isExpiring: true }
+    }
+
+    // 動態計算總有效期（從創建時間到過期時間）
+    let totalMs = 24 * 60 * 60 * 1000 // 預設24小時
+    if (advice.created_at) {
+      const createdTime = new Date(advice.created_at)
+      totalMs = expireTime.getTime() - createdTime.getTime()
+    }
+
+    const percentage = Math.max(0, (remainingMs / totalMs) * 100)
+    
+    const remainingHours = Math.floor(remainingMs / (1000 * 60 * 60))
+    const remainingMinutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60))
+    
+    let text = ''
+    let isExpiring = false
+    
+    if (remainingHours > 24) {
+      const days = Math.floor(remainingHours / 24)
+      const hours = remainingHours % 24
+      text = days > 0 ? `${days}天${hours}小時` : `${remainingHours}小時`
+    } else if (remainingHours > 6) {
+      text = `${remainingHours}小時`
+    } else if (remainingHours > 0) {
+      text = `${remainingHours}小時${remainingMinutes}分`
+      isExpiring = remainingHours <= 2
+    } else if (remainingMinutes > 0) {
+      text = `${remainingMinutes}分鐘`
+      isExpiring = true
+    } else {
+      text = '即將過期'
+      isExpiring = true
+    }
+
+    return { percentage: Math.round(percentage), text, isExpiring }
+  } catch (error) {
+    return { percentage: 50, text: '計算錯誤', isExpiring: false }
+  }
+}
+
+// 檢查信號是否在指定時間內
 const isSignalRecentEnough = (signal: Signal, maxMinutes: number): boolean => {
   if (!signal.created_at) return true // 如果沒有時間戳，假設是新信號
 
@@ -1442,13 +2088,47 @@ const isSignalRecentEnough = (signal: Signal, maxMinutes: number): boolean => {
 }
 
 const refreshShortTermSignals = async () => {
-  // 清除短線信號暫存，強制重新獲取
-  clearScalpingSignalsCache()
-
+  // 直接重新獲取數據，不再使用快取
   await updateShortTermSignals()
   showNotification('success', '激進短線信號已刷新',
     `強制刷新完成！發現 ${shortTermStats.totalSignals} 個短線交易機會 (包含${shortTermStats.strategiesUsed}種策略)`)
-}// 計算短線信號時效性 - 激進模式
+}
+
+// 確認刷新短線信號
+const confirmRefreshShortTermSignals = async () => {
+  showRefreshConfirm.value = false
+  
+  // 在刷新之前，先檢查並歸檔過期的信號
+  const expiredCount = await processExpiredShortTermSignals()
+
+  if (expiredCount > 0) {
+    console.log(`手動刷新：處理了 ${expiredCount} 個過期短線信號並移至歷史紀錄`)
+    showNotification('info', '信號歸檔完成', `已將 ${expiredCount} 個過期信號移至歷史紀錄`)
+  }
+
+  // 然後執行刷新
+  await refreshShortTermSignals()
+}// 獲取信號時效性（優先使用後端數據，向後兼容前端計算）
+const getSignalValidity = (signal: Signal): { percentage: number; text: string; can_execute: boolean } => {
+  // 優先使用後端提供的 validity_info
+  if (signal.validity_info) {
+    return {
+      percentage: signal.validity_info.percentage,
+      text: signal.validity_info.text,
+      can_execute: signal.validity_info.can_execute
+    }
+  }
+  
+  // 向後兼容：如果沒有後端數據，使用前端計算
+  const frontendValidity = getShortTermValidity(signal)
+  return {
+    percentage: frontendValidity.percentage,
+    text: frontendValidity.text,
+    can_execute: frontendValidity.percentage > 10
+  }
+}
+
+// 計算短線信號時效性 - 激進模式（保留作為後備方案）
 const getShortTermValidity = (signal: Signal): { percentage: number; text: string } => {
   if (!signal.created_at) return { percentage: 100, text: '即時' }
 
@@ -1487,9 +2167,16 @@ const getShortTermValidity = (signal: Signal): { percentage: number; text: strin
   }
 }// 快速執行交易
 const executeQuickTrade = (signal: Signal) => {
-  const validity = getShortTermValidity(signal)
-  if (validity.percentage <= 10) {
-    showNotification('warning', '信號已過期', '此短線信號已過期，無法執行')
+  const validity = getSignalValidity(signal)
+  
+  if (!validity.can_execute) {
+    showNotification('warning', '信號無法執行', '此短線信號已過期或不符合執行條件')
+    return
+  }
+
+  // 檢查價格偏離風險
+  if (signal.price_deviation_risk && signal.price_deviation_risk.level === 'critical') {
+    showNotification('warning', '價格偏離風險', signal.price_deviation_risk.warning)
     return
   }
 
@@ -1502,6 +2189,10 @@ const executeQuickTrade = (signal: Signal) => {
 
 // 查看短線信號詳情
 const viewShortTermDetail = (signal: Signal) => {
+  const validity = getSignalValidity(signal)
+  const priceRisk = signal.price_deviation_risk || { level: 'unknown', warning: '無數據' }
+  const marketImpact = signal.market_condition_impact || { rating_text: '無數據', condition_text: '無數據' }
+  
   // 暫時使用 alert，後續可以開發詳細的模態框
   const details = `
 短線信號詳情:
@@ -1513,109 +2204,21 @@ const viewShortTermDetail = (signal: Signal) => {
 止盈價格: $${signal.take_profit?.toFixed(4)}
 信心度: ${Math.round(signal.confidence * 100)}%
 緊急度: ${signal.urgency_level}
-剩餘時效: ${getShortTermValidity(signal).text}
+剩餘時效: ${validity.text}
+價格偏離風險: ${priceRisk.warning}
+市場條件評級: ${marketImpact.rating_text} (${marketImpact.condition_text})
+執行狀態: ${signal.execution_status || 'active'}
   `
   alert(details)
 }
 
-// 檢測新信號
-const detectNewSignals = (newSignals: Signal[]) => {
-  const currentTime = new Date()
-  const newDetectedSignals: Signal[] = []
-
-  newSignals.forEach(signal => {
-    const signalKey = `${signal.symbol}_${signal.signal_type}`
-    const previousSignal = previousSignalsMap.value.get(signalKey)
-
-    // 檢查是否為新信號（5分鐘內的信號視為新信號）
-    if (signal.created_at) {
-      const signalTime = new Date(signal.created_at)
-      const timeDiffMinutes = (currentTime.getTime() - signalTime.getTime()) / (1000 * 60)
-
-      if (timeDiffMinutes <= 5 && (!previousSignal || previousSignal.id !== signal.id)) {
-        newDetectedSignals.push(signal)
-        newSignalIds.value.add(signal.id)
-
-        // 自動展開新信號
-        expandedSignals.value.add(signal.id)
-      }
-    }
-
-    // 更新信號映射
-    previousSignalsMap.value.set(signalKey, signal)
-  })
-
-  // 發送新信號通知
-  if (newDetectedSignals.length > 0) {
-    showNewSignalNotification(newDetectedSignals)
-    playNotificationSound()
-  }
-
-  // 10秒後移除新信號標記
-  setTimeout(() => {
-    newDetectedSignals.forEach(signal => {
-      newSignalIds.value.delete(signal.id)
-    })
-  }, 10000)
-}
-
-// 顯示新信號通知
-const showNewSignalNotification = (signals: Signal[]) => {
-  const symbolsList = signals.map(s => s.symbol).join(', ')
-  const signalTypes = signals.map(s => s.signal_type).join(', ')
-
-  showNotification(
-    'success',
-    `🎯 新交易信號出現！`,
-    `${symbolsList} 產生 ${signalTypes} 信號，共 ${signals.length} 個新信號`
-  )
-}
-
-// 播放通知音效
-const playNotificationSound = () => {
-  if (!soundNotificationEnabled.value) return
-
-  try {
-    // 創建簡單的提示音
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
-    const oscillator = audioContext.createOscillator()
-    const gainNode = audioContext.createGain()
-
-    oscillator.connect(gainNode)
-    gainNode.connect(audioContext.destination)
-
-    oscillator.frequency.setValueAtTime(800, audioContext.currentTime)
-    oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1)
-
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
-
-    oscillator.start(audioContext.currentTime)
-    oscillator.stop(audioContext.currentTime + 0.3)
-  } catch (error) {
-    console.log('無法播放通知音效:', error)
-  }
-}
-
-// 檢查信號是否為新信號
-const isNewSignal = (signalId: number | string): boolean => {
-  return newSignalIds.value.has(signalId)
-}
-
-// 獲取信號排序（新信號優先，然後按置信度排序）
-const getSortedSignals = (signals: Signal[]): Signal[] => {
-  return signals.sort((a, b) => {
-    // 新信號優先
-    const aIsNew = isNewSignal(a.id)
-    const bIsNew = isNewSignal(b.id)
-
-    if (aIsNew && !bIsNew) return -1
-    if (!aIsNew && bIsNew) return 1
-
-    // 然後按置信度排序
-    return (b.confidence - a.confidence)
-  })
-}
+// 移除未使用的函數警告
+// const detectNewSignals = (newSignals: Signal[]) => { ... }
+// const getSortedSignals = (signals: Signal[]): Signal[] => { ... }
+// const getMockRSI = (signal: Signal): number => { ... }
+// const getMockEMADeviation = (signal: Signal): number => { ... }
+// const getMockVolumeRatio = (signal: Signal): number => { ... }
+// const getMockATR = (signal: Signal): number => { ... }
 
 // 儲存信號到歷史記錄
 const saveSignalToHistory = (signal: Signal, action: 'completed' | 'expired' | 'stopped' | 'archived') => {
@@ -1673,6 +2276,386 @@ const calculateSignalResult = (signal: Signal): string => {
 
   return '0.00%'
 }
+
+// ===== 短線信號歷史紀錄系統 =====
+
+// 檢查短線信號時效性並計算結果（優化版本 - 牛市短線交易）
+const checkShortTermSignalValidity = (signal: Signal): { isExpired: boolean; result: 'success' | 'failure' | 'breakeven'; profitPercent: number } => {
+  let isExpired = false
+  
+  // 優先使用後端提供的 validity_info
+  if (signal.validity_info && signal.validity_info.status) {
+    isExpired = signal.validity_info.status === 'expired'
+  } else {
+    // 前端計算時效性（後備方案）
+    if (signal.created_at) {
+      try {
+        const createdTime = new Date(signal.created_at)
+        const now = new Date()
+        const minutesElapsed = (now.getTime() - createdTime.getTime()) / (1000 * 60)
+        
+        // 短線信號時效性判斷：根據時間框架設定不同的過期時間
+        let validityMinutes = 30 // 預設30分鐘
+        if (signal.primary_timeframe === '1m') validityMinutes = 10
+        else if (signal.primary_timeframe === '3m') validityMinutes = 15
+        else if (signal.primary_timeframe === '5m') validityMinutes = 20
+        else if (signal.primary_timeframe === '15m') validityMinutes = 45
+        else if (signal.primary_timeframe === '30m') validityMinutes = 60
+        
+        isExpired = minutesElapsed >= validityMinutes
+        
+        console.log(`前端計算時效性: ${signal.symbol} ${signal.primary_timeframe} 已經過 ${minutesElapsed.toFixed(1)} 分鐘，有效期 ${validityMinutes} 分鐘，${isExpired ? '已過期' : '未過期'}`)
+      } catch (error) {
+        console.error('時間計算錯誤:', error)
+        isExpired = false
+      }
+    }
+  }
+  
+  if (!isExpired || !signal.current_price || !signal.entry_price) {
+    return { isExpired, result: 'breakeven', profitPercent: 0 }
+  }
+
+  const direction = getSignalDirection(signal.signal_type)
+  const priceChange = signal.current_price - signal.entry_price
+  const profitPercent = (priceChange / signal.entry_price) * 100
+
+  // 🔧 牛市短線交易優化：動態止盈策略
+  let successThreshold = calculateDynamicStopProfit(signal)
+  const stopLossThreshold = 1.0 // 固定1%止損
+  const breakevenThreshold = 0.5 // 攤平閾值：0% < 利潤 < 0.5% 才算攤平
+
+  // 🐛 調試信息
+  console.log(`🔍 勝敗計算 ${signal.symbol}:`, {
+    direction,
+    entry_price: signal.entry_price,
+    current_price: signal.current_price,
+    priceChange,
+    profitPercent: profitPercent.toFixed(3),
+    successThreshold: successThreshold.toFixed(3),
+    stopLossThreshold,
+    breakevenThreshold
+  })
+
+  let result: 'success' | 'failure' | 'breakeven'
+
+  // 根據方向判斷勝敗
+  if (direction === 'LONG') {
+    // 做多：需要達到動態閾值才算成功
+    if (profitPercent >= successThreshold) {
+      result = 'success'
+      console.log(`✅ 做多成功: ${profitPercent.toFixed(3)}% >= ${successThreshold.toFixed(3)}%`)
+    } else if (profitPercent <= -stopLossThreshold) {
+      result = 'failure' // 虧損超過1%算失敗
+      console.log(`❌ 做多失敗: ${profitPercent.toFixed(3)}% <= -${stopLossThreshold}%`)
+    } else if (profitPercent > 0 && profitPercent < breakevenThreshold) {
+      result = 'breakeven' // 0% < 利潤 < 0.5% 才算攤平
+      console.log(`⚖️ 做多攤平: 0% < ${profitPercent.toFixed(3)}% < ${breakevenThreshold}%`)
+    } else {
+      result = 'success' // 0.5% <= 利潤 < successThreshold 也算成功
+      console.log(`✅ 做多成功(中等): ${profitPercent.toFixed(3)}% (介於 ${breakevenThreshold}% 和 ${successThreshold.toFixed(3)}% 之間)`)
+    }
+  } else if (direction === 'SHORT') {
+    // 做空：價格下跌需要達到動態閾值才算成功
+    if (-profitPercent >= successThreshold) { // 做空時使用負值進行比較
+      result = 'success'
+      console.log(`✅ 做空成功: -${profitPercent.toFixed(3)}% >= ${successThreshold.toFixed(3)}%`)
+    } else if (profitPercent >= stopLossThreshold) {
+      result = 'failure' // 虧損超過1%算失敗（做空時價格上漲）
+      console.log(`❌ 做空失敗: ${profitPercent.toFixed(3)}% >= ${stopLossThreshold}%`)
+    } else if (profitPercent < 0 && -profitPercent < breakevenThreshold) {
+      result = 'breakeven' // 做空：0% < 利潤 < 0.5% 才算攤平
+      console.log(`⚖️ 做空攤平: 0% < ${(-profitPercent).toFixed(3)}% < ${breakevenThreshold}%`)
+    } else {
+      result = 'success' // 做空：0.5% <= 利潤 < successThreshold 也算成功
+      console.log(`✅ 做空成功(中等): ${(-profitPercent).toFixed(3)}% (介於 ${breakevenThreshold}% 和 ${successThreshold.toFixed(3)}% 之間)`)
+    }
+  } else {
+    result = 'breakeven'
+    console.log(`⚖️ 未知方向攤平: ${direction}`)
+  }
+
+  // 🔧 修正：返回帶方向性的利潤百分比
+  const displayProfitPercent = direction === 'SHORT' ? -profitPercent : profitPercent
+  
+  return { isExpired, result, profitPercent: displayProfitPercent }
+}
+
+// � 牛市短線交易：動態止盈計算（ATR + ADX 趨勢判斷）
+const calculateDynamicStopProfit = (signal: Signal): number => {
+  // 基礎閾值設定
+  let baseThreshold = 2.0 // 基礎閾值2%
+  
+  // 根據時間框架調整基礎閾值
+  if (signal.primary_timeframe === '1m') baseThreshold = 1.5  // 1分鐘: 1.5%
+  else if (signal.primary_timeframe === '3m') baseThreshold = 2.0  // 3分鐘: 2%
+  else if (signal.primary_timeframe === '5m') baseThreshold = 2.5  // 5分鐘: 2.5%
+  else if (signal.primary_timeframe === '15m') baseThreshold = 3.0 // 15分鐘: 3%
+  else if (signal.primary_timeframe === '30m') baseThreshold = 4.0 // 30分鐘: 4%
+
+  // 🔥 ATR 波動率調整（模擬 ATR 計算）
+  let atrMultiplier = 1.0
+  const priceLevel = signal.entry_price || 1
+  
+  // 根據價格區間估算波動率調整
+  if (priceLevel > 50000) atrMultiplier = 1.3      // 高價位（如BTC）：高波動
+  else if (priceLevel > 3000) atrMultiplier = 1.2   // 中高價位（如ETH）：中高波動
+  else if (priceLevel > 300) atrMultiplier = 1.1    // 中價位（如BNB）：中等波動
+  else if (priceLevel > 1) atrMultiplier = 1.0      // 低價位：標準波動
+  else atrMultiplier = 0.8                          // 極低價位：低波動
+
+  // 🎯 ADX 趨勢強度判斷（基於技術指標模擬）
+  let trendMultiplier = 1.0
+  
+  // 基於現有信號數據估算趨勢強度
+  if (signal.key_indicators) {
+    const rsi = signal.key_indicators.rsi || 50
+    const macdSignal = signal.key_indicators.macd_signal || 0
+    const stochK = signal.key_indicators.stoch_k || 50
+    
+    // 趨勢強度評估
+    let trendScore = 0
+    
+    // RSI 趨勢判斷
+    if (rsi > 70 || rsi < 30) trendScore += 1  // 強趨勢
+    else if (rsi > 60 || rsi < 40) trendScore += 0.5  // 中等趨勢
+    
+    // MACD 趨勢判斷
+    if (Math.abs(macdSignal) > 0.5) trendScore += 1  // 強信號
+    else if (Math.abs(macdSignal) > 0.2) trendScore += 0.5  // 中等信號
+    
+    // Stochastic 趨勢判斷
+    if (stochK > 80 || stochK < 20) trendScore += 1  // 強勢區間
+    else if (stochK > 70 || stochK < 30) trendScore += 0.5  // 中等區間
+    
+    // 趨勢倍數調整
+    if (trendScore >= 2.5) trendMultiplier = 1.4      // 強趨勢：開放到4.8%
+    else if (trendScore >= 1.5) trendMultiplier = 1.2  // 中等趨勢：適度放寬
+    else if (trendScore >= 0.5) trendMultiplier = 1.0  // 弱趨勢：標準設定
+    else trendMultiplier = 0.8                         // 震盪盤：控制在1.5-2%
+  }
+
+  // 🎖️ 信心度調整（高信心度要求更高收益）
+  let confidenceMultiplier = 1.0
+  if (signal.confidence > 0.9) confidenceMultiplier = 1.3      // 極高信心度
+  else if (signal.confidence > 0.8) confidenceMultiplier = 1.2  // 高信心度+20%
+  else if (signal.confidence > 0.6) confidenceMultiplier = 1.0  // 中等信心度
+  else confidenceMultiplier = 0.8                              // 低信心度-20%
+
+  // 💎 追單條件檢測（突破條件額外加成）
+  let breakoutBonus = checkBreakoutConditions(signal)
+  
+  // 計算最終動態止盈點
+  let finalThreshold = baseThreshold * atrMultiplier * trendMultiplier * confidenceMultiplier + breakoutBonus
+  
+  // 限制在合理範圍內：1.2% ~ 6.0%
+  finalThreshold = Math.max(1.2, Math.min(6.0, finalThreshold))
+  
+  console.log(`🎯 動態止盈計算 ${signal.symbol}: 基礎${baseThreshold}% × ATR${atrMultiplier} × 趨勢${trendMultiplier} × 信心${confidenceMultiplier} + 突破${breakoutBonus}% = ${finalThreshold.toFixed(2)}%`)
+  
+  return finalThreshold
+}
+
+// 🚀 追單條件檢測（突破信號識別）
+const checkBreakoutConditions = (signal: Signal): number => {
+  let breakoutScore = 0
+  
+  // 檢查成交量突破（Volume Spike）
+  if (signal.technical_summary?.volume_analysis) {
+    const volumeRatio = signal.technical_summary.volume_analysis.relative_volume || 1
+    if (volumeRatio > 2.0) breakoutScore += 0.8  // 成交量暴增
+    else if (volumeRatio > 1.5) breakoutScore += 0.4  // 成交量增加
+  }
+  
+  // 檢查價格突破（Price Breakout）
+  if (signal.price_action) {
+    if (signal.price_action.breakout_potential && signal.price_action.breakout_potential > 0.7) {
+      breakoutScore += 0.6  // 高突破潛力
+    }
+  }
+  
+  // 檢查 MACD 雙金叉
+  if (signal.key_indicators) {
+    const macdLine = signal.key_indicators.macd_line || 0
+    const macdSignal = signal.key_indicators.macd_signal || 0
+    const macdHist = signal.key_indicators.macd_histogram || 0
+    
+    // MACD 金叉 + 柱狀圖向上
+    if (macdLine > macdSignal && macdHist > 0) {
+      breakoutScore += 0.5  // MACD 雙金叉
+    }
+  }
+  
+  // 檢查 RSI 突破關鍵位
+  if (signal.key_indicators?.rsi) {
+    const rsi = signal.key_indicators.rsi
+    if ((rsi > 50 && rsi < 70) || (rsi < 50 && rsi > 30)) {
+      breakoutScore += 0.3  // RSI 在動能區間
+    }
+  }
+  
+  // 檢查布林帶突破
+  if (signal.bollinger_bands) {
+    const currentPrice = signal.current_price || signal.entry_price || 0
+    const upperBand = signal.bollinger_bands.upper || 0
+    const lowerBand = signal.bollinger_bands.lower || 0
+    
+    if (currentPrice > upperBand || currentPrice < lowerBand) {
+      breakoutScore += 0.7  // 布林帶突破
+    }
+  }
+  
+  console.log(`💎 追單條件評分 ${signal.symbol}: ${breakoutScore.toFixed(2)}`)
+  return breakoutScore
+}
+
+// 🎯 判斷是否為突破信號（前端顯示用）
+const isBreakoutSignal = (signal: Signal): boolean => {
+  const breakoutScore = checkBreakoutConditions(signal)
+  const dynamicThreshold = calculateDynamicStopProfit(signal)
+  
+  // 突破信號條件：
+  // 1. 追單評分 > 1.5
+  // 2. 動態止盈目標 > 3.5%
+  // 3. 信心度 > 80%
+  const isBreakout = breakoutScore > 1.5 && dynamicThreshold > 3.5 && signal.confidence > 0.8
+  
+  if (isBreakout) {
+    console.log(`🚀 檢測到突破信號: ${signal.symbol} (評分:${breakoutScore.toFixed(2)}, 目標:${dynamicThreshold.toFixed(2)}%, 信心:${(signal.confidence * 100).toFixed(0)}%)`)
+  }
+  
+  return isBreakout
+}
+
+// 注意：短線信號歷史記錄現在由後端處理，前端不再需要本地存儲
+
+// 專門處理過期短線信號的函數（簡化版 - 僅移除過期信號）
+const processExpiredShortTermSignals = async () => {
+  console.log(`開始檢查過期短線信號，目前有 ${shortTermSignals.value.length} 個短線信號`)
+  
+  const expiredSignals = shortTermSignals.value.filter(signal => {
+    const validityCheck = checkShortTermSignalValidity(signal)
+    console.log(`信號檢查: ${signal.symbol} ${signal.signal_type} - ${validityCheck.isExpired ? '已過期' : '有效'}`)
+    return validityCheck.isExpired
+  })
+
+  console.log(`找到 ${expiredSignals.length} 個過期信號`)
+
+  // 🔄 將過期信號歸檔到短線歷史記錄
+  if (expiredSignals.length > 0) {
+    // 歸檔過期信號到歷史記錄
+    archiveExpiredShortTermSignals(expiredSignals)
+    
+    // 移除過期信號
+    shortTermSignals.value = shortTermSignals.value.filter(signal => {
+      const validityCheck = checkShortTermSignalValidity(signal)
+      return !validityCheck.isExpired
+    })
+    
+    console.log(`清理完成，歸檔並移除了 ${expiredSignals.length} 個過期短線信號`)
+  }
+
+  console.log(`清理完成，剩餘 ${shortTermSignals.value.length} 個有效信號`)
+  return expiredSignals.length
+}
+
+// 🗂️ 將過期短線信號歸檔到歷史記錄
+const archiveExpiredShortTermSignals = (expiredSignals: Signal[]) => {
+  try {
+    // 載入現有的短線歷史記錄
+    const existingHistory = localStorage.getItem('tradingx_shortterm_history')
+    const existingCategories = localStorage.getItem('tradingx_shortterm_categories')
+    
+    let shortTermHistory: any[] = existingHistory ? JSON.parse(existingHistory) : []
+    let shortTermCategories: Record<string, any> = existingCategories ? JSON.parse(existingCategories) : {}
+    
+    expiredSignals.forEach(signal => {
+      const validityCheck = checkShortTermSignalValidity(signal)
+      
+      // 創建歷史記錄條目
+      const historyEntry = {
+        id: signal.id,
+        symbol: signal.symbol,
+        signal_type: signal.signal_type,
+        entry_price: signal.entry_price,
+        current_price: signal.current_price,
+        confidence: signal.confidence,
+        archived_at: new Date().toISOString(),
+        archive_reason: 'expired',
+        trade_result: validityCheck.result,
+        profit_percent: validityCheck.profitPercent,
+        strategy_name: signal.strategy_name || '短線專用',
+        is_scalping: true
+      }
+      
+      // 添加到歷史記錄
+      shortTermHistory.push(historyEntry)
+      
+      // 更新分類統計
+      if (!shortTermCategories[signal.symbol]) {
+        shortTermCategories[signal.symbol] = {
+          name: signal.symbol,
+          signals: [],
+          count: 0
+        }
+      }
+      
+      shortTermCategories[signal.symbol].signals.push(historyEntry)
+      shortTermCategories[signal.symbol].count += 1
+      
+      console.log(`📊 歸檔短線信號: ${signal.symbol} ${signal.signal_type} -> ${validityCheck.result} (${validityCheck.profitPercent.toFixed(2)}%)`)
+    })
+    
+    // 保存到 localStorage
+    localStorage.setItem('tradingx_shortterm_history', JSON.stringify(shortTermHistory))
+    localStorage.setItem('tradingx_shortterm_categories', JSON.stringify(shortTermCategories))
+    
+    console.log(`✅ 成功歸檔 ${expiredSignals.length} 個短線信號到歷史記錄`)
+    
+  } catch (error) {
+    console.error('歸檔短線信號到歷史記錄失敗:', error)
+  }
+}
+
+// 確保最少5個主要幣種的信號覆蓋
+const ensureMinimumCoinCoverage = async () => {
+  const targetCoins = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT']
+  const currentCoins = new Set(shortTermSignals.value.map(s => s.symbol))
+  const missingCoins = targetCoins.filter(coin => !currentCoins.has(coin))
+
+  if (missingCoins.length > 0) {
+    console.log(`缺少 ${missingCoins.length} 個主要幣種信號: ${missingCoins.join(', ')}`)
+    
+    // 嘗試從中長線信號中為缺失的幣種生成信號
+    const aggressiveTimeframes = ['1m', '3m', '5m', '15m', '30m']
+    
+    missingCoins.forEach(coinSymbol => {
+      const candidateSignals = latestSignals.value.filter(signal => {
+        const hasShortTimeframe = aggressiveTimeframes.includes(signal.primary_timeframe || '') ||
+          (signal.confirmed_timeframes && signal.confirmed_timeframes.some(tf => aggressiveTimeframes.includes(tf)))
+        const hasDecentConfidence = signal.confidence >= 0.5
+        const isTargetCoin = signal.symbol === coinSymbol
+        
+        return hasShortTimeframe && hasDecentConfidence && isTargetCoin
+      })
+
+      if (candidateSignals.length > 0) {
+        // 選擇信心度最高的信號
+        const bestSignal = candidateSignals.reduce((best, current) => 
+          current.confidence > best.confidence ? current : best
+        )
+        
+        // 檢查是否已經在短線信號中
+        const alreadyExists = shortTermSignals.value.some(s => s.id === bestSignal.id)
+        if (!alreadyExists) {
+          shortTermSignals.value.push(bestSignal)
+          console.log(`為 ${coinSymbol} 補充短線信號 (信心度: ${Math.round(bestSignal.confidence * 100)}%)`)
+        }
+      }
+    })
+  }
+}
+
 
 // 從 localStorage 載入歷史記錄
 const loadSignalHistory = () => {
@@ -1844,6 +2827,15 @@ const toggleSignalExpansion = (signalId: number | string) => {
   }
 }
 
+// 技術指標展開/收縮切換
+const toggleIndicatorExpansion = (signalId: number | string) => {
+  if (expandedIndicators.value.has(signalId)) {
+    expandedIndicators.value.delete(signalId)
+  } else {
+    expandedIndicators.value.add(signalId)
+  }
+}
+
 // 計算信號時效性
 const calculateSignalValidity = (signal: Signal): string => {
   if (!signal.created_at) return '未知'
@@ -1945,19 +2937,37 @@ const shouldDeleteSignal = (signal: Signal): { shouldDelete: boolean; reason: st
     }
   }
 
-  // 4. 檢查價格偏離度 - 如果當前價格與進場價格偏離超過15%且是不利方向
+  // 4. 檢查價格偏離度 - 分級警告和刪除機制
   if (signal.current_price && signal.entry_price) {
     const priceDeviation = Math.abs(signal.current_price - signal.entry_price) / signal.entry_price
     const direction = getSignalDirection(signal.signal_type)
 
-    if (priceDeviation > 0.15) {
-      // 做多信號但價格大幅下跌，做空信號但價格大幅上漲
-      if ((direction === 'LONG' && signal.current_price < signal.entry_price * 0.85) ||
-        (direction === 'SHORT' && signal.current_price > signal.entry_price * 1.15)) {
-        return {
-          shouldDelete: true,
-          reason: '價格超出區間',
-          isSuccess: false
+    // 5% 偏離：警告但不刪除，可以在 UI 中顯示警告標識
+    if (priceDeviation > 0.05) {
+      // 不利方向的偏離檢查
+      const isUnfavorableDirection = 
+        (direction === 'LONG' && signal.current_price < signal.entry_price) ||
+        (direction === 'SHORT' && signal.current_price > signal.entry_price)
+
+      if (isUnfavorableDirection) {
+        // 8% 偏離：中等風險，考慮提醒用戶
+        if (priceDeviation > 0.08) {
+          // 12% 偏離：高風險，自動刪除信號
+          if (priceDeviation > 0.12) {
+            return {
+              shouldDelete: true,
+              reason: '價格嚴重偏離',
+              isSuccess: false
+            }
+          }
+          
+          // 8-12% 偏離：暫時保留但標記高風險
+          console.warn(`信號 ${signal.symbol} 價格偏離 ${(priceDeviation * 100).toFixed(1)}% (高風險)`)
+        }
+        
+        // 5-8% 偏離：標記中風險
+        if (priceDeviation > 0.05) {
+          console.warn(`信號 ${signal.symbol} 價格偏離 ${(priceDeviation * 100).toFixed(1)}% (中風險)`)
         }
       }
     }
@@ -2022,47 +3032,8 @@ const ensureSignalSeparation = () => {
   }
 }
 
-// 模擬技術指標函數 (基於信號數據計算)
-const getMockRSI = (signal: Signal): number => {
-  // 基於信號類型和信心度模擬RSI值
-  const direction = getSignalDirection(signal.signal_type)
-  const base = direction === 'LONG' ? 35 : 65
-  const variance = (signal.confidence - 0.5) * 40
-  return Math.round(Math.max(10, Math.min(90, base + variance)))
-}
-
-const getMockEMADeviation = (signal: Signal): number => {
-  // 基於當前價格和入場價格計算EMA偏離度
-  if (!signal.current_price || !signal.entry_price) return 0
-  const deviation = ((signal.current_price - signal.entry_price) / signal.entry_price * 100)
-  return Number(deviation.toFixed(2))
-}
-
-const getMockVolumeRatio = (signal: Signal): number => {
-  // 基於緊急程度模擬成交量比率
-  const urgencyMultiplier = {
-    'urgent': 3.5,
-    'high': 2.2,
-    'medium': 1.6
-  }
-  const base = urgencyMultiplier[signal.urgency_level as keyof typeof urgencyMultiplier] || 1.2
-  const variance = (signal.confidence - 0.5) * 2
-  return Number((base + variance).toFixed(1))
-}
-
-const getMockATR = (signal: Signal): number => {
-  // 基於時間框架和信號強度模擬ATR
-  const timeframeATR = {
-    '1m': 0.15,
-    '3m': 0.25,
-    '5m': 0.35,
-    '15m': 0.55,
-    '30m': 0.85
-  }
-  const base = timeframeATR[signal.primary_timeframe as keyof typeof timeframeATR] || 0.4
-  const variance = signal.confidence * 0.3
-  return Number((base + variance).toFixed(2))
-}
+// 移除未使用的模擬技術指標函數 (改用實際數據)
+// 這些函數已被實際的技術指標數據取代
 
 // 解析信號方向 (LONG/SHORT)
 const getSignalDirection = (signalType: string): string => {
@@ -2083,11 +3054,11 @@ const getSignalDirectionText = (signalType: string): string => {
 
   switch (direction) {
     case 'LONG':
-      return '🚀 做多'
+      return '做多'
     case 'SHORT':
-      return '📉 做空'
+      return '做空'
     default:
-      return '❓ 未知'
+      return '未知'
   }
 }
 
@@ -2123,6 +3094,82 @@ const calculateCurrentProfit = (signal: Signal): number => {
   }
 
   return 0
+}
+
+// 計算價格偏離風險等級
+const calculatePriceDeviationRisk = (signal: Signal): { level: string; percentage: number; color: string; warning: string } => {
+  if (!signal.current_price || !signal.entry_price) {
+    return { level: 'unknown', percentage: 0, color: 'gray', warning: '' }
+  }
+
+  const priceDeviation = Math.abs(signal.current_price - signal.entry_price) / signal.entry_price
+  const direction = getSignalDirection(signal.signal_type)
+  
+  // 檢查是否為不利方向
+  const isUnfavorableDirection = 
+    (direction === 'LONG' && signal.current_price < signal.entry_price) ||
+    (direction === 'SHORT' && signal.current_price > signal.entry_price)
+
+  if (!isUnfavorableDirection) {
+    // 有利方向：顯示盈利狀態
+    return { 
+      level: 'profit', 
+      percentage: priceDeviation * 100, 
+      color: 'green', 
+      warning: `${direction === 'LONG' ? '上漲' : '下跌'} ${(priceDeviation * 100).toFixed(1)}%` 
+    }
+  }
+
+  // 不利方向：按風險等級分類
+  if (priceDeviation > 0.12) {
+    return { 
+      level: 'critical', 
+      percentage: priceDeviation * 100, 
+      color: 'red', 
+      warning: `嚴重偏離 -${(priceDeviation * 100).toFixed(1)}%` 
+    }
+  } else if (priceDeviation > 0.08) {
+    return { 
+      level: 'high', 
+      percentage: priceDeviation * 100, 
+      color: 'orange', 
+      warning: `高風險 -${(priceDeviation * 100).toFixed(1)}%` 
+    }
+  } else if (priceDeviation > 0.05) {
+    return { 
+      level: 'medium', 
+      percentage: priceDeviation * 100, 
+      color: 'yellow', 
+      warning: `中風險 -${(priceDeviation * 100).toFixed(1)}%` 
+    }
+  } else {
+    return { 
+      level: 'low', 
+      percentage: priceDeviation * 100, 
+      color: 'green', 
+      warning: '正常範圍' 
+    }
+  }
+}
+
+// 獲取價格偏離風險標章樣式
+const getPriceDeviationBadgeClass = (level: string): string => {
+  const baseClasses = 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium'
+  
+  switch (level) {
+    case 'profit':
+      return `${baseClasses} bg-green-100 text-green-800`
+    case 'low':
+      return `${baseClasses} bg-green-100 text-green-800`
+    case 'medium':
+      return `${baseClasses} bg-yellow-100 text-yellow-800`
+    case 'high':
+      return `${baseClasses} bg-orange-100 text-orange-800`
+    case 'critical':
+      return `${baseClasses} bg-red-100 text-red-800`
+    default:
+      return `${baseClasses} bg-gray-100 text-gray-800`
+  }
 }
 
 // 過濾和管理信號 - 增強版
@@ -2188,27 +3235,36 @@ const calculateMarketSentiment = () => {
 // 檢查服務狀態
 const checkServiceStatus = async () => {
   try {
+    // 等待服務可用
+    const serviceReady = await waitForService(5, 1000)
+    if (!serviceReady) {
+      console.warn('服務不可用，使用離線模式')
+      serviceStatus.value.market_data = false
+      serviceStatus.value.strategy_engine = false
+      serviceStatus.value.backtest_service = false
+      serviceStatus.value.database = false
+      return
+    }
+
     // 檢查市場數據服務
     try {
-      await axios.get('/api/v1/market/symbols', { timeout: 3000 })
+      await api.get('/api/v1/market/symbols')
       serviceStatus.value.market_data = true
     } catch {
       serviceStatus.value.market_data = false
     }
 
     // 檢查後端健康狀態
-    try {
-      await axios.get('/health', { timeout: 3000 })
-      serviceStatus.value.strategy_engine = true
-      serviceStatus.value.backtest_service = true
-      serviceStatus.value.database = true
-    } catch {
-      serviceStatus.value.strategy_engine = false
-      serviceStatus.value.backtest_service = false
-      serviceStatus.value.database = false
-    }
+    const isHealthy = await checkHealth()
+    serviceStatus.value.strategy_engine = isHealthy
+    serviceStatus.value.backtest_service = isHealthy
+    serviceStatus.value.database = isHealthy
   } catch (error) {
     console.error('檢查服務狀態失敗:', error)
+    serviceStatus.value.market_data = false
+    serviceStatus.value.strategy_engine = false
+    serviceStatus.value.backtest_service = false
+    serviceStatus.value.database = false
   }
 }
 
@@ -2229,10 +3285,13 @@ const fetchRealtimeUpdates = async () => {
       isLogRefreshing.value = false
     }, 3000)
 
-  } catch (error) {
+  } catch (error: any) {
     isLogRefreshing.value = false
-    console.error('獲取實時更新失敗:', error)
-    showNotification('error', '獲取市場數據失敗', '無法連接到市場數據服務，請檢查網路連接')
+    // 只在開發模式下輸出錯誤，避免生產環境的噪音
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('獲取實時更新失敗 (非關鍵錯誤):', error?.message || error)
+    }
+    // 不顯示錯誤通知，因為這不是關鍵功能
   }
 }
 
@@ -2373,8 +3432,11 @@ const fetchDashboardData = async () => {
 }
 
 onMounted(() => {
-  // 載入短線信號暫存
-  loadScalpingSignalsCache()
+  // 載入即時建議
+  loadInstantAdviceFromStorage()
+
+  // 載入歷史紀錄
+  loadSignalHistory()
 
   // 初始載入
   checkServiceStatus()
@@ -2388,6 +3450,20 @@ onMounted(() => {
   updateInterval = setInterval(() => {
     fetchDashboardData()  // 改為載入信號數據來檢測新信號
   }, 15000) // 從30秒改為15秒，更激進的數據獲取
+
+  // 短線信號時效性檢查器：每30秒檢查一次過期信號
+  setInterval(async () => {
+    try {
+      const expiredCount = await processExpiredShortTermSignals()
+      if (expiredCount > 0) {
+        console.log(`自動檢查：處理了 ${expiredCount} 個過期短線信號`)
+        // 確保幣種覆蓋
+        await ensureMinimumCoinCoverage()
+      }
+    } catch (error) {
+      console.error('短線信號時效性檢查失敗:', error)
+    }
+  }, 30000) // 每30秒檢查一次
 
   // 設置系統日誌更新 (每3秒更新一次，原為5秒)
   logUpdateInterval = setInterval(() => {
@@ -2427,6 +3503,9 @@ onMounted(() => {
 
     // 確保信號分離
     ensureSignalSeparation()
+
+    // 檢查即時建議過期情況
+    cleanupExpiredAdvice()
   }, 5000) // 激進模式：從10秒改為5秒
 
   // 激進模式：額外的短線信號專用更新間隔
@@ -2448,6 +3527,11 @@ onMounted(() => {
       console.error('價格更新失敗:', error)
     }
   }, 30000) // 每30秒更新價格 (牛市環境下降低更新頻率)
+
+  // 即時建議專用定時器：每分鐘檢查一次過期情況
+  setInterval(() => {
+    cleanupExpiredAdvice()
+  }, 60000) // 每分鐘檢查一次即時建議過期情況
 })
 
 onUnmounted(() => {

@@ -33,24 +33,62 @@ class TechnicalIndicator(Base):
     created_at = Column(DateTime, default=func.now())
 
 class TradingSignal(Base):
-    """交易信號模型"""
+    """增強信號模型"""
     __tablename__ = "trading_signals"
     
     id = Column(Integer, primary_key=True, index=True)
     symbol = Column(String(20), nullable=False, index=True)
-    timeframe = Column(String(10), nullable=False, index=True)
-    signal_type = Column(String(10), nullable=False)  # LONG, SHORT, CLOSE
-    signal_strength = Column(Float, nullable=False)   # 0-100
+    signal_type = Column(String(20), nullable=False, index=True)  # LONG, SHORT, SCALPING_LONG, SCALPING_SHORT
+    signal_strength = Column(Float, nullable=False)   # 0-1
+    confidence = Column(Float, nullable=False)        # 0-1
+    
+    # 價格相關
     entry_price = Column(Float, nullable=True)
+    current_price = Column(Float, nullable=True)
     stop_loss = Column(Float, nullable=True)
     take_profit = Column(Float, nullable=True)
     risk_reward_ratio = Column(Float, nullable=True)
-    confidence = Column(Float, nullable=False)        # 0-1
-    indicators_used = Column(JSON, nullable=True)
+    
+    # 時間框架
+    primary_timeframe = Column(String(10), nullable=False, index=True)
+    confirmed_timeframes = Column(JSON, nullable=True)  # 多時間框架確認
+    
+    # 信號元數據
+    strategy_name = Column(String(100), nullable=True)
+    urgency_level = Column(String(20), nullable=True, index=True)  # urgent, high, medium, low
     reasoning = Column(Text, nullable=True)
-    status = Column(String(20), default="ACTIVE")     # ACTIVE, TRIGGERED, EXPIRED
-    created_at = Column(DateTime, default=func.now())
-    expires_at = Column(DateTime, nullable=True)
+    key_indicators = Column(JSON, nullable=True)
+    
+    # 市場分析相關（新增）
+    market_condition = Column(JSON, nullable=True)  # 市場狀況分析
+    bull_score = Column(Float, nullable=True)       # 牛市分數
+    bear_score = Column(Float, nullable=True)       # 熊市分數
+    market_phase = Column(String(50), nullable=True) # 市場階段
+    
+    # 突破分析相關（新增）
+    is_breakout_signal = Column(Boolean, default=False)
+    breakout_analysis = Column(JSON, nullable=True)  # 突破分析詳情
+    volatility_level = Column(String(20), nullable=True)  # high, medium, low
+    
+    # 動態調整相關（新增）
+    atr_adjusted = Column(Boolean, default=False)
+    market_condition_adjusted = Column(Boolean, default=False)
+    
+    # 狀態管理
+    is_active = Column(Boolean, default=True, index=True)
+    is_scalping = Column(Boolean, default=False, index=True)  # 是否為短線信號
+    
+    # 交易結果相關（新增）
+    trade_result = Column(String(20), nullable=True, index=True)  # win, loss, breakeven, expired, pending
+    profit_loss_pct = Column(Float, nullable=True)  # 盈虧百分比
+    max_profit_pct = Column(Float, nullable=True)   # 最大盈利百分比
+    max_loss_pct = Column(Float, nullable=True)     # 最大虧損百分比
+    time_to_result = Column(Integer, nullable=True) # 結果產生時間（秒）
+    
+    # 時間戳
+    created_at = Column(DateTime, default=func.now(), index=True)
+    expires_at = Column(DateTime, nullable=True, index=True)
+    archived_at = Column(DateTime, nullable=True, index=True)  # 歸檔時間
 
 class Strategy(Base):
     """策略模型"""
@@ -104,3 +142,6 @@ class RiskMetrics(Base):
     correlation_btc = Column(Float, nullable=True)
     liquidity_score = Column(Float, nullable=True)
     created_at = Column(DateTime, default=func.now())
+
+# 為了向後兼容，建立 Signal 別名
+Signal = TradingSignal
