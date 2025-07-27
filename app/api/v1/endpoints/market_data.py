@@ -6,6 +6,7 @@ import logging
 from app.services.market_data import MarketDataService
 from app.services.technical_indicators import TechnicalIndicatorsService
 from app.schemas.market import MarketDataResponse, IndicatorResponse
+from app.utils.time_utils import get_taiwan_now_naive
 
 router = APIRouter()
 
@@ -37,7 +38,7 @@ class DatabaseLogHandler(logging.Handler):
                             timeframe = params[1]
                             
                             # 避免重複記錄
-                            current_time = datetime.now()
+                            current_time = get_taiwan_now_naive()
                             recent_key = f"{symbol}_{timeframe}_{current_time.strftime('%H:%M')}"
                             
                             # 檢查是否在最近一分鐘內已有相同記錄
@@ -84,7 +85,7 @@ async def get_current_price(symbol: str, exchange: str = "binance"):
             "symbol": symbol,
             "price": price,
             "exchange": exchange,
-            "timestamp": datetime.utcnow()
+            "timestamp": get_taiwan_now_naive()
         }
         
     except HTTPException:
@@ -169,7 +170,7 @@ async def get_indicators(
         return {
             "symbol": symbol,
             "timeframe": timeframe,
-            "timestamp": datetime.utcnow(),
+            "timestamp": get_taiwan_now_naive(),
             "indicators": indicator_data
         }
         
@@ -299,7 +300,7 @@ async def get_market_summary():
                 continue
         
         return {
-            "timestamp": datetime.utcnow(),
+            "timestamp": get_taiwan_now_naive(),
             "market_data": market_data,
             "total_symbols": len(market_data)
         }
@@ -361,7 +362,7 @@ async def get_realtime_updates():
                 
                 # 計算短期變化（模擬1小時變化）
                 import random
-                random.seed(int(datetime.now().timestamp() / 3600) + i)
+                random.seed(int(get_taiwan_now_naive().timestamp() / 3600) + i)
                 short_term_change = random.uniform(-2, 2)
                 
             else:
@@ -432,7 +433,7 @@ async def get_realtime_updates():
                 "short_term_change": round(short_term_change, 2),
                 "sentiment": sentiment,
                 "color": color,
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": get_taiwan_now_naive().isoformat(),
                 "volume": volume,
                 "market_cap_rank": i + 1,
                 "data_source": "binance_api" if isinstance(result, dict) else "fallback"
@@ -451,7 +452,7 @@ async def get_realtime_updates():
             overall_color = "#6B7280"
         
         # 生成系統日誌
-        current_time = datetime.now()
+        current_time = get_taiwan_now_naive()
         crypto_symbols = ["BTC", "ETH", "BNB", "ADA", "XRP"]
         
         enhanced_logs = []
@@ -473,7 +474,7 @@ async def get_realtime_updates():
             })
         
         return {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": get_taiwan_now_naive().isoformat(),
             "updates": updates,
             "total_updates": len(updates),
             "overall_sentiment": overall_sentiment,
@@ -485,14 +486,14 @@ async def get_realtime_updates():
             },
             "database_logs": enhanced_logs,
             "data_source": "binance_real_time",
-            "last_updated": datetime.now().strftime("%H:%M:%S"),
+            "last_updated": get_taiwan_now_naive().strftime("%H:%M:%S"),
             "api_status": "connected"
         }
         
     except Exception as e:
         # 🚨 API失敗時的回退方案
         print(f"幣安API連接失敗: {e}")
-        current_time = datetime.now()
+        current_time = get_taiwan_now_naive()
         
         # 使用基準價格作為回退
         fallback_data = [

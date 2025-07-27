@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 
 from app.core.database import get_db
+from app.utils.time_utils import get_taiwan_now_naive, taiwan_now_minus
 from app.services.market_data import MarketDataService
 from app.services.technical_indicators import TechnicalIndicatorsService
 from app.services.strategy_engine import StrategyEngine
@@ -113,8 +114,8 @@ async def compare_strategies(
 ):
     """比較不同策略的回測表現"""
     try:
-        end_date = datetime.utcnow()
-        start_date = end_date - timedelta(days=days)
+        end_date = get_taiwan_now_naive()
+        start_date = taiwan_now_minus(days=days)
         
         query = db.query(BacktestResult).filter(
             BacktestResult.symbol == symbol,

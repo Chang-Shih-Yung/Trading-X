@@ -1,0 +1,624 @@
+{
+  "version": "1.0.0",
+  "description": "Trading-X 進階市場條件與策略配置",
+  "last_updated": "2025-07-27",
+  "assets": {
+    "major": ["BTC", "ETH"],
+    "altcoins": ["SOL", "BNB", "XRP", "ADA"],
+    "all": ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA"]
+  },
+  "timeframes": {
+    "ultra_short": {
+      "name": "極短線",
+      "duration": "5分鐘～1小時",
+      "kline_timeframes": ["5m", "15m", "30m", "1h"],
+      "holding_period": "幾分鐘～幾小時",
+      "purpose": ["快速套利", "消息交易", "波動捕捉"],
+      "characteristics": "快速進出場，依靠技術指標瞬時訊號，波動劇烈",
+      "risk_management": {
+        "stop_loss_range": [0.01, 0.03],
+        "max_drawdown": 0.02,
+        "position_hold_limit": "4小時",
+        "monitoring_frequency": "實時監控"
+      }
+    },
+    "short_term": {
+      "name": "短線",
+      "duration": "1～3天",
+      "kline_timeframes": ["1h", "4h", "1d"],
+      "holding_period": "幾小時～3天內",
+      "purpose": ["日內波段", "強勢股追蹤"],
+      "characteristics": "須密切觀察盤面變化，風險控制較嚴格",
+      "risk_management": {
+        "stop_loss_range": [0.02, 0.05],
+        "max_drawdown": 0.05,
+        "position_hold_limit": "3天",
+        "monitoring_frequency": "每小時檢查"
+      }
+    },
+    "mid_term": {
+      "name": "中線",
+      "duration": "3天～3週",
+      "kline_timeframes": ["1d", "3d"],
+      "holding_period": "持倉1週為主",
+      "purpose": ["趨勢交易", "主升段捕捉"],
+      "characteristics": "須搭配波段趨勢指標與交易量變化",
+      "risk_management": {
+        "stop_loss_range": [0.05, 0.12],
+        "max_drawdown": 0.10,
+        "position_hold_limit": "3週",
+        "monitoring_frequency": "每日檢查"
+      }
+    },
+    "long_term": {
+      "name": "長線",
+      "duration": "3週～數月以上",
+      "kline_timeframes": ["1w", "1M"],
+      "holding_period": "多週至數月",
+      "purpose": ["價值投資", "牛市佈局", "宏觀交易"],
+      "characteristics": "依賴基本面與週/月線級別走勢",
+      "risk_management": {
+        "stop_loss_range": [0.15, 0.30],
+        "max_drawdown": 0.25,
+        "position_hold_limit": "無限制",
+        "monitoring_frequency": "每週檢查"
+      }
+    }
+  },
+  "market_conditions": {
+    "bull": {
+      "description": "牛市環境：趨勢向上，多頭主導，適合追漲策略",
+      "conditions": {
+        "technical_indicators": {
+          "MA200_slope": { 
+            "threshold": 0.02, 
+            "weight": 2.5,
+            "description": "200日均線斜率 > 2%，確認長期上升趨勢",
+            "timeframe": "1d"
+          },
+          "RSI_14": { 
+            "min": 55, 
+            "max": 85, 
+            "weight": 1.8,
+            "description": "RSI 在強勢區間，避免超買區域",
+            "timeframe": "4h"
+          },
+          "MACD_histogram": { 
+            "min_growth": 0, 
+            "weight": 1.5,
+            "description": "MACD 柱狀圖持續向上，動能增強",
+            "timeframe": "1d"
+          },
+          "BB_position": {
+            "min": 0.6,
+            "max": 0.95,
+            "weight": 1.2,
+            "description": "價格位於布林帶上軌附近，但未完全突破",
+            "timeframe": "4h"
+          },
+          "Volume_MA": {
+            "ratio_threshold": 1.5,
+            "weight": 1.0,
+            "description": "成交量比20日平均高50%以上",
+            "timeframe": "1d"
+          }
+        },
+        "on_chain_metrics": {
+          "MVRV": { 
+            "min": 1.2, 
+            "max": 3.5,
+            "weight": 1.8,
+            "description": "市值與實現市值比，適中偏高區間",
+            "applicable_assets": ["BTC", "ETH"]
+          },
+          "Netflow_Exchange": { 
+            "direction": "outflow", 
+            "threshold": -1000,
+            "weight": 1.5,
+            "description": "交易所淨流出 > 1000 BTC，供應減少",
+            "applicable_assets": ["BTC"]
+          },
+          "Active_Addresses": {
+            "growth_rate": 0.1,
+            "weight": 1.0,
+            "description": "活躍地址數增長 > 10%",
+            "timeframe": "7d"
+          }
+        },
+        "derivatives_metrics": {
+          "FundingRate": { 
+            "min": 0.005, 
+            "max": 0.08,
+            "weight": 1.2,
+            "description": "資金費率適中正值，多頭意願強但未過熱",
+            "timeframe": "8h"
+          },
+          "OI_growth": {
+            "min": 0.05,
+            "weight": 1.0,
+            "description": "未平倉合約增長 > 5%，市場參與度提升",
+            "timeframe": "24h"
+          },
+          "Long_Short_Ratio": {
+            "min": 1.2,
+            "max": 2.5,
+            "weight": 0.8,
+            "description": "多空比適中偏多，避免極端情緒",
+            "timeframe": "24h"
+          }
+        },
+        "sentiment_indicators": {
+          "FearGreed": { 
+            "min": 55, 
+            "max": 85,
+            "weight": 1.0,
+            "description": "恐懼貪婪指數：貪婪但未極端",
+            "source": "alternative.me"
+          },
+          "Social_Sentiment": {
+            "threshold": 0.6,
+            "weight": 0.8,
+            "description": "社群情緒正面度 > 60%",
+            "platforms": ["Twitter", "Reddit", "Telegram"]
+          }
+        }
+      },
+      "total_score_threshold": 8.5,
+      "confidence_levels": {
+        "high": { "min_score": 10.0, "description": "強烈牛市信號" },
+        "medium": { "min_score": 8.5, "description": "中等牛市信號" },
+        "low": { "min_score": 6.0, "description": "弱牛市信號" }
+      },
+      "strategies": {
+        "ultra_short_scalping": {
+          "name": "極短線高頻剝頭皮",
+          "timeframe": "5m-30m",
+          "classification": "極短線",
+          "entry": {
+            "conditions": "RSI_5m > 50 且 MACD_15m 金叉 且 成交量突增 > 150%",
+            "confirmation": "價格突破前15分鐘高點 + EMA21 支撐確認",
+            "risk_reward": "1:1.5",
+            "entry_padding": "0.1%"
+          },
+          "exit": {
+            "profit_target": "快速獲利 0.5-1.5%",
+            "stop_loss": "-1.0%",
+            "time_limit": "30分鐘內強制平倉",
+            "trailing_stop": "ATR_5m * 1.5"
+          },
+          "indicators": ["RSI_5m", "MACD_15m", "EMA21_5m", "Volume_5m", "ATR_5m", "BollingerBand_15m"],
+          "market_cap_filter": "> 1B USD",
+          "position_sizing": "1-3% 總資產",
+          "max_concurrent_positions": 2
+        },
+        "ultra_short_breakout": {
+          "name": "極短線突破策略",
+          "timeframe": "15m-1h",
+          "classification": "極短線",
+          "entry": {
+            "conditions": "價格突破1小時內關鍵阻力 + 成交量放大 > 200%",
+            "confirmation": "RSI_30m > 55 + MACD_1h 向上發散",
+            "risk_reward": "1:2"
+          },
+          "exit": {
+            "profit_target": "1-3% 或 ATR * 3",
+            "stop_loss": "-1.5%",
+            "time_limit": "2小時內",
+            "partial_profit": "50% 部位於 +1% 獲利"
+          },
+          "indicators": ["RSI_30m", "MACD_1h", "Volume_15m", "ATR_1h", "KeyLevel_1h"],
+          "position_sizing": "2-4% 總資產"
+        },
+        "short_term_momentum": {
+          "name": "短線動能追蹤",
+          "timeframe": "1h-4h",
+          "classification": "短線",
+          "entry": {
+            "conditions": "RSI_4h 50~70 區間 + MACD_1h 金叉確認 + 日內強勢股",
+            "confirmation": "價格站穩4小時EMA20 + 回踩不破支撐",
+            "risk_reward": "1:2.5"
+          },
+          "exit": {
+            "profit_target": "RSI_4h > 75 或價格偏離EMA20 > 6%",
+            "stop_loss": "-3%",
+            "trailing_stop": "ATR_4h * 2",
+            "time_limit": "48小時內"
+          },
+          "indicators": ["RSI_4h", "MACD_1h", "EMA20_4h", "Volume_1h", "ATR_4h"],
+          "position_sizing": "3-8% 總資產"
+        },
+        "short_term_swing": {
+          "name": "短線波段策略",
+          "timeframe": "4h-1d",
+          "classification": "短線",
+          "entry": {
+            "conditions": "日線回調至關鍵支撐 + RSI_1d < 45 + 成交量萎縮後放量",
+            "confirmation": "4小時級別止跌信號 + MACD背離修復",
+            "risk_reward": "1:3"
+          },
+          "exit": {
+            "profit_target": "測試前高阻力位或RSI_1d > 70",
+            "stop_loss": "-4%",
+            "time_limit": "3天內",
+            "partial_profit": "40% 部位於 +6% 獲利"
+          },
+          "indicators": ["RSI_1d", "MACD_4h", "Support_Resistance_1d", "Volume_1d"],
+          "position_sizing": "5-12% 總資產"
+        },
+        "mid_term_trend": {
+          "name": "中線趨勢跟隨",
+          "timeframe": "1d-3d",
+          "classification": "中線",
+          "entry": {
+            "conditions": "日線MACD金叉 + MA20/50多頭排列 + 3日線確認趨勢",
+            "confirmation": "週線趨勢向上 + 基本面配合",
+            "risk_reward": "1:4"
+          },
+          "exit": {
+            "profit_target": "日線跌破MA20且放量 或 RSI_W 頂背離",
+            "stop_loss": "-8%",
+            "partial_profit": "30% 部位於 +12% 獲利",
+            "time_limit": "3週內檢視"
+          },
+          "indicators": ["MACD_1d", "MA20_1d", "MA50_1d", "Volume_1d", "RSI_W", "Trend_3d"],
+          "position_sizing": "8-20% 總資產"
+        },
+        "long_term_position": {
+          "name": "長線價值定位",
+          "timeframe": "1w-1M",
+          "classification": "長線",
+          "entry": {
+            "conditions": "週線級別重要支撐 + 月線趨勢完整 + 基本面強勁",
+            "confirmation": "MVRV < 2.0 + 宏觀環境有利 + 技術面多重確認",
+            "risk_reward": "1:5+"
+          },
+          "exit": {
+            "profit_target": "MVRV > 3.5 或技術面轉熊 或基本面變化",
+            "stop_loss": "-20%",
+            "rebalancing": "每月檢視一次",
+            "time_limit": "無限制"
+          },
+          "indicators": ["MA200_W", "MVRV", "NVT", "Weekly_Trend", "Monthly_Structure"],
+          "position_sizing": "15-50% 總資產"
+        }
+      }
+    },
+    "sideway": {
+      "description": "震盪市場：橫盤整理，區間交易為主",
+      "conditions": {
+        "technical_indicators": {
+          "MA200_slope": { 
+            "min": -0.01, 
+            "max": 0.01, 
+            "weight": 2.0,
+            "description": "200日均線接近水平，無明確趨勢",
+            "timeframe": "1d"
+          },
+          "RSI_14": { 
+            "min": 40, 
+            "max": 60, 
+            "weight": 1.5,
+            "description": "RSI 在中性區間震盪",
+            "timeframe": "4h"
+          },
+          "MACD_histogram": { 
+            "growth_near_zero": true, 
+            "threshold": 0.02,
+            "weight": 1.2,
+            "description": "MACD 柱狀圖接近零軸震盪",
+            "timeframe": "1d"
+          },
+          "BB_squeeze": {
+            "threshold": 0.1,
+            "weight": 1.8,
+            "description": "布林帶收縮，波動率降低",
+            "timeframe": "4h"
+          }
+        },
+        "derivatives_metrics": {
+          "FundingRate": { 
+            "min": -0.01, 
+            "max": 0.01, 
+            "weight": 1.0,
+            "description": "資金費率接近零，多空平衡",
+            "timeframe": "8h"
+          },
+          "OI_stability": { 
+            "change_threshold": 0.05,
+            "weight": 1.2,
+            "description": "未平倉合約變化 < 5%，市場穩定",
+            "timeframe": "24h"
+          }
+        }
+      },
+      "total_score_threshold": 5.5,
+      "strategies": {
+        "ultra_short_scalping": {
+          "name": "震盪市極短線套利",
+          "timeframe": "5m-30m",
+          "classification": "極短線",
+          "entry": {
+            "conditions": "價格觸及布林帶邊界 + RSI極值反彈 + 成交量確認",
+            "support_entry": "RSI_15m < 30 + 價格觸及下軌",
+            "resistance_entry": "RSI_15m > 70 + 價格觸及上軌"
+          },
+          "exit": {
+            "profit_target": "布林帶中線或0.5-1%獲利",
+            "stop_loss": "-1%",
+            "time_limit": "1小時內"
+          },
+          "indicators": ["RSI_15m", "BollingerBand_30m", "Volume_5m"],
+          "position_sizing": "1-2% 總資產"
+        },
+        "short_term_range": {
+          "name": "短線區間交易",
+          "timeframe": "1h-4h",
+          "classification": "短線",
+          "entry": {
+            "conditions": "價格觸及區間邊界 + RSI 超買/超賣 + 成交量確認",
+            "support_bounce": "RSI_4h < 35 + 價格接近支撐位",
+            "resistance_rejection": "RSI_4h > 65 + 價格接近阻力位"
+          },
+          "exit": {
+            "profit_target": "區間中線或對側邊界",
+            "stop_loss": "-3%",
+            "time_limit": "48小時內"
+          },
+          "indicators": ["RSI_4h", "Support_Resistance_1d", "Volume_1h"],
+          "position_sizing": "3-6% 總資產"
+        },
+        "mid_term_consolidation": {
+          "name": "中線整理突破",
+          "timeframe": "1d-3d",
+          "classification": "中線",
+          "entry": {
+            "conditions": "長期整理後成交量放大 + 技術指標同步突破",
+            "confirmation": "日線級別有效突破 + 3日確認"
+          },
+          "exit": {
+            "profit_target": "測量目標價或重要阻力位",
+            "stop_loss": "-6%",
+            "time_limit": "2週內"
+          },
+          "indicators": ["Volume_1d", "MA20_1d", "ATR_1d"],
+          "position_sizing": "5-10% 總資產"
+        }
+      }
+    },
+    "bear": {
+      "description": "熊市環境：趨勢向下，空頭主導，防守為主",
+      "conditions": {
+        "technical_indicators": {
+          "MA200_slope": { 
+            "threshold": -0.02, 
+            "weight": 2.5,
+            "description": "200日均線向下傾斜 > 2%",
+            "timeframe": "1d"
+          },
+          "RSI_14": { 
+            "max": 45, 
+            "weight": 1.8,
+            "description": "RSI 持續在弱勢區域",
+            "timeframe": "4h"
+          },
+          "MACD_histogram": { 
+            "max_growth": -0.01, 
+            "weight": 1.5,
+            "description": "MACD 柱狀圖持續向下",
+            "timeframe": "1d"
+          }
+        },
+        "on_chain_metrics": {
+          "MVRV": { 
+            "max": 1.0, 
+            "weight": 1.8,
+            "description": "市值低於實現市值，市場低估",
+            "applicable_assets": ["BTC", "ETH"]
+          },
+          "Netflow_Exchange": { 
+            "direction": "inflow", 
+            "threshold": 500,
+            "weight": 1.5,
+            "description": "交易所淨流入 > 500 BTC，拋壓增加",
+            "applicable_assets": ["BTC"]
+          }
+        },
+        "sentiment_indicators": {
+          "FearGreed": { 
+            "max": 35, 
+            "weight": 1.0,
+            "description": "恐懼情緒主導市場",
+            "source": "alternative.me"
+          }
+        }
+      },
+      "total_score_threshold": 6.5,
+      "strategies": {
+        "ultra_short_counter": {
+          "name": "極短線逆勢反彈",
+          "timeframe": "15m-1h",
+          "classification": "極短線",
+          "entry": {
+            "conditions": "RSI_30m < 25 + 價格超跌反彈 + 成交量萎縮轉放量",
+            "confirmation": "15分鐘級別止跌信號確認"
+          },
+          "exit": {
+            "profit_target": "快速獲利 1-2%",
+            "stop_loss": "-2%",
+            "time_limit": "2小時內強制平倉"
+          },
+          "indicators": ["RSI_30m", "Volume_15m", "ATR_1h"],
+          "position_sizing": "0.5-1% 總資產",
+          "note": "極小倉位試探，嚴格執行"
+        },
+        "short_term_defensive": {
+          "name": "短線防守反彈",
+          "timeframe": "4h-1d",
+          "classification": "短線",
+          "entry": {
+            "conditions": "極度超賣 + 重要支撐位守住 + 技術面背離",
+            "confirmation": "RSI_1d < 30 + 成交量萎縮 + 週線支撐確認"
+          },
+          "exit": {
+            "profit_target": "快速獲利 3-8%",
+            "stop_loss": "-4%",
+            "time_limit": "3天內",
+            "strategy": "輕倉試探，嚴格止損"
+          },
+          "indicators": ["RSI_1d", "Support_Weekly", "Volume_1d", "MACD_Divergence"],
+          "position_sizing": "1-3% 總資產"
+        },
+        "mid_term_bottom": {
+          "name": "中線底部建倉",
+          "timeframe": "1w-1M",
+          "classification": "中線到長線",
+          "entry": {
+            "conditions": "週線級別超跌 + 基本面未惡化 + 宏觀見底信號",
+            "confirmation": "月線支撐 + MVRV極低 + 恐慌情緒極值"
+          },
+          "exit": {
+            "profit_target": "技術面轉強 + 基本面改善",
+            "stop_loss": "-15%",
+            "strategy": "分批建倉，長期持有"
+          },
+          "indicators": ["MA200_W", "MVRV", "FearGreed", "Weekly_Support"],
+          "position_sizing": "3-8% 總資產"
+        }
+      }
+    }
+  },
+  "risk_management": {
+    "timeframe_based_sizing": {
+      "ultra_short": {
+        "max_per_trade": 0.03,
+        "max_total": 0.10,
+        "stop_loss_range": [0.01, 0.03],
+        "max_holding_time": "4小時",
+        "max_concurrent_positions": 3,
+        "description": "極短線：小倉位，嚴格止損，快速進出"
+      },
+      "short_term": {
+        "max_per_trade": 0.08,
+        "max_total": 0.30,
+        "stop_loss_range": [0.02, 0.05],
+        "max_holding_time": "3天",
+        "max_concurrent_positions": 5,
+        "description": "短線：中等倉位，適中止損，密切監控"
+      },
+      "mid_term": {
+        "max_per_trade": 0.15,
+        "max_total": 0.50,
+        "stop_loss_range": [0.05, 0.12],
+        "max_holding_time": "3週",
+        "max_concurrent_positions": 4,
+        "description": "中線：較大倉位，寬鬆止損，週期性檢視"
+      },
+      "long_term": {
+        "max_per_trade": 0.30,
+        "max_total": 0.80,
+        "stop_loss_range": [0.15, 0.30],
+        "max_holding_time": "無限制",
+        "max_concurrent_positions": 3,
+        "description": "長線：大倉位，寬鬆止損，基本面導向"
+      }
+    },
+    "market_condition_adjustments": {
+      "bull_market": {
+        "position_multiplier": 1.2,
+        "stop_loss_multiplier": 0.8,
+        "description": "牛市：略增倉位，收緊止損"
+      },
+      "bear_market": {
+        "position_multiplier": 0.5,
+        "stop_loss_multiplier": 1.2,
+        "description": "熊市：大幅減倉，放寬止損"
+      },
+      "sideway_market": {
+        "position_multiplier": 0.8,
+        "stop_loss_multiplier": 1.0,
+        "description": "震盪：適度減倉，正常止損"
+      }
+    },
+    "position_sizing": {
+      "conservative": { "max_per_trade": 0.02, "max_total": 0.3 },
+      "moderate": { "max_per_trade": 0.05, "max_total": 0.5 },
+      "aggressive": { "max_per_trade": 0.1, "max_total": 0.8 }
+    },
+    "correlation_limits": {
+      "max_correlated_positions": 3,
+      "correlation_threshold": 0.7
+    },
+    "drawdown_limits": {
+      "ultra_short": { "daily": 0.02, "weekly": 0.05 },
+      "short_term": { "daily": 0.05, "weekly": 0.10 },
+      "mid_term": { "weekly": 0.15, "monthly": 0.20 },
+      "long_term": { "monthly": 0.25, "quarterly": 0.35 }
+    },
+    "monitoring_requirements": {
+      "ultra_short": "實時監控，5分鐘內響應",
+      "short_term": "每小時檢查，4小時內響應",
+      "mid_term": "每日檢查，24小時內響應", 
+      "long_term": "每週檢查，適時調整"
+    }
+  },
+  "custom_parameters": {
+    "BTC": {
+      "volatility_factor": 1.0,
+      "entry_padding": 1.0,
+      "stop_loss_multiplier": 1.0,
+      "min_volume_24h": 10000000000,
+      "market_cap_rank": 1
+    },
+    "ETH": {
+      "volatility_factor": 1.2,
+      "entry_padding": 1.01,
+      "stop_loss_multiplier": 1.1,
+      "min_volume_24h": 5000000000,
+      "market_cap_rank": 2
+    },
+    "SOL": {
+      "volatility_factor": 1.8,
+      "entry_padding": 1.03,
+      "stop_loss_multiplier": 1.3,
+      "min_volume_24h": 500000000,
+      "market_cap_rank": 5,
+      "ecosystem_factor": 1.2
+    },
+    "BNB": {
+      "volatility_factor": 1.1,
+      "entry_padding": 1.0,
+      "stop_loss_multiplier": 0.9,
+      "min_volume_24h": 300000000,
+      "market_cap_rank": 4,
+      "exchange_token": true
+    },
+    "XRP": {
+      "volatility_factor": 1.4,
+      "entry_padding": 1.02,
+      "stop_loss_multiplier": 1.2,
+      "min_volume_24h": 800000000,
+      "market_cap_rank": 6,
+      "regulatory_risk": 1.3
+    },
+    "ADA": {
+      "volatility_factor": 1.6,
+      "entry_padding": 1.04,
+      "stop_loss_multiplier": 1.4,
+      "min_volume_24h": 200000000,
+      "market_cap_rank": 8,
+      "academic_approach": true
+    }
+  },
+  "data_sources": {
+    "price_data": ["Binance", "Coinbase", "Kraken"],
+    "on_chain": ["Glassnode", "CryptoQuant", "IntoTheBlock"],
+    "sentiment": ["Fear&Greed Index", "Social Media API", "News API"],
+    "derivatives": ["Binance Futures", "FTX", "Deribit"]
+  },
+  "update_intervals": {
+    "real_time": ["price", "volume", "funding_rate"],
+    "5_minutes": ["technical_indicators", "order_book"],
+    "1_hour": ["on_chain_metrics", "sentiment"],
+    "daily": ["market_structure", "correlation_matrix"]
+  }
+}

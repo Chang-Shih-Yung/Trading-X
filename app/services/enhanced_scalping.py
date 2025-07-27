@@ -8,6 +8,8 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Any
 import pandas as pd
 import numpy as np
+
+from ..utils.time_utils import get_taiwan_now_naive, taiwan_now_plus
 from dataclasses import dataclass, asdict
 import logging
 import json
@@ -89,7 +91,7 @@ class EnhancedScalpingService:
     
     def _is_signal_expired(self, signal: EnhancedSignal) -> bool:
         """檢查信號是否過期"""
-        return datetime.now() > signal.expires_at
+        return get_taiwan_now_naive() > signal.expires_at
     
     def _cleanup_expired_signals(self):
         """清理過期的緩存信號"""
@@ -300,7 +302,7 @@ class EnhancedScalpingService:
                         continue
                 
                 # 生成新信號
-                signal_id = f"scalp_{symbol}_{timeframe}_{int(datetime.now().timestamp())}"
+                signal_id = f"scalp_{symbol}_{timeframe}_{int(get_taiwan_now_naive().timestamp())}"
                 
                 # 生成推理說明
                 reasoning = self._generate_reasoning(
@@ -326,7 +328,7 @@ class EnhancedScalpingService:
                     urgency_level=urgency_level,
                     timeframe=timeframe,
                     expires_at=expires_at,
-                    created_at=datetime.now(),
+                    created_at=get_taiwan_now_naive(),
                     market_condition={
                         'trend': market_condition.trend.value,
                         'phase': market_condition.phase.value if market_condition.phase else None,
@@ -445,7 +447,7 @@ class EnhancedScalpingService:
         elif market_condition.trend == MarketTrend.BEAR:
             hours *= 0.8  # 熊市縮短有效期
         
-        return datetime.now() + timedelta(hours=hours)
+        return taiwan_now_plus(hours=hours)
     
     def _determine_urgency_level(self,
                                confidence: float,

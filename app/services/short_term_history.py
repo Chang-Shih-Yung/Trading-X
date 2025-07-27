@@ -8,14 +8,16 @@ import json
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass, asdict
+
+from ..utils.time_utils import get_taiwan_now_naive, taiwan_now_minus
 from enum import Enum
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_, or_, func
+from sqlalchemy import select, update, delete, and_, or_, func, text
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.models.models import Signal as SignalModel
+from app.models.models import TradingSignal as SignalModel
 from app.services.market_analysis import MarketAnalysisService, MarketCondition, DynamicStopLoss, SignalDirection
 
 logger = logging.getLogger(__name__)
@@ -86,44 +88,64 @@ class ShortTermHistoryService:
             int: 處理的過期信號數量
         """
         try:
-            current_time = datetime.now()
+            current_time = get_taiwan_now_naive()
             
-            # 查找過期的短線信號
-            stmt = select(SignalModel).where(
-                and_(
-                    SignalModel.expires_at < current_time,
-                    SignalModel.is_active == True,
-                    or_(
-                        SignalModel.signal_type.in_(['SCALPING_LONG', 'SCALPING_SHORT']),
-                        SignalModel.strategy_name.like('%短線%'),
-                        SignalModel.primary_timeframe.in_(['1m', '3m', '5m', '15m', '30m'])
-                    )
-                )
-            )
+            # 使用原生SQL查詢，因為資料庫表結構與模型不完全一致
+            # 查找狀態為expired且為短線時間框架的信號
+            raw_query = text("""
+                SELECT id, symbol, signal_type, signal_strength, confidence,
+                       entry_price, stop_loss, take_profit, risk_reward_ratio,
+                       timeframe, reasoning, created_at, expires_at, status, indicators_used
+                FROM trading_signals 
+                WHERE status = 'expired'
+                AND timeframe IN ('1m', '3m', '5m', '15m', '30m')
+                AND (reasoning LIKE '%短線%' OR reasoning LIKE '%scalping%' OR reasoning LIKE '%框架短線策略%')
+            """)
             
-            expired_signals = await db.execute(stmt)
-            expired_signals = expired_signals.scalars().all()
+            result = await db.execute(raw_query)
+            expired_signals = result.fetchall()
             
             processed_count = 0
             
-            for signal in expired_signals:
+            for signal_row in expired_signals:
                 try:
+                    # 將查詢結果轉換為字典格式以便處理
+                    signal_dict = {
+                        'id': signal_row[0],
+                        'symbol': signal_row[1],
+                        'signal_type': signal_row[2],
+                        'signal_strength': signal_row[3],
+                        'confidence': signal_row[4],
+                        'entry_price': signal_row[5],
+                        'stop_loss': signal_row[6],
+                        'take_profit': signal_row[7],
+                        'risk_reward_ratio': signal_row[8],
+                        'timeframe': signal_row[9],
+                        'reasoning': signal_row[10],
+                        'created_at': signal_row[11],
+                        'expires_at': signal_row[12],
+                        'status': signal_row[13],
+                        'indicators_used': signal_row[14]
+                    }
+                    
                     # 計算最終結果
-                    trade_result, profit_loss_pct = await self._calculate_final_result(signal)
+                    trade_result, profit_loss_pct = await self._calculate_final_result_from_dict(signal_dict)
                     
-                    # 更新信號狀態
-                    signal.is_active = False
-                    signal.trade_result = trade_result.value
-                    signal.profit_loss_pct = profit_loss_pct
-                    signal.archived_at = current_time
+                    # 創建歷史記錄
+                    await self._create_history_record(db, signal_dict, trade_result, profit_loss_pct)
                     
-                    # 添加到歷史統計
-                    await self._update_history_statistics(db, signal)
+                    # 更新信號狀態為已歸檔（可選，或者保持expired狀態）
+                    update_query = text("""
+                        UPDATE trading_signals 
+                        SET status = 'archived'
+                        WHERE id = :signal_id
+                    """)
+                    await db.execute(update_query, {'signal_id': signal_dict['id']})
                     
                     processed_count += 1
                     
                 except Exception as e:
-                    logger.error(f"處理過期信號 {signal.id} 失敗: {e}")
+                    logger.error(f"處理過期信號 {signal_dict.get('id', 'unknown')} 失敗: {e}")
                     continue
             
             await db.commit()
@@ -156,7 +178,7 @@ class ShortTermHistoryService:
             HistoryStatistics: 統計結果
         """
         try:
-            start_date = datetime.now() - timedelta(days=days)
+            start_date = taiwan_now_minus(days=days)
             
             # 構建查詢條件
             conditions = [
@@ -330,7 +352,7 @@ class ShortTermHistoryService:
                                    limit: int = 100,
                                    offset: int = 0,
                                    symbol: Optional[str] = None,
-                                   trade_result: Optional[str] = None) -> List[ShortTermSignalHistory]:
+                                   trade_result: Optional[str] = None) -> List[Dict]:
         """
         獲取短線信號歷史記錄
         
@@ -342,65 +364,71 @@ class ShortTermHistoryService:
             trade_result: 篩選交易結果
             
         Returns:
-            List[ShortTermSignalHistory]: 歷史記錄列表
+            List[Dict]: 歷史記錄列表
         """
         try:
-            conditions = [SignalModel.archived_at.isnot(None)]
+            # 使用原生SQL查詢已歸檔的短線信號
+            where_conditions = ["status IN ('expired', 'archived')"]
+            where_conditions.append("timeframe IN ('1m', '3m', '5m', '15m', '30m')")
+            where_conditions.append("(reasoning LIKE '%短線%' OR reasoning LIKE '%scalping%' OR reasoning LIKE '%框架短線策略%')")
             
             if symbol:
-                conditions.append(SignalModel.symbol == symbol)
+                where_conditions.append(f"symbol = '{symbol}'")
                 
             if trade_result:
-                conditions.append(SignalModel.trade_result == trade_result)
+                where_conditions.append(f"status = '{trade_result}'")
             
-            stmt = (select(SignalModel)
-                   .where(and_(*conditions))
-                   .order_by(SignalModel.archived_at.desc())
-                   .limit(limit)
-                   .offset(offset))
+            query = f"""
+                SELECT id, symbol, signal_type, signal_strength, confidence,
+                       entry_price, stop_loss, take_profit, risk_reward_ratio,
+                       timeframe, reasoning, created_at, expires_at, status, indicators_used
+                FROM trading_signals 
+                WHERE {' AND '.join(where_conditions)}
+                ORDER BY created_at DESC
+                LIMIT {limit} OFFSET {offset}
+            """
             
-            result = await db.execute(stmt)
-            records = result.scalars().all()
+            result = await db.execute(text(query))
+            rows = result.fetchall()
             
-            history_list = []
-            for record in records:
-                # 解析市場條件
-                market_condition = None
-                if hasattr(record, 'market_condition') and record.market_condition:
-                    try:
-                        market_condition = json.loads(record.market_condition)
-                    except:
-                        market_condition = None
-                
-                history_item = ShortTermSignalHistory(
-                    id=record.id,
-                    symbol=record.symbol,
-                    signal_type=record.signal_type,
-                    entry_price=record.entry_price,
-                    current_price=record.current_price,
-                    stop_loss=record.stop_loss,
-                    take_profit=record.take_profit,
-                    confidence=record.confidence,
-                    created_at=record.created_at,
-                    expires_at=record.expires_at,
-                    archived_at=record.archived_at,
-                    trade_result=TradeResult(record.trade_result) if record.trade_result else TradeResult.PENDING,
-                    profit_loss_pct=record.profit_loss_pct,
-                    max_profit_pct=getattr(record, 'max_profit_pct', None),
-                    max_loss_pct=getattr(record, 'max_loss_pct', None),
-                    time_to_result=getattr(record, 'time_to_result', None),
-                    market_condition=market_condition,
-                    reasoning=record.reasoning or "",
-                    strategy_name=record.strategy_name or "Unknown"
-                )
-                history_list.append(history_item)
+            # 轉換為字典格式
+            history_records = []
+            for row in rows:
+                record = {
+                    "id": row[0],
+                    "symbol": row[1],
+                    "signal_type": row[2],
+                    "signal_strength": row[3],
+                    "confidence": row[4],
+                    "entry_price": row[5],
+                    "stop_loss": row[6],
+                    "take_profit": row[7],
+                    "risk_reward_ratio": row[8],
+                    "timeframe": row[9],
+                    "reasoning": row[10],
+                    "created_at": row[11],
+                    "expires_at": row[12],
+                    "status": row[13],
+                    "indicators_used": row[14],
+                    # 添加計算的歷史字段
+                    "archived_at": row[12],  # 使用expires_at作為archived_at
+                    "trade_result": "EXPIRED",  # 標記為已過期
+                    "profit_loss_pct": None,
+                    "current_price": None,
+                    "max_profit_pct": None,
+                    "max_loss_pct": None,
+                    "time_to_result": None,
+                    "market_condition": "Unknown",
+                    "strategy_name": "短線策略"
+                }
+                history_records.append(record)
             
-            return history_list
+            return history_records
             
         except Exception as e:
-            logger.error(f"獲取短線歷史失敗: {e}")
+            logger.error(f"獲取短線歷史記錄失敗: {e}")
             return []
-    
+
     async def _calculate_final_result(self, signal: SignalModel) -> Tuple[TradeResult, Optional[float]]:
         """計算信號的最終交易結果"""
         try:
@@ -424,6 +452,27 @@ class ShortTermHistoryService:
         except Exception as e:
             logger.error(f"計算最終結果失敗: {e}")
             return TradeResult.EXPIRED, None
+
+    async def _calculate_final_result_from_dict(self, signal_dict: dict) -> Tuple[TradeResult, Optional[float]]:
+        """從字典格式計算信號的最終交易結果"""
+        try:
+            # 對於過期信號，使用模擬的市場價格或直接標記為過期
+            # 這裡可以通過市場數據服務獲取實際價格
+            # 暫時標記為已過期
+            return TradeResult.EXPIRED, None
+                
+        except Exception as e:
+            logger.error(f"計算最終結果失敗: {e}")
+            return TradeResult.EXPIRED, None
+
+    async def _create_history_record(self, db: AsyncSession, signal_dict: dict, trade_result: TradeResult, profit_loss_pct: Optional[float]):
+        """創建歷史記錄（將在歷史表中實現）"""
+        try:
+            # 目前只是記錄到日誌，未來可以創建專門的歷史表
+            logger.info(f"歷史記錄創建 - ID: {signal_dict['id']}, 結果: {trade_result.value}, 盈虧: {profit_loss_pct}%")
+            
+        except Exception as e:
+            logger.error(f"創建歷史記錄失敗: {e}")
     
     async def _update_history_statistics(self, db: AsyncSession, signal: SignalModel):
         """更新歷史統計數據"""

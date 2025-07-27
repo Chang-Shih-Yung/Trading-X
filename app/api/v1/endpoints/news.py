@@ -6,6 +6,7 @@ import asyncio
 from datetime import datetime, timedelta
 import logging
 from app.core.config import settings
+from app.utils.time_utils import get_taiwan_now_naive, taiwan_now_minus
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ FREE_NEWS_APIS = {
             "language": "en",
             "sortBy": "publishedAt",
             "pageSize": 50,
-            "from": (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+            "from": taiwan_now_minus(days=1).strftime("%Y-%m-%d")
         }
     }
 }
@@ -96,7 +97,7 @@ async def fetch_cointelegraph_news():
                 
                 for entry in feed.entries[:10]:  # 取前10則新聞
                     # 解析發布時間
-                    published_time = datetime.now()
+                    published_time = get_taiwan_now_naive()
                     if hasattr(entry, 'published_parsed') and entry.published_parsed:
                         import time
                         published_time = datetime.fromtimestamp(time.mktime(entry.published_parsed))
@@ -133,7 +134,7 @@ async def fetch_cointelegraph_news():
                 "summary": "Latest Bitcoin market developments and technical analysis...",
                 "url": f"https://cointelegraph.com/news/bitcoin-analysis-{i}",
                 "source": "CoinTelegraph",
-                "publishedAt": (datetime.now() - timedelta(hours=i)).isoformat(),
+                "publishedAt": taiwan_now_minus(hours=i).isoformat(),
                 "category": "crypto",
                 "image": None
             }
@@ -165,7 +166,7 @@ async def fetch_cryptopanic_news():
                         "summary": item.get("title", "")[:200] + "...",
                         "url": item.get("url", ""),
                         "source": "CryptoPanic",
-                        "publishedAt": item.get("published_at", datetime.now().isoformat()),
+                        "publishedAt": item.get("published_at", get_taiwan_now_naive().isoformat()),
                         "category": "crypto",
                         "image": None
                     })
@@ -198,7 +199,7 @@ async def fetch_blockchain_news():
                         "summary": item.get("description", "暫無摘要")[:200] + "...",
                         "url": item.get("url", "#"),
                         "source": item.get("author", "CoinGecko"),
-                        "publishedAt": item.get("published_at", datetime.now().isoformat()),
+                        "publishedAt": item.get("published_at", get_taiwan_now_naive().isoformat()),
                         "category": "crypto",
                         "image": item.get("thumb_2x")
                     })
@@ -238,7 +239,7 @@ async def fetch_backup_real_news():
                         "summary": item.get("title", "")[:150] + "...",
                         "url": url,
                         "source": "CryptoPanic",
-                        "publishedAt": item.get("published_at", datetime.now().isoformat()),
+                        "publishedAt": item.get("published_at", get_taiwan_now_naive().isoformat()),
                         "category": "crypto",
                         "image": None
                     })
@@ -253,7 +254,7 @@ async def fetch_backup_real_news():
 
 def get_mock_news():
     """獲取模擬新聞數據 - 使用真實網站URL"""
-    current_time = datetime.now()
+    current_time = get_taiwan_now_naive()
     
     mock_news = [
         {
@@ -366,7 +367,7 @@ async def get_ai_summary():
             "marketSentiment": market_sentiment,
             "totalNews": len(news_data),
             "keyTopics": unique_topics[:5],
-            "lastUpdate": datetime.now().isoformat()
+            "lastUpdate": get_taiwan_now_naive().isoformat()
         }
         
         return summary
@@ -448,42 +449,42 @@ async def get_economic_indicators():
                 "value": "3.2%",
                 "impact": "neutral",
                 "description": "年化通脹率略高於預期",
-                "lastUpdate": datetime.now().isoformat()
+                "lastUpdate": get_taiwan_now_naive().isoformat()
             },
             {
                 "name": "DXY 美元指數",
                 "value": "103.45",
                 "impact": "negative", 
                 "description": "美元走強對風險資產不利",
-                "lastUpdate": datetime.now().isoformat()
+                "lastUpdate": get_taiwan_now_naive().isoformat()
             },
             {
                 "name": "10年期美債收益率",
                 "value": "4.25%",
                 "impact": "negative",
                 "description": "債券收益率上升增加資金成本",
-                "lastUpdate": datetime.now().isoformat()
+                "lastUpdate": get_taiwan_now_naive().isoformat()
             },
             {
                 "name": "VIX 恐慌指數",
                 "value": "16.8",
                 "impact": "positive",
                 "description": "市場恐慌情緒處於低位",
-                "lastUpdate": datetime.now().isoformat()
+                "lastUpdate": get_taiwan_now_naive().isoformat()
             },
             {
                 "name": "NASDAQ 100",
                 "value": "+1.2%",
                 "impact": "positive",
                 "description": "科技股表現強勁",
-                "lastUpdate": datetime.now().isoformat()
+                "lastUpdate": get_taiwan_now_naive().isoformat()
             },
             {
                 "name": "黃金價格",
                 "value": "$1,985",
                 "impact": "neutral",
                 "description": "避險資產保持穩定",
-                "lastUpdate": datetime.now().isoformat()
+                "lastUpdate": get_taiwan_now_naive().isoformat()
             }
         ]
         

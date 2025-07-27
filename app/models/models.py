@@ -92,6 +92,14 @@ class TradingSignal(Base):
     created_at = Column(DateTime, default=func.now(), index=True)
     expires_at = Column(DateTime, nullable=True, index=True)
     archived_at = Column(DateTime, nullable=True, index=True)  # 歸檔時間
+    
+    # 智能時間計算相關（新增）
+    smart_timing_enabled = Column(Boolean, default=True)  # 是否啟用智能時間計算
+    smart_timing_details = Column(JSON, nullable=True)    # 智能時間計算詳情
+    base_expiry_minutes = Column(Integer, nullable=True)  # 基礎有效期（分鐘）
+    calculated_expiry_minutes = Column(Integer, nullable=True)  # 計算後的有效期（分鐘）
+    timing_multipliers = Column(JSON, nullable=True)      # 各種倍數信息
+    timing_reasoning = Column(Text, nullable=True)        # 時間計算推理
 
 class Strategy(Base):
     """策略模型"""

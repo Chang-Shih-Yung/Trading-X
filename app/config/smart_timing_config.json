@@ -1,0 +1,73 @@
+{
+  "smart_timing": {
+    "enable_smart_expiry": true,
+    "base_timeframes": {
+      "1m": 4,
+      "3m": 8,
+      "5m": 12,
+      "15m": 20,
+      "30m": 35
+    },
+    "signal_strength_multipliers": {
+      "very_strong": 0.6,
+      "strong": 0.75,
+      "medium": 1.0,
+      "weak": 1.3,
+      "very_weak": 1.6
+    },
+    "volatility_adjustments": {
+      "very_high": 0.5,
+      "high": 0.7,
+      "medium": 1.0,
+      "low": 1.3,
+      "very_low": 1.6
+    },
+    "signal_type_multipliers": {
+      "MOMENTUM_BREAKOUT": 0.5,
+      "REVERSAL_SIGNAL": 1.2,
+      "TREND_FOLLOWING": 1.0,
+      "SUPPORT_RESISTANCE": 0.8,
+      "MOMENTUM_SIGNAL": 0.7,
+      "DIVERGENCE_SIGNAL": 1.5,
+      "SCALPING_SIGNAL": 0.4,
+      "VOLUME_BREAKOUT": 0.6,
+      "PRICE_ACTION": 0.9
+    },
+    "market_session_adjustments": {
+      "asia_morning": 1.2,
+      "asia_afternoon": 1.1,
+      "europe_opening": 0.8,
+      "europe_session": 0.9,
+      "us_opening": 0.6,
+      "us_session": 0.7,
+      "overnight": 1.5,
+      "weekend": 1.8
+    },
+    "confirmation_multipliers": {
+      "single_timeframe": 1.0,
+      "dual_confirmation": 0.85,
+      "triple_confirmation": 0.7,
+      "cross_timeframe": 0.6,
+      "multiple_indicators": 0.8
+    },
+    "limits": {
+      "min_minutes": 2,
+      "max_minutes": 60,
+      "emergency_min": 1,
+      "emergency_max": 90
+    },
+    "volatility_thresholds": {
+      "very_high": 3.0,
+      "high": 2.0,
+      "medium_high": 1.5,
+      "medium": 1.0,
+      "low": 0.5
+    },
+    "signal_strength_thresholds": {
+      "very_strong": 0.9,
+      "strong": 0.75,
+      "medium": 0.6,
+      "weak": 0.4
+    }
+  }
+}

@@ -8,6 +8,9 @@ import numpy as np
 import pandas_ta as ta
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass
+from datetime import datetime
+
+from ..utils.time_utils import get_taiwan_now_naive
 from enum import Enum
 from datetime import datetime, timedelta
 import logging
@@ -187,7 +190,7 @@ class MarketAnalysisService:
                 bear_score=bear_score,
                 confidence=confidence,
                 key_factors=key_factors,
-                analysis_timestamp=datetime.now()
+                analysis_timestamp=get_taiwan_now_naive()
             )
             
         except Exception as e:
@@ -199,7 +202,7 @@ class MarketAnalysisService:
                 bear_score=5.0,
                 confidence=0.3,
                 key_factors=["分析失敗，使用預設中性判斷"],
-                analysis_timestamp=datetime.now()
+                analysis_timestamp=get_taiwan_now_naive()
             )
     
     def calculate_dynamic_stop_loss(self, 
@@ -568,7 +571,7 @@ class MarketAnalysisService:
         """
         # 這裡是一個簡化的實現
         # 實際應該根據真實的比特幣減半時間來計算
-        current_year = datetime.now().year
+        current_year = get_taiwan_now_naive().year
         
         # 已知的減半年份：2012, 2016, 2020, 2024
         last_halving_years = [2020, 2024]

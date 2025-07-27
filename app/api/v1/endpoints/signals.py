@@ -10,6 +10,7 @@ from app.core.database import get_db
 from app.models.models import TradingSignal
 from app.services.strategy_engine import StrategyEngine
 from app.schemas.signals import SignalResponse, SignalCreate, SignalFilter, AnalyzeRequest, MarketTrendResponse
+from app.utils.time_utils import get_taiwan_now_naive, taiwan_now_plus, taiwan_now_minus, to_taiwan_naive
 
 # 初始化logger
 logger = logging.getLogger(__name__)
@@ -37,7 +38,7 @@ async def get_market_trend(symbol: str):
             key_levels=trend_analysis.key_levels,
             volatility=trend_analysis.volatility,
             momentum=trend_analysis.momentum,
-            timestamp=datetime.now()
+            timestamp=get_taiwan_now_naive()
         )
         
     except Exception as e:
@@ -100,7 +101,7 @@ async def get_market_overview():
             'bear_count': bear_count,
             'neutral_count': neutral_count,
             'symbols': market_overview,
-            'timestamp': datetime.now(),
+            'timestamp': get_taiwan_now_naive(),
             'analysis_summary': f"{bull_count}牛/{bear_count}熊/{neutral_count}中性"
         }
         
@@ -169,7 +170,7 @@ async def generate_live_signals():
                         "risk_reward_ratio": round(signal.risk_reward_ratio, 2),
                         "timeframe": signal.timeframe,
                         "reasoning": signal.reasoning,
-                        "created_at": datetime.now().isoformat()
+                        "created_at": get_taiwan_now_naive().isoformat()
                     })
                 
                 analysis_results.append({
@@ -191,7 +192,7 @@ async def generate_live_signals():
             "message": f"完成{len(symbols)}個幣種分析，生成{len(generated_signals)}個高質量信號",
             "generated_signals": generated_signals,
             "analysis_summary": analysis_results,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": get_taiwan_now_naive().isoformat()
         }
         
     except Exception as e:
@@ -206,7 +207,7 @@ async def get_latest_signals(
         from datetime import datetime, timedelta
         import random
         
-        current_time = datetime.now()
+        current_time = get_taiwan_now_naive()
         
         # 🎯 精準的市場價格數據 (更新至真實價格)
         price_data = {
@@ -406,8 +407,8 @@ async def get_latest_signals(
             "urgency_level": "低",
             "urgency_color": "#10B981",
             "reasoning": "系統正在進行多時間軸技術分析，請稍候...",
-            "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat(),
+            "created_at": get_taiwan_now_naive().isoformat(),
+            "updated_at": get_taiwan_now_naive().isoformat(),
             "status": "PENDING",
             "market_context": "系統初始化中...",
             "execution_notes": "等待系統完成分析"
@@ -427,8 +428,8 @@ async def get_latest_signals(
                 confidence=mock["confidence"],
                 reasoning=mock["reasoning"],
                 status="ACTIVE",
-                created_at=datetime.now(),
-                updated_at=datetime.now()
+                created_at=get_taiwan_now_naive(),
+                updated_at=get_taiwan_now_naive()
             ))
         
         return signal_responses
@@ -492,7 +493,7 @@ async def get_latest_signals_original(
 ):
     """獲取最新信號"""
     try:
-        since_time = datetime.utcnow() - timedelta(hours=hours)
+        since_time = taiwan_now_minus(hours=hours)
         
         stmt = select(TradingSignal).filter(
             and_(
@@ -539,7 +540,7 @@ async def get_expired_signals(
 ):
     """獲取已過期的信號"""
     try:
-        now = datetime.now()
+        now = get_taiwan_now_naive()
         cutoff_time = now - timedelta(hours=24)
         
         # 使用原始SQL查詢以避免模型欄位不匹配問題
@@ -649,7 +650,7 @@ async def analyze_symbol(
             "symbol": request.symbol,
             "timeframe": request.timeframe,
             "current_price": current_price,
-            "analysis_time": datetime.now().isoformat(),
+            "analysis_time": get_taiwan_now_naive().isoformat(),
             "pattern_analysis": pattern_analysis,
             "technical_indicators": {}
         }
@@ -750,7 +751,7 @@ async def get_signal_performance(
 ):
     """獲取信號表現統計"""
     try:
-        since_date = datetime.utcnow() - timedelta(days=days)
+        since_date = taiwan_now_minus(days=days)
         
         # 統計信號數量
         total_stmt = select(TradingSignal).filter(
@@ -860,7 +861,7 @@ async def generate_instant_trading_advice(request: InstantAdviceRequest):
         logger.info(f"成功生成 {len(advice_signals)} 個即時中長線建議")
         return {
             "advice_signals": advice_signals,
-            "generation_time": datetime.now().isoformat(),
+            "generation_time": get_taiwan_now_naive().isoformat(),
             "analysis_method": "牛熊市導向中長線分析",
             "total_symbols": len(advice_signals)
         }
@@ -924,7 +925,7 @@ def _generate_market_advice(
     
     # 生成建議信號
     advice = {
-        "id": f"advice_{symbol}_{int(datetime.now().timestamp())}",
+        "id": f"advice_{symbol}_{int(get_taiwan_now_naive().timestamp())}",
         "symbol": symbol,
         "signal_type": signal_type,
         "entry_price": round(entry_price, 6),
@@ -948,8 +949,8 @@ def _generate_market_advice(
         },
         "risk_management": f"止損:{abs((stop_loss-entry_price)/entry_price*100):.1f}%, 止盈:{abs((take_profit-entry_price)/entry_price*100):.1f}%",
         "time_horizon": "中長線(3-30天)",
-        "created_at": datetime.now().isoformat(),
-        "expires_at": (datetime.now() + timedelta(hours=24)).isoformat(),  # 24小時有效期
+        "created_at": get_taiwan_now_naive().isoformat(),
+        "expires_at": taiwan_now_plus(hours=24).isoformat(),  # 24小時有效期
         "is_manual_advice": True,  # 標記為手動生成建議
         "advice_type": "instant_medium_term"
     }
@@ -1002,8 +1003,8 @@ async def archive_expired_signals(
                 "risk_reward_ratio": signal_data.get('risk_reward_ratio'),
                 "reasoning": signal_data.get('reasoning', '短線信號過期歸檔'),
                 "status": 'ARCHIVED',
-                "created_at": signal_data.get('timestamp', datetime.now().isoformat()),
-                "expires_at": signal_data.get('archived_at', datetime.now().isoformat()),
+                "created_at": signal_data.get('timestamp', get_taiwan_now_naive().isoformat()),
+                "expires_at": signal_data.get('archived_at', get_taiwan_now_naive().isoformat()),
                 "indicators_used": str(signal_data.get('key_indicators', {}))
             })
             archived_count += 1

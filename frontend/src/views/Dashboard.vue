@@ -317,7 +317,7 @@
                   <div class="bg-white p-2 rounded border">
                     <div class="text-gray-500">ATR %</div>
                     <div class="font-medium text-purple-600">{{ signal.key_indicators?.atr_percent?.toFixed(2) || '0.00'
-                      }}%</div>
+                    }}%</div>
                   </div>
 
                   <!-- 擴展顯示更多指標 -->
@@ -349,30 +349,46 @@
               </div>
             </div>
 
-            <!-- 時效性倒計時 -->
+            <!-- 信號狀態與剩餘時間 -->
             <div class="mb-3">
               <div class="flex justify-between items-center">
-                <span class="text-xs text-gray-500">剩餘時效</span>
+                <span class="text-xs text-gray-500">信號狀態</span>
                 <span :class="{
-                  'text-red-600': getSignalValidity(signal).percentage <= 30,
-                  'text-orange-600': getSignalValidity(signal).percentage <= 60,
-                  'text-green-600': getSignalValidity(signal).percentage > 60
+                  'text-red-600': signal.validity_info?.status === 'expired',
+                  'text-orange-600': signal.validity_info?.status === 'expiring',
+                  'text-yellow-600': signal.validity_info?.status === 'valid',
+                  'text-green-600': signal.validity_info?.status === 'fresh'
                 }" class="text-xs font-bold">
-                  {{ getSignalValidity(signal).text }}
+                  {{ getSignalStatusText(signal) }}
                 </span>
               </div>
+
+              <!-- 剩餘時間顯示 -->
+              <div class="flex justify-between items-center mt-1">
+                <span class="text-xs text-gray-500">剩餘時間</span>
+                <span :class="{
+                  'text-red-600': (signal.remaining_time_minutes || 0) <= 2,
+                  'text-orange-600': (signal.remaining_time_minutes || 0) <= 5,
+                  'text-yellow-600': (signal.remaining_time_minutes || 0) <= 10,
+                  'text-green-600': (signal.remaining_time_minutes || 0) > 10
+                }" class="text-xs font-medium">
+                  {{ formatRemainingTime(signal) }}
+                </span>
+              </div>
+
               <div class="w-full bg-gray-200 rounded-full h-1 mt-1">
-                <div :style="{ width: getSignalValidity(signal).percentage + '%' }" :class="{
-                  'bg-red-500': getSignalValidity(signal).percentage <= 30,
-                  'bg-orange-500': getSignalValidity(signal).percentage <= 60,
-                  'bg-green-500': getSignalValidity(signal).percentage > 60
-                }" class="h-1 rounded-full transition-all duration-300"></div>
+                <div :style="{ width: getSignalStatusPercentage(signal) + '%' }" :class="{
+                  'bg-red-500': signal.validity_info?.status === 'expired',
+                  'bg-orange-500': signal.validity_info?.status === 'expiring',
+                  'bg-yellow-500': signal.validity_info?.status === 'valid',
+                  'bg-green-500': signal.validity_info?.status === 'fresh'
+                }" class="h-1 rounded-full"></div>
               </div>
             </div>
 
             <!-- 快速操作按鈕 -->
             <div class="flex space-x-2">
-              <button @click="executeQuickTrade(signal)" :disabled="!getSignalValidity(signal).can_execute"
+              <button @click="executeQuickTrade(signal)" :disabled="!canExecuteSignal(signal)"
                 class="flex-1 px-3 py-1 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-300 text-white text-xs font-medium rounded transition-colors">
                 快速執行
               </button>
@@ -690,14 +706,14 @@
                   <div class="flex items-center justify-between">
                     <span class="text-gray-600">強度:</span>
                     <span class="font-medium text-blue-600">{{ Math.round(advice.market_analysis.strength * 100)
-                      }}%</span>
+                    }}%</span>
                   </div>
                 </div>
                 <div class="grid grid-cols-2 gap-2 mb-2">
                   <div class="flex items-center justify-between">
                     <span class="text-gray-600">信心度:</span>
                     <span class="font-medium text-purple-600">{{ Math.round(advice.market_analysis.confidence * 100)
-                      }}%</span>
+                    }}%</span>
                   </div>
                   <div class="flex items-center justify-between">
                     <span class="text-gray-600">動量:</span>
@@ -1102,6 +1118,7 @@ interface Signal {
   id: number | string
   symbol: string
   signal_type: string
+  status?: string // 後端信號狀態：active, expired, executed, cancelled
   entry_price?: number
   stop_loss?: number
   take_profit?: number
@@ -1156,9 +1173,11 @@ interface Signal {
   expires_at?: string
   price_change_percent?: number
   // 新增：後端計算的時效性和風險信息
+  remaining_time_minutes?: number  // 剩餘時間（分鐘）
   validity_info?: {
     percentage: number
     remaining_minutes: number
+    remaining_seconds: number
     status: string
     text: string
     color: string
@@ -1302,7 +1321,7 @@ const updateShortTermStats = () => {
     ['urgent', 'high'].includes(signal.urgency_level || '')).length
   shortTermStats.strategiesUsed = strategiesSet.size
 
-  console.log(`📊 短線統計更新: ${shortTermStats.totalSignals}個信號, 平均信心度${shortTermStats.avgConfidence}%, ${shortTermStats.urgentCount}個緊急信號, ${shortTermStats.strategiesUsed}種策略`)
+  // 短線統計更新 (已移除調試日誌)
 }
 
 const shortTermFilter = reactive({
@@ -1345,13 +1364,13 @@ const filteredShortTermSignals = computed(() => {
     const isValid = !validityCheck.isExpired
 
     if (!isValid) {
-      console.log(`🚫 過期信號被過濾: ${signal.symbol} ${signal.signal_type} (ID: ${signal.id})`)
+      // 過期信號被過濾 (已移除調試日誌)
     }
 
     return isValid
   })
 
-  console.log(`📊 有效信號統計: ${validSignals.length}/${shortTermSignals.value.length} 個信號有效`)
+  // 有效信號統計 (已移除調試日誌)
 
   // 按目標幣種順序排序
   return validSignals
@@ -1379,17 +1398,15 @@ const navigateToSignalHistory = () => {
 // 跳轉到短線歷史頁面
 const navigateToShortTermHistory = () => {
   // 防止在跳轉期間觸發額外的歸檔操作
-  console.log('🔀 準備跳轉到短線歷史頁面')
+  // 準備跳轉到短線歷史頁面 (已移除調試日誌)
   router.push({ name: 'ShortTermHistory' })
 }
 
 // 打印短線信號分析中心的過期信號
 const printExpiredSignals = async () => {
-  console.log('🔍 開始載入過往所有累積的過期信號...')
-
   try {
     // 從後端API載入所有歸檔的過期信號
-    const response = await fetch('/api/v1/signals/expired', {
+    const response = await fetch('/api/v1/scalping/expired', {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' }
     })
@@ -1402,10 +1419,8 @@ const printExpiredSignals = async () => {
     }
 
     const allExpiredSignals = await response.json()
-    console.log(`📊 後端返回 ${allExpiredSignals.length} 個過往累積的過期信號`)
 
     if (allExpiredSignals.length === 0) {
-      console.log('✅ 沒有發現任何過往累積的過期信號！')
       showNotification('info', '過期信號檢查', '沒有發現任何過往累積的過期信號。')
       return
     }
@@ -1419,26 +1434,6 @@ const printExpiredSignals = async () => {
       symbolGroups[signal.symbol].push(signal)
     })
 
-    console.log('📋 ===== 過往累積過期信號總結 =====')
-    console.log(`🔴 總過期信號數量: ${allExpiredSignals.length}`)
-    console.log(`� 涉及幣種: ${Object.keys(symbolGroups).join(', ')}`)
-
-    // 按幣種詳細打印
-    Object.keys(symbolGroups).forEach(symbol => {
-      const signals = symbolGroups[symbol]
-      console.log(`\n� ${symbol} (${signals.length} 個信號):`)
-
-      signals.forEach((signal, index) => {
-        console.log(`  ${index + 1}. ${signal.signal_type || signal.direction} | 信心度: ${(signal.confidence * 100).toFixed(1)}%`)
-        console.log(`     ├─ 進場價: $${signal.entry_price?.toFixed(4) || 'N/A'}`)
-        console.log(`     ├─ 當前價: $${signal.current_price?.toFixed(4) || 'N/A'}`)
-        console.log(`     ├─ 策略: ${signal.strategy_name || signal.reasoning || 'Unknown'}`)
-        console.log(`     ├─ 創建時間: ${signal.created_at}`)
-        console.log(`     ├─ 時間框架: ${signal.primary_timeframe || 'N/A'}`)
-        console.log(`     └─ ID: ${signal.id}`)
-      })
-    })
-
     // 計算統計信息
     const typeStats: Record<string, number> = {}
     allExpiredSignals.forEach((signal: any) => {
@@ -1446,12 +1441,10 @@ const printExpiredSignals = async () => {
       typeStats[type] = (typeStats[type] || 0) + 1
     })
 
-    console.log('\n📊 信號類型統計:')
-    Object.entries(typeStats).forEach(([type, count]) => {
-      console.log(`  ${type}: ${count} 個`)
-    })
-
-    console.log('\n🔍 過往累積過期信號檢查完成')
+    // 僅在開發環境顯示詳細日誌
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`📊 過期信號檢查: ${allExpiredSignals.length} 個信號, ${Object.keys(symbolGroups).length} 個幣種`)
+    }
 
     // 顯示通知
     showNotification('info', '過往累積過期信號檢查',
@@ -1478,7 +1471,7 @@ const fetchRealtimePrices = async () => {
       // 更新短線信號中的當前價格
       updateCurrentPricesInSignals()
 
-      console.log(`更新即時價格: ${Object.keys(realtimePrices.value).length} 個交易對`)
+      // 更新即時價格 (已移除調試日誌)
     }
 
   } catch (error: any) {
@@ -1524,7 +1517,7 @@ const updateCurrentPricesInSignals = () => {
 }
 const fetchScalpingSignals = async (): Promise<any[]> => {
   try {
-    console.log('獲取短線信號...')
+    // 獲取短線信號 (已移除調試日誌)
 
     const response = await api.get('/api/v1/scalping/signals', {
       params: {
@@ -1538,7 +1531,7 @@ const fetchScalpingSignals = async (): Promise<any[]> => {
     })
 
     rawScalpingSignals.value = response.data || []
-    console.log(`獲取到 ${rawScalpingSignals.value.length} 個專用短線信號`)
+    // 獲取到專用短線信號 (已移除調試日誌)
 
     // 載入存儲的信號時間戳
     const savedTimestamps = JSON.parse(localStorage.getItem('tradingx_signal_timestamps') || '{}')
@@ -1565,11 +1558,11 @@ const fetchScalpingSignals = async (): Promise<any[]> => {
           preservedCreatedAt = saved.created_at
           preservedExpiresAt = saved.expires_at
           isExistingSignal = true
-          console.log(`信號 ${signalKey} 使用保存的時間戳 (${hoursDiff.toFixed(1)}小時前)`)
+          // 信號使用保存的時間戳 (已移除調試日誌)
         } else {
           // 清理過期的時間戳記錄
           delete savedTimestamps[signalKey]
-          console.log(`信號 ${signalKey} 時間戳過期，使用新時間戳`)
+          // 信號時間戳過期，使用新時間戳 (已移除調試日誌)
         }
       }
 
@@ -1583,7 +1576,7 @@ const fetchScalpingSignals = async (): Promise<any[]> => {
           entry_price: signal.entry_price
         }
         localStorage.setItem('tradingx_signal_timestamps', JSON.stringify(savedTimestamps))
-        console.log(`新信號 ${signalKey} 保存時間戳`)
+        // 新信號保存時間戳 (已移除調試日誌)
       }
 
       const convertedSignal: Signal = {
@@ -1660,7 +1653,7 @@ const cleanupExpiredTimestamps = () => {
     if (expiredKeys.length > 0) {
       expiredKeys.forEach(key => delete savedTimestamps[key])
       localStorage.setItem('tradingx_signal_timestamps', JSON.stringify(savedTimestamps))
-      console.log(`清理了 ${expiredKeys.length} 個過期的信號時間戳記錄 (>4小時)`)
+      // 清理過期的信號時間戳記錄 (已移除調試日誌)
     }
   } catch (error) {
     console.error('清理時間戳記錄失敗:', error)
@@ -1714,7 +1707,7 @@ const updateShortTermSignals = async () => {
 
       // 如果該幣種在儀表板中已有未過期信號，跳過
       if (existingCoins.has(key)) {
-        console.log(`跳過 ${key}：儀表板中已存在未過期信號`)
+        // 跳過已存在的信號 (已移除調試日誌)
         return
       }
 
@@ -1741,10 +1734,10 @@ const updateShortTermSignals = async () => {
     // 更新統計數據 - 基於實際顯示的篩選後信號
     updateShortTermStats()
 
-    console.log(`短線信號更新完成`)
+    // 短線信號更新完成 (已移除調試日誌)
 
     if (expiredCount > 0) {
-      console.log(`處理了 ${expiredCount} 個過期短線信號並移至歷史紀錄`)
+      // 處理過期短線信號 (已移除調試日誌)
     }
 
   } catch (error) {
@@ -1804,7 +1797,7 @@ const generateInstantAdvice = async () => {
         expireTime.setHours(expireTime.getHours() + hoursToExpire)
         advice.expires_at = expireTime.toISOString()
 
-        console.log(`設定 ${advice.symbol} 建議有效期: ${hoursToExpire} 小時 (${advice.time_horizon || '中長線'})`)
+        // 設定建議有效期 (已移除調試日誌)
       }
     })
 
@@ -1814,7 +1807,7 @@ const generateInstantAdvice = async () => {
     // 更新統計
     updateAdviceStats()
 
-    console.log(`生成了 ${adviceStats.totalAdvice} 個即時中長線建議`)
+    // 生成即時中長線建議 (已移除調試日誌)
     showNotification('success', '即時建議生成成功',
       `基於牛熊市分析，生成 ${adviceStats.totalAdvice} 個中長線策略建議`)
 
@@ -1871,7 +1864,7 @@ const saveInstantAdviceToStorage = () => {
       timestamp: Date.now()
     }
     localStorage.setItem('tradingx_instant_advice', JSON.stringify(adviceData))
-    console.log(`保存 ${instantAdviceSignals.value.length} 個即時建議到 localStorage`)
+    // 保存即時建議到 localStorage (已移除調試日誌)
   } catch (error) {
     console.error('保存即時建議失敗:', error)
   }
@@ -1899,11 +1892,11 @@ const loadInstantAdviceFromStorage = () => {
       // 如果有過期的建議被移除，更新儲存
       if (validAdvice.length !== adviceData.signals.length) {
         const expiredCount = adviceData.signals.length - validAdvice.length
-        console.log(`移除了 ${expiredCount} 個過期的即時建議`)
+        // 移除過期的即時建議 (已移除調試日誌)
         saveInstantAdviceToStorage()
       }
 
-      console.log(`從 localStorage 載入 ${validAdvice.length} 個有效即時建議`)
+      // 從 localStorage 載入有效即時建議 (已移除調試日誌)
     }
   } catch (error) {
     console.error('載入即時建議失敗:', error)
@@ -1916,7 +1909,7 @@ const loadInstantAdviceFromStorage = () => {
 const clearInstantAdviceFromStorage = () => {
   try {
     localStorage.removeItem('tradingx_instant_advice')
-    console.log('已清除 localStorage 中的即時建議')
+    // 已清除 localStorage 中的即時建議 (已移除調試日誌)
   } catch (error) {
     console.error('清除即時建議儲存失敗:', error)
   }
@@ -1939,7 +1932,7 @@ const cleanupExpiredAdvice = () => {
   if (expiredCount > 0) {
     updateAdviceStats()
     saveInstantAdviceToStorage()
-    console.log(`自動清理了 ${expiredCount} 個過期的即時建議`)
+    // 自動清理過期的即時建議 (已移除調試日誌)
     showNotification('info', '建議已過期', `已自動移除 ${expiredCount} 個過期的中長線建議`)
   }
 }
@@ -2041,7 +2034,7 @@ const confirmRefreshShortTermSignals = async () => {
   const expiredCount = await processExpiredShortTermSignals()
 
   if (expiredCount > 0) {
-    console.log(`手動刷新：處理了 ${expiredCount} 個過期短線信號並移至歷史紀錄`)
+    // 手動刷新處理過期信號 (已移除調試日誌)
     showNotification('info', '信號歸檔完成', `已將 ${expiredCount} 個過期信號移至歷史紀錄`)
   }
 
@@ -2049,31 +2042,67 @@ const confirmRefreshShortTermSignals = async () => {
   await refreshShortTermSignals()
 }
 
-// 獲取信號時效性（只使用後端真實數據）
-const getSignalValidity = (signal: Signal): { percentage: number; text: string; can_execute: boolean } => {
-  // 只使用後端提供的真實 validity_info 數據
-  if (signal.validity_info) {
-    return {
-      percentage: signal.validity_info.percentage,
-      text: signal.validity_info.text,
-      can_execute: signal.validity_info.can_execute
-    }
-  }
+// 格式化剩餘時間顯示
+const formatRemainingTime = (signal: Signal): string => {
+  const remainingMinutes = signal.validity_info?.remaining_minutes || 0
+  const remainingSeconds = signal.validity_info?.remaining_seconds || 0
 
-  // 如果沒有後端數據，返回保守的預設值，避免假數據
-  console.warn(`⚠️ 缺少後端時效性數據: ${signal.symbol}，使用保守預設值`)
-  return {
-    percentage: 0,
-    text: '無時效數據',
-    can_execute: false
+  if (remainingMinutes >= 60) {
+    const hours = Math.floor(remainingMinutes / 60)
+    const mins = Math.floor(remainingMinutes % 60)
+    return mins > 0 ? `${hours}小時${mins}分鐘` : `${hours}小時`
+  } else if (remainingMinutes >= 1) {
+    return `${Math.floor(remainingMinutes)}分鐘`
+  } else if (remainingSeconds > 0) {
+    return `${Math.floor(remainingSeconds)}秒`
+  } else {
+    return '已過期'
+  }
+}
+
+// 檢查信號是否可執行
+const canExecuteSignal = (signal: Signal): boolean => {
+  const status = signal.validity_info?.status || 'unknown'
+  return status === 'fresh' || status === 'valid'
+}
+
+// 獲取信號狀態文字
+const getSignalStatusText = (signal: Signal): string => {
+  const status = signal.validity_info?.status || 'unknown'
+  switch (status) {
+    case 'fresh':
+      return '新鮮'
+    case 'valid':
+      return '有效'
+    case 'expiring':
+      return '即將過期'
+    case 'expired':
+      return '已過期'
+    default:
+      return '未知'
+  }
+}
+
+// 獲取信號狀態百分比（用於進度條）
+const getSignalStatusPercentage = (signal: Signal): number => {
+  const status = signal.validity_info?.status || 'unknown'
+  switch (status) {
+    case 'fresh':
+      return 100
+    case 'valid':
+      return 70
+    case 'expiring':
+      return 30
+    case 'expired':
+      return 0
+    default:
+      return 0
   }
 }
 
 // 快速執行交易
 const executeQuickTrade = (signal: Signal) => {
-  const validity = getSignalValidity(signal)
-
-  if (!validity.can_execute) {
+  if (!canExecuteSignal(signal)) {
     showNotification('warning', '信號無法執行', '此短線信號已過期或不符合執行條件')
     return
   }
@@ -2088,12 +2117,12 @@ const executeQuickTrade = (signal: Signal) => {
   showNotification('info', '快速交易', `正在執行 ${signal.symbol} ${signal.signal_type} 信號`)
 
   // 模擬交易執行
-  console.log(`執行快速交易: ${signal.symbol} ${signal.signal_type} at ${signal.entry_price}`)
+  // 執行快速交易 (已移除調試日誌)
 }
 
 // 查看短線信號詳情
 const viewShortTermDetail = (signal: Signal) => {
-  const validity = getSignalValidity(signal)
+  const statusText = getSignalStatusText(signal)
   const priceRisk = signal.price_deviation_risk || { level: 'unknown', warning: '無數據' }
   const marketImpact = signal.market_condition_impact || { rating_text: '無數據', condition_text: '無數據' }
 
@@ -2108,7 +2137,7 @@ const viewShortTermDetail = (signal: Signal) => {
 止盈價格: $${signal.take_profit?.toFixed(4)}
 信心度: ${Math.round(signal.confidence * 100)}%
 緊急度: ${signal.urgency_level}
-剩餘時效: ${validity.text}
+信號狀態: ${statusText}
 價格偏離風險: ${priceRisk.warning}
 市場條件評級: ${marketImpact.rating_text} (${marketImpact.condition_text})
 執行狀態: ${signal.execution_status || 'active'}
@@ -2187,10 +2216,17 @@ const calculateSignalResult = (signal: Signal): string => {
 const checkShortTermSignalValidity = (signal: Signal): { isExpired: boolean; result: 'success' | 'failure' | 'breakeven'; profitPercent: number } => {
   let isExpired = false
 
-  // 只使用後端提供的真實 validity_info 數據
-  if (signal.validity_info && signal.validity_info.status) {
-    isExpired = signal.validity_info.status === 'expired'
-    console.log(`🔍 使用後端時效性數據: ${signal.symbol} - ${isExpired ? '已過期' : '有效'}`)
+  // 優先檢查後端的 status 字段
+  if (signal.status === 'expired') {
+    isExpired = true
+    console.log(`🔍 根據後端狀態判斷: ${signal.symbol} - 已過期 (status: expired)`)
+  }
+  // 使用後端提供的 validity_info 數據
+  else if (signal.validity_info) {
+    // 只有當 validity_info.status 為 "expired" 或剩餘時間 <= 0 時才算過期
+    isExpired = signal.validity_info.status === 'expired' ||
+      (signal.validity_info.remaining_seconds !== undefined && signal.validity_info.remaining_seconds <= 0)
+    console.log(`🔍 根據時效性數據判斷: ${signal.symbol} - ${isExpired ? '已過期' : '有效'} (status: ${signal.validity_info.status}, remaining: ${signal.validity_info.remaining_seconds}s)`)
   } else {
     // 如果沒有後端數據，保守處理為未過期，避免錯誤判斷
     console.warn(`⚠️ 缺少後端時效性數據: ${signal.symbol}，預設為有效`)
@@ -2207,7 +2243,9 @@ const checkShortTermSignalValidity = (signal: Signal): { isExpired: boolean; res
 
   // 🔧 牛市短線交易優化：動態止盈策略
   let successThreshold = calculateDynamicStopProfit(signal)
-  const stopLossThreshold = 1.0 // 固定1%止損
+
+  // 動態止損計算（基於 JSON 配置邏輯）
+  const stopLossThreshold = calculateDynamicStopLoss(signal)
   const breakevenThreshold = 0.5 // 攤平閾值：0% < 利潤 < 0.5% 才算攤平
 
   // 🐛 調試信息
@@ -2264,6 +2302,51 @@ const checkShortTermSignalValidity = (signal: Signal): { isExpired: boolean; res
   const displayProfitPercent = direction === 'SHORT' ? -profitPercent : profitPercent
 
   return { isExpired, result, profitPercent: displayProfitPercent }
+}
+
+// 動態止損計算（基於 JSON 配置邏輯）
+const calculateDynamicStopLoss = (signal: Signal): number => {
+  // 基於資產類型的波動性因子
+  const assetVolatilityMap: Record<string, number> = {
+    'BTCUSDT': 1.0,
+    'ETHUSDT': 1.2,
+    'SOLUSDT': 1.8,
+    'BNBUSDT': 1.1,
+    'XRPUSDT': 1.4,
+    'ADAUSDT': 1.6
+  }
+
+  // 基於時間框架的止損範圍
+  const timeframeStopLossMap: Record<string, [number, number]> = {
+    '1m': [0.01, 0.03],   // 極短線: 1-3%
+    '3m': [0.01, 0.03],
+    '5m': [0.01, 0.03],
+    '15m': [0.01, 0.03],
+    '30m': [0.01, 0.03],
+    '1h': [0.01, 0.03],
+    '4h': [0.02, 0.05],   // 短線: 2-5%
+    '1d': [0.02, 0.05]
+  }
+
+  // 獲取基礎止損範圍
+  const baseRange = timeframeStopLossMap[signal.primary_timeframe || '1h'] || [0.02, 0.03]
+  const volatilityFactor = assetVolatilityMap[signal.symbol] || 1.0
+
+  // 計算平均止損百分比
+  const baseStopLoss = (baseRange[0] + baseRange[1]) / 2
+  const adjustedStopLoss = baseStopLoss * volatilityFactor
+
+  // 根據信號緊急程度調整
+  let urgencyMultiplier = 1.0
+  if (signal.urgency_level === 'urgent') urgencyMultiplier = 0.8  // 緊急信號收緊止損
+  else if (signal.urgency_level === 'high') urgencyMultiplier = 0.9
+  else if (signal.urgency_level === 'medium') urgencyMultiplier = 1.1
+
+  // 最終止損百分比
+  const finalStopLoss = adjustedStopLoss * urgencyMultiplier
+
+  // 限制在合理範圍內 (0.5% - 5%)
+  return Math.max(0.5, Math.min(5.0, finalStopLoss * 100))
 }
 
 // � 牛市短線交易：動態止盈計算（ATR + ADX 趨勢判斷）
@@ -2705,6 +2788,10 @@ const isLogExpanded = ref(false)  // 新增：日誌展開狀態
 
 let updateInterval: NodeJS.Timeout | null = null
 let logUpdateInterval: NodeJS.Timeout | null = null
+let countdownUpdateInterval: NodeJS.Timeout | null = null
+
+// 即時倒數計時狀態
+const currentTime = ref(new Date())
 
 const formatTime = (timestamp: string): string => {
   try {
@@ -3452,6 +3539,11 @@ onMounted(() => {
     fetchRealtimeUpdates()
   }, 3000)
 
+  // 即時倒數計時更新器：每秒更新當前時間
+  countdownUpdateInterval = setInterval(() => {
+    currentTime.value = new Date()
+  }, 1000)
+
   // 每30秒檢查一次服務狀態 (原為60秒)
   setInterval(() => {
     checkServiceStatus()
@@ -3522,6 +3614,9 @@ onUnmounted(() => {
   }
   if (logUpdateInterval) {
     clearInterval(logUpdateInterval)
+  }
+  if (countdownUpdateInterval) {
+    clearInterval(countdownUpdateInterval)
   }
 })
 </script>

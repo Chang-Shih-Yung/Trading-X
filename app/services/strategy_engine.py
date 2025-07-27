@@ -12,6 +12,7 @@ from app.services.candlestick_patterns import analyze_candlestick_patterns, Patt
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.models.models import TradingSignal
+from app.utils.time_utils import get_taiwan_now_naive, taiwan_now_plus, to_taiwan_naive
 import logging
 
 logger = logging.getLogger(__name__)
@@ -88,13 +89,38 @@ class StrategyEngine:
             'technical_indicators': 0.40   # 技術指標佔40%權重  
         }
         
-        # 牛熊市策略參數調整
+        # 牛熊市策略參數調整 - 基於 market_conditions_config.json
         self.bull_market_params = {
             'confidence_threshold': 0.65,  # 牛市較低信心度門檻
             'risk_reward_min': 1.5,        # 牛市較低風險回報比
             'stop_loss_pct': 0.035,        # 牛市較緊止損 3.5%
             'take_profit_pct': 0.08,       # 牛市較緊止盈 8%
-            'long_bias': 0.15              # 做多傾向加成
+            'long_bias': 0.15,             # 做多傾向加成
+            # 基於 JSON 配置的時間框架策略參數
+            'ultra_short': {
+                'stop_loss_range': [0.01, 0.03],
+                'max_holding_time': '4小時',
+                'position_size': 0.03,      # 3% 總資產
+                'monitoring_freq': '實時監控'
+            },
+            'short_term': {
+                'stop_loss_range': [0.02, 0.05],
+                'max_holding_time': '3天',
+                'position_size': 0.08,      # 8% 總資產
+                'monitoring_freq': '每小時檢查'
+            },
+            'mid_term': {
+                'stop_loss_range': [0.05, 0.12],
+                'max_holding_time': '3週',
+                'position_size': 0.15,      # 15% 總資產
+                'monitoring_freq': '每日檢查'
+            },
+            'long_term': {
+                'stop_loss_range': [0.15, 0.30],
+                'max_holding_time': '無限制',
+                'position_size': 0.30,      # 30% 總資產
+                'monitoring_freq': '每週檢查'
+            }
         }
         
         self.bear_market_params = {
@@ -102,8 +128,155 @@ class StrategyEngine:
             'risk_reward_min': 2.5,        # 熊市較高風險回報比
             'stop_loss_pct': 0.025,        # 熊市較緊止損 2.5%
             'take_profit_pct': 0.06,       # 熊市較保守止盈 6%
-            'short_bias': 0.15             # 做空傾向加成
+            'short_bias': 0.15,            # 做空傾向加成
+            # 基於 JSON 配置的時間框架策略參數 (熊市調整)
+            'ultra_short': {
+                'stop_loss_range': [0.015, 0.04],  # 熊市稍微放寬
+                'max_holding_time': '2小時',        # 熊市縮短持倉
+                'position_size': 0.01,              # 1% 總資產 (大幅減倉)
+                'monitoring_freq': '實時監控'
+            },
+            'short_term': {
+                'stop_loss_range': [0.025, 0.06],  # 熊市稍微放寬
+                'max_holding_time': '1天',          # 熊市縮短持倉
+                'position_size': 0.03,              # 3% 總資產 (大幅減倉)
+                'monitoring_freq': '每小時檢查'
+            },
+            'mid_term': {
+                'stop_loss_range': [0.08, 0.15],   # 熊市稍微放寬
+                'max_holding_time': '1週',          # 熊市縮短持倉
+                'position_size': 0.05,              # 5% 總資產 (大幅減倉)
+                'monitoring_freq': '每日檢查'
+            },
+            'long_term': {
+                'stop_loss_range': [0.20, 0.35],   # 熊市稍微放寬
+                'max_holding_time': '1個月',        # 熊市縮短持倉
+                'position_size': 0.08,              # 8% 總資產 (大幅減倉)
+                'monitoring_freq': '每週檢查'
+            }
         }
+        
+        # 震盪市場參數 - 基於 JSON 配置的 sideway 策略
+        self.sideway_market_params = {
+            'confidence_threshold': 0.70,  # 震盪市中等信心度門檻
+            'risk_reward_min': 2.0,        # 震盪市中等風險回報比
+            'stop_loss_pct': 0.03,         # 震盪市適中止損 3%
+            'take_profit_pct': 0.06,       # 震盪市適中止盈 6%
+            'range_bias': 0.10,            # 區間交易偏向
+            # 震盪市時間框架策略參數
+            'ultra_short': {
+                'stop_loss_range': [0.01, 0.02],
+                'max_holding_time': '1小時',
+                'position_size': 0.02,      # 2% 總資產
+                'strategy': '布林帶邊界反彈'
+            },
+            'short_term': {
+                'stop_loss_range': [0.03, 0.04],
+                'max_holding_time': '48小時',
+                'position_size': 0.06,      # 6% 總資產
+                'strategy': '區間交易'
+            },
+            'mid_term': {
+                'stop_loss_range': [0.06, 0.08],
+                'max_holding_time': '2週',
+                'position_size': 0.10,      # 10% 總資產
+                'strategy': '整理突破'
+            }
+        }
+        
+        # 基於 JSON 配置的資產特定參數
+        self.asset_parameters = {
+            'BTCUSDT': {
+                'volatility_factor': 1.0,
+                'entry_padding': 1.0,
+                'stop_loss_multiplier': 1.0,
+                'min_volume_24h': 10000000000,
+                'market_cap_rank': 1,
+                'primary_asset': True
+            },
+            'ETHUSDT': {
+                'volatility_factor': 1.2,
+                'entry_padding': 1.01,
+                'stop_loss_multiplier': 1.1,
+                'min_volume_24h': 5000000000,
+                'market_cap_rank': 2,
+                'primary_asset': True
+            },
+            'SOLUSDT': {
+                'volatility_factor': 1.8,
+                'entry_padding': 1.03,
+                'stop_loss_multiplier': 1.3,
+                'min_volume_24h': 500000000,
+                'market_cap_rank': 5,
+                'ecosystem_factor': 1.2
+            },
+            'BNBUSDT': {
+                'volatility_factor': 1.1,
+                'entry_padding': 1.0,
+                'stop_loss_multiplier': 0.9,
+                'min_volume_24h': 300000000,
+                'market_cap_rank': 4,
+                'exchange_token': True
+            },
+            'XRPUSDT': {
+                'volatility_factor': 1.4,
+                'entry_padding': 1.02,
+                'stop_loss_multiplier': 1.2,
+                'min_volume_24h': 800000000,
+                'market_cap_rank': 6,
+                'regulatory_risk': 1.3
+            },
+            'ADAUSDT': {
+                'volatility_factor': 1.6,
+                'entry_padding': 1.04,
+                'stop_loss_multiplier': 1.4,
+                'min_volume_24h': 200000000,
+                'market_cap_rank': 8,
+                'academic_approach': True
+            }
+        }
+        
+        # 時間框架分類方法 - 基於 JSON 配置
+        self.timeframe_classification = {
+            '5m': 'ultra_short',
+            '15m': 'ultra_short', 
+            '30m': 'ultra_short',
+            '1h': 'ultra_short',
+            '4h': 'short_term',
+            '6h': 'short_term',
+            '8h': 'short_term',
+            '12h': 'short_term',
+            '1d': 'short_term',
+            '3d': 'mid_term',
+            '1w': 'mid_term',
+            '1M': 'long_term',
+            '3M': 'long_term',
+            '6M': 'long_term',
+            '1y': 'long_term'
+        }
+        
+    def get_timeframe_classification(self, timeframe: str) -> str:
+        """獲取時間框架分類"""
+        return self.timeframe_classification.get(timeframe, 'short_term')
+    
+    def get_asset_parameters(self, symbol: str) -> dict:
+        """獲取資產特定參數"""
+        return self.asset_parameters.get(symbol, {
+            'volatility_factor': 1.0,
+            'entry_padding': 1.0,
+            'stop_loss_multiplier': 1.0,
+            'min_volume_24h': 100000000,
+            'market_cap_rank': 100
+        })
+    
+    def get_market_params(self, market_condition: str) -> dict:
+        """獲取市場條件參數"""
+        if market_condition.upper() == 'BULL':
+            return self.bull_market_params
+        elif market_condition.upper() == 'BEAR':
+            return self.bear_market_params
+        else:  # SIDEWAY or others
+            return self.sideway_market_params
         
     async def start_signal_generation(self):
         """啟動信號生成 - 多時間框架分析"""
@@ -276,7 +449,7 @@ class StrategyEngine:
             
             # 緩存結果（5分鐘有效）
             self.market_conditions[symbol] = market_condition
-            self.last_trend_analysis[symbol] = datetime.now()
+            self.last_trend_analysis[symbol] = get_taiwan_now_naive()
             
             logger.info(f"{symbol} 市場趨勢分析: {trend.value} 強度:{strength:.2f} 信心度:{confidence:.2f}")
             
@@ -388,22 +561,37 @@ class StrategyEngine:
         # 檢查緩存是否有效（5分鐘內的分析結果）
         if symbol in self.market_conditions and symbol in self.last_trend_analysis:
             last_analysis_time = self.last_trend_analysis[symbol]
-            if (datetime.now() - last_analysis_time).total_seconds() < 300:  # 5分鐘緩存
+            if (get_taiwan_now_naive() - last_analysis_time).total_seconds() < 300:  # 5分鐘緩存
                 return self.market_conditions[symbol]
         
         # 重新分析
         return await self.analyze_market_trend(symbol)
     
-    def _get_confidence_threshold(self, market_condition: MarketCondition) -> float:
-        """根據市場狀況獲取信心度門檻"""
-        if market_condition.trend == MarketTrend.BULL:
-            return self.bull_market_params['confidence_threshold']
-        elif market_condition.trend == MarketTrend.BEAR:
-            return self.bear_market_params['confidence_threshold']
-        else:
-            return 0.7  # 中性/橫盤市場使用標準門檻
+    def _get_confidence_threshold(self, market_condition: MarketCondition, timeframe: str = '1h') -> float:
+        """根據市場狀況和時間框架獲取信心度門檻 - 基於 JSON 配置"""
+        market_params = self.get_market_params(market_condition.trend.value)
+        
+        # 基礎信心度門檻
+        base_threshold = market_params['confidence_threshold']
+        
+        # 根據時間框架分類調整信心度要求
+        timeframe_class = self.get_timeframe_classification(timeframe)
+        
+        # 時間框架越短，信心度要求越高
+        timeframe_adjustments = {
+            'ultra_short': 0.05,   # 極短線提高 5% 信心度要求
+            'short_term': 0.02,    # 短線提高 2% 信心度要求
+            'mid_term': -0.02,     # 中線降低 2% 信心度要求
+            'long_term': -0.05     # 長線降低 5% 信心度要求
+        }
+        
+        adjustment = timeframe_adjustments.get(timeframe_class, 0)
+        adjusted_threshold = base_threshold + adjustment
+        
+        # 確保門檻在合理範圍內
+        return max(0.5, min(0.95, adjusted_threshold))
 
-    def _combine_timeframe_signals_with_trend(self, timeframe_signals: Dict, symbol: str, market_condition: MarketCondition) -> Optional[TradeSignal]:
+    def _combine_timeframe_signals_with_trend(self, timeframe_signals: Dict, symbol: str, market_condition: MarketCondition, timeframe: str = '1h') -> Optional[TradeSignal]:
         """綜合多時間框架信號 - 整合牛熊市判斷的高敏感度設計"""
         
         if not timeframe_signals:
@@ -556,21 +744,30 @@ class StrategyEngine:
             # 根據市場環境調整風險管理參數
             current_price = list(timeframe_signals.values())[0]['price']
             
-            if market_condition.trend == MarketTrend.BULL:
-                # 牛市參數：較緊止損，較寬止盈
-                stop_pct = self.bull_market_params['stop_loss_pct']
-                profit_pct = self.bull_market_params['take_profit_pct']
-            elif market_condition.trend == MarketTrend.BEAR:
-                # 熊市參數：較緊止損，較保守止盈
-                stop_pct = self.bear_market_params['stop_loss_pct']
-                profit_pct = self.bear_market_params['take_profit_pct']
+            # 獲取資產和市場參數
+            asset_params = self.get_asset_parameters(symbol)
+            market_params = self.get_market_params(market_condition.trend.value)
+            timeframe_class = self.get_timeframe_classification(timeframe)
+            
+            # 基於時間框架分類和市場條件的參數
+            if timeframe_class in market_params:
+                timeframe_params = market_params[timeframe_class]
+                stop_loss_range = timeframe_params['stop_loss_range']
+                base_stop_pct = (stop_loss_range[0] + stop_loss_range[1]) / 2
             else:
-                # 中性市場：標準參數
-                stop_pct = 0.03
-                profit_pct = 0.06
+                base_stop_pct = market_params.get('stop_loss_pct', 0.03)
+            
+            # 根據資產特性調整參數
+            volatility_factor = asset_params.get('volatility_factor', 1.0)
+            stop_loss_multiplier = asset_params.get('stop_loss_multiplier', 1.0)
+            entry_padding = asset_params.get('entry_padding', 1.0)
+            
+            # 計算調整後的止損和止盈百分比
+            stop_pct = base_stop_pct * volatility_factor * stop_loss_multiplier
+            profit_pct = market_params.get('take_profit_pct', 0.06) * volatility_factor
             
             if signal_type == SignalType.LONG:
-                avg_entry = current_price * 1.002
+                avg_entry = current_price * entry_padding
                 avg_stop = current_price * (1 - stop_pct)
                 avg_target = current_price * (1 + profit_pct)
             else:
@@ -590,7 +787,7 @@ class StrategyEngine:
             return None
         
         # 計算信號過期時間
-        expires_at = datetime.now() + timedelta(hours=24)
+        expires_at = taiwan_now_plus(hours=24)
         
         # 構建推理說明
         reasoning_parts = [
@@ -764,31 +961,54 @@ class StrategyEngine:
             signal_strength=confidence,
             reasoning=' | '.join(reasoning_parts),
             indicators_used={'pattern_analysis': True, 'multi_timeframe': True},
-            expires_at=datetime.now() + timedelta(hours=24)
+            expires_at=taiwan_now_plus(hours=24)
         )
 
     async def analyze_symbol(self, symbol: str, timeframe: str) -> Optional[TradeSignal]:
-        
-        # 計算綜合信號強度
-        signal_scores = self._calculate_signal_scores(indicators, multi_timeframe_signals)
-        
-        # 判斷主要信號方向
-        long_score = signal_scores['long_score']
-        short_score = signal_scores['short_score']
-        
-        # 信號閾值 (降低閾值，更容易觸發信號)
-        signal_threshold = 40  # 從 60 降低到 40
-        
-        if long_score >= signal_threshold and long_score > short_score:
-            return await self._create_long_signal(
-                df, indicators, symbol, timeframe, current_price, long_score, signal_scores
-            )
-        elif short_score >= signal_threshold and short_score > long_score:
-            return await self._create_short_signal(
-                df, indicators, symbol, timeframe, current_price, short_score, signal_scores
-            )
-        
-        return None
+        """分析特定交易對和時間框架"""
+        try:
+            # 獲取市場數據
+            df = await self.market_service.get_market_data_from_db(symbol, timeframe, limit=100)
+            if df.empty:
+                return None
+            
+            current_price = float(df.iloc[-1]['close'])
+            
+            # 計算技術指標
+            indicators = {}
+            indicators['ma'] = self.technical_service.calculate_moving_averages(df)
+            indicators['rsi'] = self.technical_service.calculate_rsi(df)
+            indicators['macd'] = self.technical_service.calculate_macd(df)
+            indicators['bollinger'] = self.technical_service.calculate_bollinger_bands(df)
+            indicators['adx'] = self.technical_service.calculate_adx(df)
+            
+            # 多時間框架分析
+            multi_timeframe_signals = await self._analyze_multiple_timeframes(symbol, df)
+            
+            # 計算綜合信號強度
+            signal_scores = self._calculate_signal_scores(indicators, multi_timeframe_signals)
+            
+            # 判斷主要信號方向
+            long_score = signal_scores['long_score']
+            short_score = signal_scores['short_score']
+            
+            # 信號閾值 (降低閾值，更容易觸發信號)
+            signal_threshold = 40  # 從 60 降低到 40
+            
+            if long_score >= signal_threshold and long_score > short_score:
+                return await self._create_long_signal(
+                    df, indicators, symbol, timeframe, current_price, long_score, signal_scores
+                )
+            elif short_score >= signal_threshold and short_score > long_score:
+                return await self._create_short_signal(
+                    df, indicators, symbol, timeframe, current_price, short_score, signal_scores
+                )
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error analyzing {symbol}: {e}")
+            return None
     
     def _detect_market_panic(self, indicators: Dict[str, IndicatorResult]) -> float:
         """檢測市場恐慌情況，返回恐慌倍數"""
@@ -1145,7 +1365,7 @@ class StrategyEngine:
             signal_strength=signal_strength,
             reasoning=reasoning,
             indicators_used={k: v.signal for k, v in indicators.items()},
-            expires_at=datetime.now() + timedelta(hours=24)
+            expires_at=taiwan_now_plus(hours=24)
         )
     
     async def _create_short_signal(
@@ -1189,23 +1409,48 @@ class StrategyEngine:
             signal_strength=signal_strength,
             reasoning=reasoning,
             indicators_used={k: v.signal for k, v in indicators.items()},
-            expires_at=datetime.now() + timedelta(hours=24)
+            expires_at=taiwan_now_plus(hours=24)
         )
     
     def _calculate_stop_loss_long(
         self,
         df: pd.DataFrame,
         indicators: Dict[str, IndicatorResult],
-        current_price: float
+        current_price: float,
+        symbol: str = 'BTCUSDT',
+        timeframe: str = '1h',
+        market_condition: str = 'BULL'
     ) -> float:
-        """計算做多止損價位"""
+        """計算做多止損價位 - 整合 JSON 配置參數"""
         
         stop_options = []
         
-        # 1. ATR止損
+        # 獲取資產和市場參數
+        asset_params = self.get_asset_parameters(symbol)
+        market_params = self.get_market_params(market_condition)
+        timeframe_class = self.get_timeframe_classification(timeframe)
+        
+        # 基於時間框架分類的止損範圍
+        if timeframe_class in market_params:
+            stop_loss_range = market_params[timeframe_class]['stop_loss_range']
+            base_stop_pct = (stop_loss_range[0] + stop_loss_range[1]) / 2
+        else:
+            base_stop_pct = market_params.get('stop_loss_pct', 0.03)
+        
+        # 根據資產波動性調整
+        volatility_factor = asset_params.get('volatility_factor', 1.0)
+        stop_loss_multiplier = asset_params.get('stop_loss_multiplier', 1.0)
+        adjusted_stop_pct = base_stop_pct * volatility_factor * stop_loss_multiplier
+        
+        # 1. 基於 JSON 配置的百分比止損
+        pct_stop = current_price * (1 - adjusted_stop_pct)
+        stop_options.append(pct_stop)
+        
+        # 2. ATR止損
         if 'ATR' in indicators:
             atr_value = indicators['ATR'].metadata['atr_value']
-            atr_stop = current_price - (atr_value * 2)
+            atr_multiplier = 2.0 * volatility_factor  # 根據資產波動性調整
+            atr_stop = current_price - (atr_value * atr_multiplier)
             stop_options.append(atr_stop)
         
         # 2. 近期低點止損
@@ -1382,6 +1627,69 @@ class StrategyEngine:
             except Exception as e:
                 await session.rollback()
                 logger.error(f"儲存信號失敗: {e}")
+    
+    def get_strategy_recommendations(self, symbol: str, timeframe: str, market_condition: str) -> dict:
+        """基於 JSON 配置提供策略建議"""
+        asset_params = self.get_asset_parameters(symbol)
+        market_params = self.get_market_params(market_condition.upper())
+        timeframe_class = self.get_timeframe_classification(timeframe)
+        
+        # 獲取時間框架特定參數
+        timeframe_params = market_params.get(timeframe_class, {})
+        
+        # 構建策略建議
+        recommendations = {
+            'symbol': symbol,
+            'timeframe': timeframe,
+            'timeframe_classification': timeframe_class,
+            'market_condition': market_condition.upper(),
+            'asset_profile': {
+                'volatility_factor': asset_params.get('volatility_factor', 1.0),
+                'market_cap_rank': asset_params.get('market_cap_rank', 100),
+                'is_primary_asset': asset_params.get('primary_asset', False)
+            },
+            'risk_management': {
+                'stop_loss_range': timeframe_params.get('stop_loss_range', [0.02, 0.05]),
+                'max_holding_time': timeframe_params.get('max_holding_time', '1天'),
+                'position_size_suggestion': timeframe_params.get('position_size', 0.05),
+                'monitoring_frequency': timeframe_params.get('monitoring_freq', '每日檢查')
+            },
+            'confidence_threshold': market_params.get('confidence_threshold', 0.70),
+            'strategy_focus': self._get_strategy_focus(timeframe_class, market_condition.upper()),
+            'entry_adjustments': {
+                'entry_padding': asset_params.get('entry_padding', 1.0),
+                'volatility_adjustment': asset_params.get('volatility_factor', 1.0)
+            }
+        }
+        
+        return recommendations
+    
+    def _get_strategy_focus(self, timeframe_class: str, market_condition: str) -> str:
+        """根據時間框架分類和市場條件獲取策略重點"""
+        strategy_matrix = {
+            'ultra_short': {
+                'BULL': '高頻剝頭皮、突破跟進',
+                'BEAR': '極短線逆勢反彈、嚴格止損',
+                'SIDEWAY': '區間邊界反彈、布林帶策略'
+            },
+            'short_term': {
+                'BULL': '動能追蹤、波段捕捉',
+                'BEAR': '防守反彈、輕倉試探',
+                'SIDEWAY': '區間交易、雙向操作'
+            },
+            'mid_term': {
+                'BULL': '趨勢跟隨、週期性建倉',
+                'BEAR': '底部建倉、價值定位',
+                'SIDEWAY': '整理突破、區間震盪'
+            },
+            'long_term': {
+                'BULL': '價值投資、牛市佈局',
+                'BEAR': '分批建倉、長期持有',
+                'SIDEWAY': '定投策略、耐心持倉'
+            }
+        }
+        
+        return strategy_matrix.get(timeframe_class, {}).get(market_condition, '標準策略')
     
     async def stop(self):
         """停止策略引擎"""

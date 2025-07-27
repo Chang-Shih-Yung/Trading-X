@@ -75,17 +75,26 @@
             </div>
             <div class="text-right">
               <div class="text-2xl font-bold"
-                :class="getWeeklyProfitStats().currentWeek >= 0 ? 'text-green-600' : 'text-red-600'">
-                {{ getWeeklyProfitStats().currentWeek >= 0 ? '+' : '' }}{{
-                  getWeeklyProfitStats().currentWeek.toFixed(2) }}%
+                :class="typeof getWeeklyProfitStats().currentWeek === 'number' && getWeeklyProfitStats().currentWeek >= 0 ? 'text-green-600' : 'text-red-600'">
+                <span v-if="typeof getWeeklyProfitStats().currentWeek === 'number'">
+                  {{ getWeeklyProfitStats().currentWeek >= 0 ? '+' : '' }}{{
+                    getWeeklyProfitStats().currentWeek.toFixed(2) }}%
+                </span>
+                <span v-else class="text-gray-500">
+                  無數據
+                </span>
               </div>
               <div class="text-sm text-gray-500">本週累計</div>
             </div>
           </div>
           <div class="mt-2 text-xs text-gray-500">
             上週:
-            <span class="font-medium" :class="getWeeklyProfitStats().lastWeek >= 0 ? 'text-green-600' : 'text-red-600'">
+            <span v-if="typeof getWeeklyProfitStats().lastWeek === 'number'" class="font-medium"
+              :class="getWeeklyProfitStats().lastWeek >= 0 ? 'text-green-600' : 'text-red-600'">
               {{ getWeeklyProfitStats().lastWeek >= 0 ? '+' : '' }}{{ getWeeklyProfitStats().lastWeek.toFixed(2) }}%
+            </span>
+            <span v-else class="font-medium text-gray-500">
+              無數據
             </span>
           </div>
         </div>
@@ -116,9 +125,12 @@
             </div>
             <div class="text-center">
               <div class="text-lg font-semibold">
-                <span class="font-medium"
+                <span v-if="typeof getCategoryProfitSum(symbol) === 'number'" class="font-medium"
                   :class="getCategoryProfitSum(symbol) >= 0 ? 'text-green-600' : 'text-red-600'">
                   {{ getCategoryProfitSum(symbol) >= 0 ? '+' : '' }}{{ getCategoryProfitSum(symbol).toFixed(2) }}%
+                </span>
+                <span v-else class="font-medium text-gray-500">
+                  無數據
                 </span>
               </div>
               <div class="text-gray-500">累計盈虧</div>
@@ -162,6 +174,15 @@
                 <option value="SHORT">做空</option>
               </select>
             </div>
+
+            <div class="flex items-center space-x-2">
+              <label class="text-sm font-medium text-gray-700">排序方式:</label>
+              <select v-model="sortOption"
+                class="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                <option value="profit">盈利表現（預設）</option>
+                <option value="time">時間（最新優先）</option>
+              </select>
+            </div>
           </div>
 
           <div class="flex items-center space-x-3">
@@ -182,14 +203,44 @@
         <div class="px-6 py-4 border-b border-gray-200">
           <h3 class="text-lg leading-6 font-medium text-gray-900">短線信號歷史記錄</h3>
           <p class="mt-1 text-sm text-gray-500">
-            顯示 {{ filteredHistory.length }} 筆過期短線信號
+            顯示 {{ filteredHistory.length }} 筆過期短線信號，
+            <span v-if="sortOption === 'time'">按時間排序（最新的在前）</span>
+            <span v-else>按盈利表現排序（🥇最佳表現在前）</span>
           </p>
+          <div v-if="sortOption === 'profit'" class="mt-2 flex items-center space-x-4 text-xs text-gray-400">
+            <span class="flex items-center">
+              <span class="w-3 h-3 bg-yellow-500 rounded-full mr-1"></span>
+              第1名：金牌
+            </span>
+            <span class="flex items-center">
+              <span class="w-3 h-3 bg-gray-400 rounded-full mr-1"></span>
+              第2名：銀牌
+            </span>
+            <span class="flex items-center">
+              <span class="w-3 h-3 bg-yellow-600 rounded-full mr-1"></span>
+              第3名：銅牌
+            </span>
+            <span class="flex items-center">
+              <span class="w-3 h-3 bg-blue-500 rounded-full mr-1"></span>
+              前10名
+            </span>
+            <span class="flex items-center">
+              <span class="w-3 h-3 bg-green-500 rounded-full mr-1"></span>
+              前50名
+            </span>
+          </div>
+          <div v-else class="mt-2 flex items-center space-x-4 text-xs text-gray-400">
+            <span>按歸檔時間排序，較新的記錄顯示在前面</span>
+          </div>
         </div>
 
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
               <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  排名
+                </th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   信號資訊
                 </th>
@@ -211,7 +262,21 @@
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-              <tr v-for="signal in paginatedHistory" :key="signal.id" class="hover:bg-gray-50">
+              <tr v-for="(signal, index) in paginatedHistory" :key="signal.id" class="hover:bg-gray-50">
+                <!-- 排名編號 -->
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <div class="flex items-center justify-center">
+                    <span v-if="sortOption === 'profit'"
+                      class="inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold"
+                      :class="getRankBadgeClass(getGlobalRank(signal, index))">
+                      {{ getGlobalRank(signal, index) }}
+                    </span>
+                    <span v-else
+                      class="inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold bg-blue-100 text-blue-800">
+                      {{ getGlobalRank(signal, index) }}
+                    </span>
+                  </div>
+                </td>
                 <!-- 信號資訊 -->
                 <td class="px-6 py-4 whitespace-nowrap">
                   <div class="flex items-center">
@@ -240,15 +305,27 @@
 
                 <!-- 交易結果 -->
                 <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="flex items-center">
+                  <div class="flex items-center space-x-2">
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
                       :class="getTradeResultClass(signal.tradeResult)">
                       {{ getTradeResultText(signal.tradeResult) }}
                     </span>
+                    <!-- 特殊表現標記 (只在盈利排序時顯示) -->
+                    <span v-if="sortOption === 'profit' && getGlobalRank(signal, index) <= 3"
+                      class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-bold"
+                      :class="getPerformanceBadgeClass(getGlobalRank(signal, index))">
+                      {{ getPerformanceText(getGlobalRank(signal, index)) }}
+                    </span>
                   </div>
-                  <div class="mt-1 text-sm font-medium"
-                    :class="signal.profitPercent >= 0 ? 'text-green-600' : 'text-red-600'">
-                    {{ signal.profitPercent >= 0 ? '+' : '' }}{{ signal.profitPercent?.toFixed(2) || '0.00' }}%
+                  <div class="mt-1 text-sm font-medium" :class="typeof signal.profitPercent === 'number'
+                    ? (signal.profitPercent >= 0 ? 'text-green-600' : 'text-red-600')
+                    : 'text-gray-500'">
+                    <span v-if="typeof signal.profitPercent === 'number'">
+                      {{ signal.profitPercent >= 0 ? '+' : '' }}{{ signal.profitPercent.toFixed(2) }}%
+                    </span>
+                    <span v-else>
+                      {{ signal.profitPercent }}
+                    </span>
                   </div>
                 </td>
 
@@ -275,7 +352,7 @@
               </tr>
 
               <tr v-if="filteredHistory.length === 0">
-                <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                <td colspan="7" class="px-6 py-12 text-center text-gray-500">
                   <div class="flex flex-col items-center">
                     <svg class="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -324,7 +401,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import LoadingOverlay from '@/components/LoadingOverlay.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -342,6 +419,7 @@ const shortTermCategories = ref<Record<string, { name: string; signals: any[]; c
 const selectedCategory = ref('')
 const selectedResult = ref('')
 const selectedDirection = ref('')
+const sortOption = ref('profit') // 預設按盈利排序
 const currentPage = ref(1)
 const itemsPerPage = 10
 
@@ -349,119 +427,30 @@ const itemsPerPage = 10
 const showClearConfirm = ref(false)
 const clearConfirmDetails = ref('')
 
-// 基於字符串生成一致的偽隨機數 (0-1之間)
-const generateConsistentRandom = (seed: string, index: number = 0) => {
-  let hash = 0
-  const str = seed + index.toString()
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i)
-    hash = ((hash << 5) - hash) + char
-    hash = hash & hash // Convert to 32-bit integer
-  }
-  return Math.abs(hash) / 2147483647 // 轉換為0-1之間的數
-}
-
-// 計算交易結果 - 使用一致性邏輯（不會因刷新而改變）
+// 計算交易結果 - 優先使用真實數據，無真實數據時返回 LOSE PRICE
 const calculateTradeResult = (signal: any) => {
-  // 如果已經有計算好的結果且看起來合理，直接使用
-  if (signal.tradeResult && signal.profitPercent !== undefined) {
-    return signal.tradeResult
+  // 🔥 優先使用資料庫中的真實結果
+  if (signal.trade_result && ['success', 'failure', 'breakeven'].includes(signal.trade_result)) {
+    console.log(`✅ 使用真實交易結果: ${signal.symbol} -> ${signal.trade_result}`)
+    return signal.trade_result
   }
 
-  const direction = signal.direction || signal.signal_type
-  const entryPrice = signal.entry_price
-  let currentPrice = signal.current_price
-
-  // 如果current_price和entry_price相同，說明沒有真實的當前價格數據
-  // 在這種情況下，我們使用基於信號ID的一致性估算
-  if (!entryPrice || !currentPrice || Math.abs(currentPrice - entryPrice) < 0.0001) {
-    if (signal.take_profit && signal.stop_loss) {
-      // 基於信心度和信號ID的一致性估算
-      const confidence = signal.confidence || 0.5
-      const success_probability = Math.min(0.75, confidence + 0.15)
-
-      // 使用信號ID作為種子，確保結果一致
-      const random1 = generateConsistentRandom(signal.id, 1)
-      const random2 = generateConsistentRandom(signal.id, 2)
-      const random3 = generateConsistentRandom(signal.id, 3)
-
-      if (random1 < success_probability) {
-        // 成功：在進場價和止盈之間
-        const profit_ratio = 0.7 + (random2 * 0.3) // 70%-100%的止盈
-        currentPrice = entryPrice + (signal.take_profit - entryPrice) * profit_ratio
-      } else if (random1 < success_probability + 0.2) {
-        // 止損
-        currentPrice = signal.stop_loss
-      } else {
-        // 小虧損
-        const loss_ratio = random3 * 0.4
-        currentPrice = entryPrice - (Math.abs(signal.stop_loss - entryPrice) * loss_ratio)
-      }
-    } else {
-      return 'unknown'
-    }
-  }
-
-  const isLong = direction.includes('LONG') || direction.includes('UP') ||
-    (!direction.includes('SHORT') && !direction.includes('DOWN'))
-  const priceChange = currentPrice - entryPrice
-  const profitPercent = isLong
-    ? (priceChange / entryPrice) * 100
-    : -(priceChange / entryPrice) * 100
-
-  // 修改交易結果判斷邏輯
-  if (profitPercent > 0.5) {
-    return 'success'  // 大於 +0.5% 為賺錢
-  } else if (profitPercent < 0) {
-    return 'failure'  // 負值為虧損
-  } else {
-    return 'breakeven'  // 0 到 +0.5% 之間為平手
-  }
+  // 如果沒有真實數據，返回"LOSE PRICE"字串
+  console.log(`❌ ${signal.symbol} 缺少真實交易結果，返回 LOSE PRICE`)
+  return "LOSE PRICE"
 }
 
-// 計算盈虧百分比 - 使用一致性邏輯（不會因刷新而改變）
+// 計算盈虧百分比 - 優先使用真實數據，無真實數據時返回 LOSE PRICE
 const calculateProfitPercent = (signal: any) => {
-  // 如果已經有計算好的結果，直接使用
-  if (signal.profitPercent !== undefined && signal.profitPercent !== 0) {
-    return signal.profitPercent
+  // 🔥 優先使用資料庫中的真實盈虧數據
+  if (signal.profit_loss_pct !== undefined && signal.profit_loss_pct !== null) {
+    console.log(`✅ 使用真實盈虧數據: ${signal.symbol} -> ${signal.profit_loss_pct.toFixed(2)}%`)
+    return signal.profit_loss_pct
   }
 
-  const direction = signal.direction || signal.signal_type
-  const entryPrice = signal.entry_price
-  let currentPrice = signal.current_price
-
-  // 如果current_price和entry_price相同，使用一致性估算
-  if (!entryPrice || !currentPrice || Math.abs(currentPrice - entryPrice) < 0.0001) {
-    if (signal.take_profit && signal.stop_loss) {
-      // 使用與calculateTradeResult相同的一致性邏輯
-      const confidence = signal.confidence || 0.5
-      const success_probability = Math.min(0.75, confidence + 0.15)
-
-      // 使用相同的種子確保結果一致
-      const random1 = generateConsistentRandom(signal.id, 1)
-      const random2 = generateConsistentRandom(signal.id, 2)
-      const random3 = generateConsistentRandom(signal.id, 3)
-
-      if (random1 < success_probability) {
-        const profit_ratio = 0.7 + (random2 * 0.3)
-        currentPrice = entryPrice + (signal.take_profit - entryPrice) * profit_ratio
-      } else if (random1 < success_probability + 0.2) {
-        currentPrice = signal.stop_loss
-      } else {
-        const loss_ratio = random3 * 0.4
-        currentPrice = entryPrice - (Math.abs(signal.stop_loss - entryPrice) * loss_ratio)
-      }
-    } else {
-      return 0
-    }
-  }
-
-  const isLong = direction.includes('LONG') || direction.includes('UP') ||
-    (!direction.includes('SHORT') && !direction.includes('DOWN'))
-  const priceChange = currentPrice - entryPrice
-  return isLong
-    ? (priceChange / entryPrice) * 100
-    : -(priceChange / entryPrice) * 100
+  // 如果沒有真實數據，返回"LOSE PRICE"字串
+  console.log(`❌ ${signal.symbol} 缺少真實盈虧數據，返回 LOSE PRICE`)
+  return "LOSE PRICE"
 }
 
 // 更新分類統計
@@ -493,7 +482,7 @@ const loadShortTermHistory = async () => {
     // 1. 先嘗試從後端 API 載入過期信號
     console.log('🔄 正在從後端API載入過期短線信號...')
 
-    const response = await fetch('/api/v1/signals/expired', {
+    const response = await fetch('/api/v1/scalping/expired', {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' }
     })
@@ -511,18 +500,41 @@ const loadShortTermHistory = async () => {
           const processedSignal = {
             ...signal,
             timestamp: signal.created_at,
-            archiveTime: signal.updated_at || signal.created_at,
+            archiveTime: signal.archived_at || signal.updated_at || signal.created_at,
             currentPrice: signal.current_price || signal.entry_price,
           }
 
-          // 計算一次並保存結果，避免重複計算
-          const profitPercent = calculateProfitPercent(processedSignal)
-          const tradeResult = calculateTradeResult(processedSignal)
+          // 🔥 優先使用資料庫中的真實交易結果和盈虧數據
+          let profitPercent = signal.profit_loss_pct
+          let tradeResult = signal.trade_result
+
+          // 如果資料庫沒有真實結果，計算一次並保存結果，避免重複計算
+          if (profitPercent === undefined || profitPercent === null) {
+            profitPercent = calculateProfitPercent(processedSignal)
+            console.log(`📊 ${signal.symbol}: 使用計算的盈虧=${profitPercent}`)
+          } else {
+            console.log(`✅ ${signal.symbol}: 使用真實盈虧=${typeof profitPercent === 'number' ? profitPercent.toFixed(2) + '%' : profitPercent}`)
+          }
+
+          if (!tradeResult || !['success', 'failure', 'breakeven'].includes(tradeResult)) {
+            tradeResult = calculateTradeResult(processedSignal)
+            console.log(`📊 ${signal.symbol}: 使用計算的結果=${tradeResult}`)
+          } else {
+            console.log(`✅ ${signal.symbol}: 使用真實結果=${tradeResult}`)
+          }
 
           processedSignal.profitPercent = profitPercent
           processedSignal.tradeResult = tradeResult
 
-          console.log(`📊 ${signal.symbol}: 盈虧=${profitPercent.toFixed(2)}%, 結果=${tradeResult}`)
+          // 🔧 調試：檢查關鍵欄位
+          if (!processedSignal.id || !processedSignal.symbol || !processedSignal.entry_price) {
+            console.warn(`⚠️ 信號資料不完整: ID=${processedSignal.id}, Symbol=${processedSignal.symbol}, Entry=${processedSignal.entry_price}`)
+          }
+
+          // 檢查 tradeResult 是否有效
+          if (!['success', 'failure', 'breakeven'].includes(tradeResult)) {
+            console.warn(`⚠️ 無效的交易結果: ${signal.symbol} -> ${tradeResult}`)
+          }
 
           return processedSignal
         })
@@ -568,15 +580,23 @@ const loadShortTermHistory = async () => {
 const filteredHistory = computed(() => {
   let filtered = savedShortTermHistory.value
 
+  // 🔧 調試：記錄初始狀態
+  console.log(`🔍 過濾邏輯開始 - 原始數據: ${filtered.length} 筆`)
+
   if (selectedCategory.value) {
+    const beforeFilter = filtered.length
     filtered = filtered.filter(signal => signal.symbol === selectedCategory.value)
+    console.log(`🔍 分類過濾 (${selectedCategory.value}): ${beforeFilter} -> ${filtered.length}`)
   }
 
   if (selectedResult.value) {
+    const beforeFilter = filtered.length
     filtered = filtered.filter(signal => signal.tradeResult === selectedResult.value)
+    console.log(`🔍 結果過濾 (${selectedResult.value}): ${beforeFilter} -> ${filtered.length}`)
   }
 
   if (selectedDirection.value) {
+    const beforeFilter = filtered.length
     filtered = filtered.filter(signal => {
       const direction = signal.direction || signal.signal_type || ''
       if (selectedDirection.value === 'LONG') {
@@ -589,9 +609,77 @@ const filteredHistory = computed(() => {
       }
       return true
     })
+    console.log(`🔍 方向過濾 (${selectedDirection.value}): ${beforeFilter} -> ${filtered.length}`)
   }
 
-  return filtered
+  // 按照選定的排序方式排序
+  if (sortOption.value === 'time') {
+    // 按時間排序：最新的在前
+    const sorted = filtered.sort((a, b) => {
+      const timeA = new Date(a.archiveTime || a.timestamp || 0).getTime()
+      const timeB = new Date(b.archiveTime || b.timestamp || 0).getTime()
+
+      // 優先按歸檔時間排序（較新的在前）
+      if (timeB !== timeA) {
+        return timeB - timeA // 降序：較新的在前
+      }
+
+      // 如果時間相同，按盈利排序作為次要排序（只對有效數據排序）
+      const profitA = typeof a.profitPercent === 'number' ? a.profitPercent : -999999
+      const profitB = typeof b.profitPercent === 'number' ? b.profitPercent : -999999
+      return profitB - profitA // 降序：高盈利在前
+    })
+    console.log(`🔍 時間排序完成: ${sorted.length} 筆信號`)
+    return sorted
+  } else {
+    // 按照盈利百分比排序：從高到低（最好的數據在前）
+    // 🔥 排除 LOSE PRICE 信號，這些信號排在最後
+    const validSignals = filtered.filter(signal => {
+      const profitPercent = signal.profitPercent
+      return profitPercent !== "LOSE PRICE" && typeof profitPercent === 'number'
+    })
+
+    const losePriceSignals = filtered.filter(signal => {
+      const profitPercent = signal.profitPercent
+      return profitPercent === "LOSE PRICE" || typeof profitPercent !== 'number'
+    })
+
+    // 對有效信號進行排序
+    const sortedValidSignals = validSignals.sort((a, b) => {
+      const profitA = a.profitPercent || 0
+      const profitB = b.profitPercent || 0
+
+      // 優先按盈利排序
+      if (profitB !== profitA) {
+        return profitB - profitA // 降序：高盈利在前
+      }
+
+      // 如果盈利相同，按信心度排序
+      const confidenceA = a.confidence || 0
+      const confidenceB = b.confidence || 0
+      if (confidenceB !== confidenceA) {
+        return confidenceB - confidenceA // 降序：高信心度在前
+      }
+
+      // 如果信心度也相同，按時間排序（較新的在前）
+      const timeA = new Date(a.archiveTime || a.timestamp || 0).getTime()
+      const timeB = new Date(b.archiveTime || b.timestamp || 0).getTime()
+      return timeB - timeA // 降序：較新的在前
+    })
+
+    // 對 LOSE PRICE 信號按時間排序（較新的在前）
+    const sortedLosePriceSignals = losePriceSignals.sort((a, b) => {
+      const timeA = new Date(a.archiveTime || a.timestamp || 0).getTime()
+      const timeB = new Date(b.archiveTime || b.timestamp || 0).getTime()
+      return timeB - timeA // 降序：較新的在前
+    })
+
+    // 將有效信號排在前面，LOSE PRICE 信號排在後面
+    const sorted = [...sortedValidSignals, ...sortedLosePriceSignals]
+
+    console.log(`🔍 盈利排序完成: ${sortedValidSignals.length} 筆有效信號 + ${sortedLosePriceSignals.length} 筆 LOSE PRICE 信號`)
+    return sorted
+  }
 })
 
 const paginatedHistory = computed(() => {
@@ -604,10 +692,12 @@ const totalPages = computed(() => {
   return Math.ceil(filteredHistory.value.length / itemsPerPage)
 })
 
-// 統計計算函數
+// 統計計算函數 - 排除 LOSE PRICE 信號
 const getOverallWinRate = () => {
-  const successful = savedShortTermHistory.value.filter(s => s.tradeResult === 'success').length
-  const failed = savedShortTermHistory.value.filter(s => s.tradeResult === 'failure').length
+  // 只計算有真實結果的信號
+  const validSignals = savedShortTermHistory.value.filter(s => s.tradeResult !== 'LOSE PRICE')
+  const successful = validSignals.filter(s => s.tradeResult === 'success').length
+  const failed = validSignals.filter(s => s.tradeResult === 'failure').length
   const total = successful + failed // 平手不計入勝率計算
   if (total === 0) return 0
   return Math.round((successful / total) * 100)
@@ -631,8 +721,10 @@ const getOverallBreakoutCount = () => {
 
 const getBreakoutWinRate = () => {
   const breakouts = savedShortTermHistory.value.filter(s => s.is_breakout || s.strategy_name?.includes('突破'))
-  const successful = breakouts.filter(s => s.tradeResult === 'success').length
-  const failed = breakouts.filter(s => s.tradeResult === 'failure').length
+  // 只計算有真實結果的突破信號
+  const validBreakouts = breakouts.filter(s => s.tradeResult !== 'LOSE PRICE')
+  const successful = validBreakouts.filter(s => s.tradeResult === 'success').length
+  const failed = validBreakouts.filter(s => s.tradeResult === 'failure').length
   const total = successful + failed // 平手不計入勝率計算
   if (total === 0) return 0
   return Math.round((successful / total) * 100)
@@ -644,14 +736,15 @@ const getWeeklyProfitStats = () => {
   const lastWeekStart = new Date(currentWeekStart.getTime() - 7 * 24 * 60 * 60 * 1000)
   const lastWeekEnd = new Date(currentWeekStart.getTime() - 1)
 
+  // 只計算有真實盈虧數據的信號
   const currentWeekSignals = savedShortTermHistory.value.filter(s => {
     const signalDate = new Date(s.archiveTime)
-    return signalDate >= currentWeekStart
+    return signalDate >= currentWeekStart && typeof s.profitPercent === 'number'
   })
 
   const lastWeekSignals = savedShortTermHistory.value.filter(s => {
     const signalDate = new Date(s.archiveTime)
-    return signalDate >= lastWeekStart && signalDate <= lastWeekEnd
+    return signalDate >= lastWeekStart && signalDate <= lastWeekEnd && typeof s.profitPercent === 'number'
   })
 
   const currentWeekProfit = currentWeekSignals.reduce((sum, s) => sum + (s.profitPercent || 0), 0)
@@ -665,8 +758,10 @@ const getWeeklyProfitStats = () => {
 
 const getCategoryWinRate = (symbol: string) => {
   const categorySignals = savedShortTermHistory.value.filter(s => s.symbol === symbol)
-  const successful = categorySignals.filter(s => s.tradeResult === 'success').length
-  const failed = categorySignals.filter(s => s.tradeResult === 'failure').length
+  // 只計算有真實結果的信號
+  const validSignals = categorySignals.filter(s => s.tradeResult !== 'LOSE PRICE')
+  const successful = validSignals.filter(s => s.tradeResult === 'success').length
+  const failed = validSignals.filter(s => s.tradeResult === 'failure').length
   const total = successful + failed // 平手不計入勝率計算
   if (total === 0) return 0
   return Math.round((successful / total) * 100)
@@ -674,19 +769,50 @@ const getCategoryWinRate = (symbol: string) => {
 
 const getCategoryProfitSum = (symbol: string) => {
   const categorySignals = savedShortTermHistory.value.filter(s => s.symbol === symbol)
-  return categorySignals.reduce((sum, s) => sum + (s.profitPercent || 0), 0)
+  // 只計算有真實盈虧數據的信號
+  const validSignals = categorySignals.filter(s => typeof s.profitPercent === 'number')
+  return validSignals.reduce((sum, s) => sum + (s.profitPercent || 0), 0)
 }
 
 // 格式化函數
 const formatDateTime = (dateString: string) => {
   if (!dateString) return 'N/A'
-  return new Date(dateString).toLocaleString('zh-TW', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+
+  try {
+    // 🔧 修復時間格式化問題
+    // 確保正確處理 ISO 格式的日期字符串並使用台灣時區
+    const date = new Date(dateString)
+
+    // 檢查日期是否有效
+    if (isNaN(date.getTime())) {
+      console.warn(`無效的日期格式: ${dateString}`)
+      return dateString // 返回原始字符串
+    }
+
+    // 使用台灣時區格式化，並強制使用24小時制
+    const formatted = date.toLocaleString('zh-TW', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Asia/Taipei', // 明確指定台灣時區
+      hour12: false // 使用 24 小時制
+    })
+
+    // 🔍 調試：記錄格式化過程（特別是測試信號）
+    if (dateString.includes('15:28') || dateString.includes('TESTUSDT')) {
+      console.log(`🕐 時間格式化調試:`)
+      console.log(`原始: ${dateString}`)
+      console.log(`Date對象: ${date.toISOString()}`)
+      console.log(`格式化結果: ${formatted}`)
+    }
+
+    return formatted
+  } catch (error) {
+    console.error(`時間格式化錯誤: ${dateString}`, error)
+    return dateString // 出錯時返回原始字符串
+  }
 }
 
 // 判斷信號方向並返回對應的CSS類別
@@ -707,6 +833,56 @@ const getDirectionText = (signal: any) => {
     (!direction.includes('SHORT') && !direction.includes('DOWN'))
 
   return isLong ? '做多' : '做空'
+}
+
+// 獲取全局排名（在所有篩選結果中的位置）
+const getGlobalRank = (_signal: any, localIndex: number) => {
+  // 計算在當前頁面中的全局排名
+  const startIndex = (currentPage.value - 1) * itemsPerPage
+  return startIndex + localIndex + 1
+}
+
+// 獲取排名徽章樣式
+const getRankBadgeClass = (rank: number) => {
+  if (rank === 1) {
+    return 'bg-yellow-500 text-white' // 金牌
+  } else if (rank === 2) {
+    return 'bg-gray-400 text-white' // 銀牌
+  } else if (rank === 3) {
+    return 'bg-yellow-600 text-white' // 銅牌
+  } else if (rank <= 10) {
+    return 'bg-blue-500 text-white' // 前十名
+  } else if (rank <= 50) {
+    return 'bg-green-500 text-white' // 前五十名
+  } else {
+    return 'bg-gray-300 text-gray-700' // 其他
+  }
+}
+
+// 獲取表現徽章樣式
+const getPerformanceBadgeClass = (rank: number) => {
+  if (rank === 1) {
+    return 'bg-yellow-500 text-white' // 金牌
+  } else if (rank === 2) {
+    return 'bg-gray-400 text-white' // 銀牌
+  } else if (rank === 3) {
+    return 'bg-yellow-600 text-white' // 銅牌
+  } else {
+    return 'bg-blue-500 text-white' // 其他優秀表現
+  }
+}
+
+// 獲取表現文字
+const getPerformanceText = (rank: number) => {
+  if (rank === 1) {
+    return '🥇'
+  } else if (rank === 2) {
+    return '🥈'
+  } else if (rank === 3) {
+    return '🥉'
+  } else {
+    return '⭐'
+  }
 }
 
 const getTradeResultClass = (result: string) => {
@@ -789,5 +965,10 @@ const goBack = () => {
 // 載入頁面時執行
 onMounted(() => {
   loadShortTermHistory()
+})
+
+// 監聽排序選項變更，重置頁面
+watch(sortOption, () => {
+  currentPage.value = 1
 })
 </script>

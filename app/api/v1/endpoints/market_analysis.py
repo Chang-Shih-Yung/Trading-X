@@ -12,6 +12,7 @@ import numpy as np
 from pydantic import BaseModel
 
 from app.core.database import get_db
+from app.utils.time_utils import get_taiwan_now_naive
 from app.services.market_analysis import (
     MarketAnalysisService, 
     MarketCondition, 
@@ -220,7 +221,7 @@ async def analyze_breakout_signals(
             volume_ratio=breakout_signal.volume_ratio,
             price_momentum=breakout_signal.price_momentum,
             indicators_confirmation=breakout_signal.indicators_confirmation,
-            analysis_timestamp=datetime.now()
+            analysis_timestamp=get_taiwan_now_naive()
         )
         
     except Exception as e:
@@ -276,7 +277,7 @@ async def batch_market_analysis(
                         "strength": breakout_signal.strength,
                         "volume_ratio": breakout_signal.volume_ratio
                     },
-                    "analysis_timestamp": datetime.now()
+                    "analysis_timestamp": get_taiwan_now_naive()
                 }
                 
                 results.append(result)
@@ -352,7 +353,7 @@ async def get_history_statistics(
             "query_params": {
                 "days": days,
                 "symbol": symbol,
-                "analysis_timestamp": datetime.now()
+                "analysis_timestamp": get_taiwan_now_naive()
             }
         }
         
@@ -382,27 +383,32 @@ async def get_history_records(
         # 轉換為字典格式以便序列化
         records_data = []
         for record in history_records:
-            record_dict = {
-                "id": record.id,
-                "symbol": record.symbol,
-                "signal_type": record.signal_type,
-                "entry_price": record.entry_price,
-                "current_price": record.current_price,
-                "stop_loss": record.stop_loss,
-                "take_profit": record.take_profit,
-                "confidence": record.confidence,
-                "created_at": record.created_at,
-                "expires_at": record.expires_at,
-                "archived_at": record.archived_at,
-                "trade_result": record.trade_result.value,
-                "profit_loss_pct": record.profit_loss_pct,
-                "max_profit_pct": record.max_profit_pct,
-                "max_loss_pct": record.max_loss_pct,
-                "time_to_result": record.time_to_result,
-                "market_condition": record.market_condition,
-                "reasoning": record.reasoning,
-                "strategy_name": record.strategy_name
-            }
+            # history_records 已經是字典格式
+            if isinstance(record, dict):
+                record_dict = record
+            else:
+                # 如果還是對象格式，轉換為字典
+                record_dict = {
+                    "id": record.id,
+                    "symbol": record.symbol,
+                    "signal_type": record.signal_type,
+                    "entry_price": record.entry_price,
+                    "current_price": getattr(record, 'current_price', None),
+                    "stop_loss": record.stop_loss,
+                    "take_profit": record.take_profit,
+                    "confidence": record.confidence,
+                    "created_at": record.created_at,
+                    "expires_at": record.expires_at,
+                    "archived_at": getattr(record, 'archived_at', record.expires_at),
+                    "trade_result": getattr(record, 'trade_result', 'EXPIRED'),
+                    "profit_loss_pct": getattr(record, 'profit_loss_pct', None),
+                    "max_profit_pct": getattr(record, 'max_profit_pct', None),
+                    "max_loss_pct": getattr(record, 'max_loss_pct', None),
+                    "time_to_result": getattr(record, 'time_to_result', None),
+                    "market_condition": getattr(record, 'market_condition', 'Unknown'),
+                    "reasoning": record.reasoning,
+                    "strategy_name": getattr(record, 'strategy_name', '短線策略')
+                }
             records_data.append(record_dict)
         
         return {
@@ -488,7 +494,7 @@ async def get_market_sentiment(
                 "type": breakout_signal.breakout_type
             },
             "recommendations": _generate_recommendations(market_condition, breakout_signal),
-            "analysis_timestamp": datetime.now()
+            "analysis_timestamp": get_taiwan_now_naive()
         }
         
     except Exception as e:
