@@ -317,7 +317,7 @@
                   <div class="bg-white p-2 rounded border">
                     <div class="text-gray-500">ATR %</div>
                     <div class="font-medium text-purple-600">{{ signal.key_indicators?.atr_percent?.toFixed(2) || '0.00'
-                    }}%</div>
+                      }}%</div>
                   </div>
 
                   <!-- 擴展顯示更多指標 -->
@@ -706,14 +706,14 @@
                   <div class="flex items-center justify-between">
                     <span class="text-gray-600">強度:</span>
                     <span class="font-medium text-blue-600">{{ Math.round(advice.market_analysis.strength * 100)
-                    }}%</span>
+                      }}%</span>
                   </div>
                 </div>
                 <div class="grid grid-cols-2 gap-2 mb-2">
                   <div class="flex items-center justify-between">
                     <span class="text-gray-600">信心度:</span>
                     <span class="font-medium text-purple-600">{{ Math.round(advice.market_analysis.confidence * 100)
-                    }}%</span>
+                      }}%</span>
                   </div>
                   <div class="flex items-center justify-between">
                     <span class="text-gray-600">動量:</span>
@@ -1443,7 +1443,7 @@ const printExpiredSignals = async () => {
 
     // 僅在開發環境顯示詳細日誌
     if (process.env.NODE_ENV === 'development') {
-      console.log(`📊 過期信號檢查: ${allExpiredSignals.length} 個信號, ${Object.keys(symbolGroups).length} 個幣種`)
+
     }
 
     // 顯示通知
@@ -2190,7 +2190,7 @@ const saveSignalToHistory = (signal: Signal, action: 'completed' | 'expired' | '
   // 更新統計
   stats.activeSignals = latestSignals.value.length
 
-  console.log(`信號 ${signal.symbol} 已保存到歷史記錄並從儀表板移除，原因: ${action}`)
+
 }
 
 // 計算信號結果
@@ -2219,14 +2219,14 @@ const checkShortTermSignalValidity = (signal: Signal): { isExpired: boolean; res
   // 優先檢查後端的 status 字段
   if (signal.status === 'expired') {
     isExpired = true
-    console.log(`🔍 根據後端狀態判斷: ${signal.symbol} - 已過期 (status: expired)`)
+
   }
   // 使用後端提供的 validity_info 數據
   else if (signal.validity_info) {
     // 只有當 validity_info.status 為 "expired" 或剩餘時間 <= 0 時才算過期
     isExpired = signal.validity_info.status === 'expired' ||
       (signal.validity_info.remaining_seconds !== undefined && signal.validity_info.remaining_seconds <= 0)
-    console.log(`🔍 根據時效性數據判斷: ${signal.symbol} - ${isExpired ? '已過期' : '有效'} (status: ${signal.validity_info.status}, remaining: ${signal.validity_info.remaining_seconds}s)`)
+
   } else {
     // 如果沒有後端數據，保守處理為未過期，避免錯誤判斷
     console.warn(`⚠️ 缺少後端時效性數據: ${signal.symbol}，預設為有效`)
@@ -2248,17 +2248,7 @@ const checkShortTermSignalValidity = (signal: Signal): { isExpired: boolean; res
   const stopLossThreshold = calculateDynamicStopLoss(signal)
   const breakevenThreshold = 0.5 // 攤平閾值：0% < 利潤 < 0.5% 才算攤平
 
-  // 🐛 調試信息
-  console.log(`🔍 勝敗計算 ${signal.symbol}:`, {
-    direction,
-    entry_price: signal.entry_price,
-    current_price: signal.current_price,
-    priceChange,
-    profitPercent: profitPercent.toFixed(3),
-    successThreshold: successThreshold.toFixed(3),
-    stopLossThreshold,
-    breakevenThreshold
-  })
+
 
   let result: 'success' | 'failure' | 'breakeven'
 
@@ -2267,35 +2257,35 @@ const checkShortTermSignalValidity = (signal: Signal): { isExpired: boolean; res
     // 做多：需要達到動態閾值才算成功
     if (profitPercent >= successThreshold) {
       result = 'success'
-      console.log(`✅ 做多成功: ${profitPercent.toFixed(3)}% >= ${successThreshold.toFixed(3)}%`)
+
     } else if (profitPercent <= -stopLossThreshold) {
       result = 'failure' // 虧損超過1%算失敗
-      console.log(`❌ 做多失敗: ${profitPercent.toFixed(3)}% <= -${stopLossThreshold}%`)
+
     } else if (profitPercent > 0 && profitPercent < breakevenThreshold) {
       result = 'breakeven' // 0% < 利潤 < 0.5% 才算攤平
-      console.log(`⚖️ 做多攤平: 0% < ${profitPercent.toFixed(3)}% < ${breakevenThreshold}%`)
+
     } else {
       result = 'success' // 0.5% <= 利潤 < successThreshold 也算成功
-      console.log(`✅ 做多成功(中等): ${profitPercent.toFixed(3)}% (介於 ${breakevenThreshold}% 和 ${successThreshold.toFixed(3)}% 之間)`)
+
     }
   } else if (direction === 'SHORT') {
     // 做空：價格下跌需要達到動態閾值才算成功
     if (-profitPercent >= successThreshold) { // 做空時使用負值進行比較
       result = 'success'
-      console.log(`✅ 做空成功: -${profitPercent.toFixed(3)}% >= ${successThreshold.toFixed(3)}%`)
+
     } else if (profitPercent >= stopLossThreshold) {
       result = 'failure' // 虧損超過1%算失敗（做空時價格上漲）
-      console.log(`❌ 做空失敗: ${profitPercent.toFixed(3)}% >= ${stopLossThreshold}%`)
+
     } else if (profitPercent < 0 && -profitPercent < breakevenThreshold) {
       result = 'breakeven' // 做空：0% < 利潤 < 0.5% 才算攤平
-      console.log(`⚖️ 做空攤平: 0% < ${(-profitPercent).toFixed(3)}% < ${breakevenThreshold}%`)
+
     } else {
       result = 'success' // 做空：0.5% <= 利潤 < successThreshold 也算成功
-      console.log(`✅ 做空成功(中等): ${(-profitPercent).toFixed(3)}% (介於 ${breakevenThreshold}% 和 ${successThreshold.toFixed(3)}% 之間)`)
+
     }
   } else {
     result = 'breakeven'
-    console.log(`⚖️ 未知方向攤平: ${direction}`)
+
   }
 
   // 🔧 修正：返回帶方向性的利潤百分比
@@ -2419,7 +2409,7 @@ const calculateDynamicStopProfit = (signal: Signal): number => {
   // 限制在合理範圍內：1.2% ~ 6.0%
   finalThreshold = Math.max(1.2, Math.min(6.0, finalThreshold))
 
-  console.log(`🎯 動態止盈計算 ${signal.symbol}: 基礎${baseThreshold}% × ATR${atrMultiplier} × 趨勢${trendMultiplier} × 信心${confidenceMultiplier} + 突破${breakoutBonus}% = ${finalThreshold.toFixed(2)}%`)
+
 
   return finalThreshold
 }
@@ -2473,7 +2463,7 @@ const checkBreakoutConditions = (signal: Signal): number => {
     }
   }
 
-  console.log(`💎 追單條件評分 ${signal.symbol}: ${breakoutScore.toFixed(2)}`)
+
   return breakoutScore
 }
 
@@ -2489,7 +2479,7 @@ const isBreakoutSignal = (signal: Signal): boolean => {
   const isBreakout = breakoutScore > 1.5 && dynamicThreshold > 3.5 && signal.confidence > 0.8
 
   if (isBreakout) {
-    console.log(`🚀 檢測到突破信號: ${signal.symbol} (評分:${breakoutScore.toFixed(2)}, 目標:${dynamicThreshold.toFixed(2)}%, 信心:${(signal.confidence * 100).toFixed(0)}%)`)
+
   }
 
   return isBreakout
@@ -2509,12 +2499,12 @@ const processExpiredShortTermSignals = async (forceCheck = false) => {
   // 節流檢查：避免過度頻繁的檢查（手動觸發時可繞過）
   const now = Date.now()
   if (!forceCheck && now - lastExpiredCheckTime < EXPIRED_CHECK_THROTTLE) {
-    console.log(`⏳ 跳過過期信號檢查 (節流中，剩餘 ${Math.ceil((EXPIRED_CHECK_THROTTLE - (now - lastExpiredCheckTime)) / 1000)} 秒)`)
+
     return 0
   }
 
   lastExpiredCheckTime = now
-  console.log(`🔍 開始檢查過期短線信號${forceCheck ? ' (強制檢查)' : ''}，目前有 ${shortTermSignals.value.length} 個短線信號`)
+
 
   // 獲取已歸檔的歷史記錄 ID，避免重複歸檔
   const existingHistory = localStorage.getItem('tradingx_shortterm_history')
@@ -2523,12 +2513,12 @@ const processExpiredShortTermSignals = async (forceCheck = false) => {
     const historyData = JSON.parse(existingHistory)
     historyData.forEach((entry: any) => archivedSignalIds.add(entry.id))
   }
-  console.log(`📋 已歸檔的信號 ID: ${archivedSignalIds.size} 個`)
+
 
   const expiredSignals = shortTermSignals.value.filter(signal => {
     // 檢查是否已經歸檔過
     if (archivedSignalIds.has(signal.id)) {
-      console.log(`⚠️ 信號已歸檔，跳過: ${signal.symbol} ${signal.signal_type} (ID: ${signal.id})`)
+
       return false
     }
 
