@@ -88,6 +88,14 @@ class TradingSignal(Base):
     max_loss_pct = Column(Float, nullable=True)     # 最大虧損百分比
     time_to_result = Column(Integer, nullable=True) # 結果產生時間（秒）
     
+    # 精準度相關欄位（新增）
+    precision_score = Column(Float, nullable=True, index=True)           # 精準度評分
+    is_precision_selected = Column(Boolean, default=False, index=True)   # 是否為精準篩選
+    market_condition_score = Column(Float, nullable=True)                # 市場條件評分
+    indicator_consistency = Column(Float, nullable=True)                 # 指標一致性
+    timing_score = Column(Float, nullable=True)                          # 時機評分
+    risk_adjustment = Column(Float, nullable=True)                       # 風險調整評分
+    
     # 時間戳
     created_at = Column(DateTime, default=func.now(), index=True)
     expires_at = Column(DateTime, nullable=True, index=True)

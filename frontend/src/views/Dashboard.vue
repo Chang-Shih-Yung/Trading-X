@@ -1530,8 +1530,14 @@ const fetchScalpingSignals = async (): Promise<any[]> => {
       }
     })
 
-    rawScalpingSignals.value = response.data || []
-    // 獲取到專用短線信號 (已移除調試日誌)
+    // 修復：處理精準篩選API的響應格式
+    const responseData = response.data
+    rawScalpingSignals.value = responseData.signals || []
+    
+    // 記錄精準篩選模式信息
+    if (responseData.precision_mode) {
+      console.log(`🎯 精準篩選模式: ${responseData.count} 個信號`, responseData.market_conditions)
+    }
 
     // 載入存儲的信號時間戳
     const savedTimestamps = JSON.parse(localStorage.getItem('tradingx_signal_timestamps') || '{}')
@@ -3134,6 +3140,115 @@ const getSignalTypeText = (signalType: string): string => {
   return typeMap[signalType] || signalType
 }
 
+// 分析信號來源和策略分佈
+const analyzeSignalSources = (totalSignals: Signal[], shortTermSignals: Signal[]) => {
+  // 策略名稱中文對照表 - 支援 strategy_name 和 pattern_detected
+  const strategyMap: { [key: string]: string } = {
+    // 短線策略名稱
+    'enhanced_momentum': '增強動量',
+    'breakout_scalp': '突破短線',
+    'reversal_scalp': '反轉短線', 
+    'volume_scalp': '成交量短線',
+    'momentum_scalp': '動量短線',
+    'scalping_precision': '精準短線',
+    
+    // 圖表形態 (pattern_detected)
+    '三重頂形態': '反轉形態',
+    '頭肩底反轉': '反轉形態',
+    '雙重底確認': '反轉形態',
+    '看漲旗形整理': '整理形態',
+    '楔形收斂突破': '突破形態',
+    '頭肩頂': '反轉形態',
+    '上升三角形': '突破形態',
+    '下降楔形': '反轉形態',
+    
+    // 其他策略
+    'trend_following': '趨勢跟隨',
+    'mean_reversion': '均值回歸',
+    'volume_breakout': '成交量突破',
+    'advanced_scalping': '進階短線'
+  }
+  
+  // 策略類型分類
+  const getStrategyCategory = (signal: Signal): string => {
+    const strategyName = signal.strategy_name || ''
+    const patternName = (signal as any).pattern_detected || ''
+    
+    // 優先檢查 strategy_name
+    if (strategyName) {
+      if (strategyName.includes('scalp') || strategyName.includes('precision')) {
+        return '精準短線'
+      } else if (strategyName.includes('trend') || strategyName.includes('momentum')) {
+        return '趨勢策略' 
+      } else if (strategyName.includes('reversal') || strategyName.includes('reversion')) {
+        return '反轉策略'
+      } else if (strategyName.includes('volume')) {
+        return '成交量策略'
+      } else if (strategyName.includes('breakout')) {
+        return '突破策略'
+      }
+    }
+    
+    // 如果沒有 strategy_name，檢查 pattern_detected
+    if (patternName) {
+      if (patternName.includes('頂') || patternName.includes('底') || patternName.includes('反轉')) {
+        return '反轉形態'
+      } else if (patternName.includes('突破') || patternName.includes('三角') || patternName.includes('楔形')) {
+        return '突破形態'
+      } else if (patternName.includes('旗形') || patternName.includes('整理')) {
+        return '整理形態'
+      }
+    }
+    
+    return '技術分析'
+  }
+  
+  // 獲取信號顯示名稱
+  const getSignalDisplayName = (signal: Signal): string => {
+    const strategyName = signal.strategy_name || ''
+    const patternName = (signal as any).pattern_detected || ''
+    
+    if (strategyName && strategyMap[strategyName]) {
+      return strategyMap[strategyName]
+    } else if (patternName && strategyMap[patternName]) {
+      return strategyMap[patternName]
+    } else if (patternName) {
+      return patternName
+    } else if (strategyName) {
+      return strategyName
+    }
+    
+    return '未知策略'
+  }
+  
+  // 分析總信號
+  const totalStrategies = new Set()
+  const totalCategories = new Set()
+  totalSignals.forEach(signal => {
+    const displayName = getSignalDisplayName(signal)
+    const category = getStrategyCategory(signal)
+    totalStrategies.add(displayName)
+    totalCategories.add(category)
+  })
+  
+  // 分析短線信號
+  const shortTermStrategies = new Set()
+  const shortTermCategories = new Set()
+  shortTermSignals.forEach(signal => {
+    const displayName = getSignalDisplayName(signal)
+    const category = getStrategyCategory(signal)
+    shortTermStrategies.add(displayName)
+    shortTermCategories.add(category)
+  })
+  
+  return {
+    totalStrategies: Array.from(totalCategories).join('、'),
+    shortTermStrategies: Array.from(shortTermCategories).join('、'),
+    totalStrategyDetails: Array.from(totalStrategies).join('、'),
+    shortTermStrategyDetails: Array.from(shortTermStrategies).join('、')
+  }
+}
+
 // 計算當前收益
 const calculateCurrentProfit = (signal: Signal): number => {
   if (!signal.current_price || !signal.entry_price) return 0
@@ -3476,8 +3591,23 @@ const fetchDashboardData = async () => {
 
     hideLoading()
 
-    if (latestSignals.value.length > 0) {
-      showNotification('success', '儀表板數據載入成功', `已載入 ${latestSignals.value.length} 個交易信號`)
+    // 顯示載入結果通知，明確顯示信號來源和類型
+    const shortTermCount = shortTermSignals.value.length
+    const totalCount = latestSignals.value.length
+    
+    if (totalCount > 0) {
+      // 分析信號來源和策略分佈
+      const signalAnalysis = analyzeSignalSources(latestSignals.value, shortTermSignals.value)
+      
+      if (shortTermCount > 0) {
+        showNotification('success', '儀表板數據載入成功', 
+          `已載入 ${shortTermCount} 個精準短線信號 (${signalAnalysis.shortTermStrategies})，總計 ${totalCount} 個交易信號 (${signalAnalysis.totalStrategies})`)
+      } else {
+        showNotification('info', '儀表板數據載入成功', 
+          `已載入 ${totalCount} 個交易信號 (${signalAnalysis.totalStrategies})，當前無符合條件的精準短線信號`)
+      }
+    } else {
+      showNotification('info', '儀表板數據載入完成', '當前無活躍交易信號')
     }
 
   } catch (error) {
