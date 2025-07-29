@@ -314,7 +314,14 @@ pip install -r requirements.txt
 pip install -r requirements-dev.txt
 
 # 4. 運行測試
-pytest tests/ -v
+# 快速功能測試
+python TEST/quick_test.py
+
+# 完整測試套件
+python TEST/run_all_tests.py
+
+# 單獨運行特定測試
+python TEST/backend/test_precision_signal.py
 
 # 5. 啟動開發服務
 uvicorn main:app --reload

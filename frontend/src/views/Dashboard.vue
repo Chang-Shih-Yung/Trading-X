@@ -1533,7 +1533,7 @@ const fetchScalpingSignals = async (): Promise<any[]> => {
     // 修復：處理精準篩選API的響應格式
     const responseData = response.data
     rawScalpingSignals.value = responseData.signals || []
-    
+
     // 記錄精準篩選模式信息
     if (responseData.precision_mode) {
       console.log(`🎯 精準篩選模式: ${responseData.count} 個信號`, responseData.market_conditions)
@@ -1917,7 +1917,7 @@ const clearInstantAdviceFromStorage = () => {
     localStorage.removeItem('tradingx_instant_advice')
     // 已清除 localStorage 中的即時建議 (已移除調試日誌)
   } catch (error) {
-    console.error('清除即時建議儲存失敗:', error)
+    // console.error('清除即時建議儲存失敗:', error)
   }
 }
 
@@ -2221,6 +2221,30 @@ const calculateSignalResult = (signal: Signal): string => {
 // 檢查短線信號時效性並計算結果（優化版本 - 牛市短線交易）
 const checkShortTermSignalValidity = (signal: Signal): { isExpired: boolean; result: 'success' | 'failure' | 'breakeven'; profitPercent: number } => {
   let isExpired = false
+
+  // 🔧 新增：驗證後端時間邏輯的一致性，並使用實際時間差
+  if (signal.created_at && signal.expires_at) {
+    const createdTime = new Date(signal.created_at)
+    const expiresTime = new Date(signal.expires_at)
+    const now = new Date()
+
+    // 使用實際的過期時間判斷是否過期
+    isExpired = now >= expiresTime
+
+    if (signal.validity_info) {
+      const actualDiffMinutes = (expiresTime.getTime() - createdTime.getTime()) / (1000 * 60)
+      const backendMinutes = signal.validity_info.remaining_minutes || 0
+
+      // 如果實際時間差與後端數據差異超過1分鐘，記錄警告
+      if (Math.abs(actualDiffMinutes - backendMinutes) > 1) {
+        console.warn(`⚠️ 時間邏輯不一致 ${signal.symbol}: 實際有效期 ${actualDiffMinutes.toFixed(2)}分鐘 vs 後端計算 ${backendMinutes}分鐘`)
+      }
+    }
+
+    if (isExpired) {
+      return { isExpired: true, result: 'breakeven', profitPercent: 0 }
+    }
+  }
 
   // 優先檢查後端的 status 字段
   if (signal.status === 'expired') {
@@ -2708,7 +2732,7 @@ const ensureMinimumCoinCoverage = async () => {
           console.log(`⚠️ 跳過 ${coinSymbol}：信號已存在 (ID: ${bestSignal.id})`)
         }
       } else {
-        console.log(`⚠️ 無法為 ${coinSymbol} 找到合適的信號 (可能已被歸檔或已過期)`)
+        // console.log(`⚠️ 無法為 ${coinSymbol} 找到合適的信號 (可能已被歸檔或已過期)`)
       }
     })
   }
@@ -3147,11 +3171,11 @@ const analyzeSignalSources = (totalSignals: Signal[], shortTermSignals: Signal[]
     // 短線策略名稱
     'enhanced_momentum': '增強動量',
     'breakout_scalp': '突破短線',
-    'reversal_scalp': '反轉短線', 
+    'reversal_scalp': '反轉短線',
     'volume_scalp': '成交量短線',
     'momentum_scalp': '動量短線',
     'scalping_precision': '精準短線',
-    
+
     // 圖表形態 (pattern_detected)
     '三重頂形態': '反轉形態',
     '頭肩底反轉': '反轉形態',
@@ -3161,25 +3185,25 @@ const analyzeSignalSources = (totalSignals: Signal[], shortTermSignals: Signal[]
     '頭肩頂': '反轉形態',
     '上升三角形': '突破形態',
     '下降楔形': '反轉形態',
-    
+
     // 其他策略
     'trend_following': '趨勢跟隨',
     'mean_reversion': '均值回歸',
     'volume_breakout': '成交量突破',
     'advanced_scalping': '進階短線'
   }
-  
+
   // 策略類型分類
   const getStrategyCategory = (signal: Signal): string => {
     const strategyName = signal.strategy_name || ''
     const patternName = (signal as any).pattern_detected || ''
-    
+
     // 優先檢查 strategy_name
     if (strategyName) {
       if (strategyName.includes('scalp') || strategyName.includes('precision')) {
         return '精準短線'
       } else if (strategyName.includes('trend') || strategyName.includes('momentum')) {
-        return '趨勢策略' 
+        return '趨勢策略'
       } else if (strategyName.includes('reversal') || strategyName.includes('reversion')) {
         return '反轉策略'
       } else if (strategyName.includes('volume')) {
@@ -3188,7 +3212,7 @@ const analyzeSignalSources = (totalSignals: Signal[], shortTermSignals: Signal[]
         return '突破策略'
       }
     }
-    
+
     // 如果沒有 strategy_name，檢查 pattern_detected
     if (patternName) {
       if (patternName.includes('頂') || patternName.includes('底') || patternName.includes('反轉')) {
@@ -3199,15 +3223,15 @@ const analyzeSignalSources = (totalSignals: Signal[], shortTermSignals: Signal[]
         return '整理形態'
       }
     }
-    
+
     return '技術分析'
   }
-  
+
   // 獲取信號顯示名稱
   const getSignalDisplayName = (signal: Signal): string => {
     const strategyName = signal.strategy_name || ''
     const patternName = (signal as any).pattern_detected || ''
-    
+
     if (strategyName && strategyMap[strategyName]) {
       return strategyMap[strategyName]
     } else if (patternName && strategyMap[patternName]) {
@@ -3217,10 +3241,10 @@ const analyzeSignalSources = (totalSignals: Signal[], shortTermSignals: Signal[]
     } else if (strategyName) {
       return strategyName
     }
-    
+
     return '未知策略'
   }
-  
+
   // 分析總信號
   const totalStrategies = new Set()
   const totalCategories = new Set()
@@ -3230,7 +3254,7 @@ const analyzeSignalSources = (totalSignals: Signal[], shortTermSignals: Signal[]
     totalStrategies.add(displayName)
     totalCategories.add(category)
   })
-  
+
   // 分析短線信號
   const shortTermStrategies = new Set()
   const shortTermCategories = new Set()
@@ -3240,7 +3264,7 @@ const analyzeSignalSources = (totalSignals: Signal[], shortTermSignals: Signal[]
     shortTermStrategies.add(displayName)
     shortTermCategories.add(category)
   })
-  
+
   return {
     totalStrategies: Array.from(totalCategories).join('、'),
     shortTermStrategies: Array.from(shortTermCategories).join('、'),
@@ -3594,16 +3618,16 @@ const fetchDashboardData = async () => {
     // 顯示載入結果通知，明確顯示信號來源和類型
     const shortTermCount = shortTermSignals.value.length
     const totalCount = latestSignals.value.length
-    
+
     if (totalCount > 0) {
       // 分析信號來源和策略分佈
       const signalAnalysis = analyzeSignalSources(latestSignals.value, shortTermSignals.value)
-      
+
       if (shortTermCount > 0) {
-        showNotification('success', '儀表板數據載入成功', 
+        showNotification('success', '儀表板數據載入成功',
           `已載入 ${shortTermCount} 個精準短線信號 (${signalAnalysis.shortTermStrategies})，總計 ${totalCount} 個交易信號 (${signalAnalysis.totalStrategies})`)
       } else {
-        showNotification('info', '儀表板數據載入成功', 
+        showNotification('info', '儀表板數據載入成功',
           `已載入 ${totalCount} 個交易信號 (${signalAnalysis.totalStrategies})，當前無符合條件的精準短線信號`)
       }
     } else {

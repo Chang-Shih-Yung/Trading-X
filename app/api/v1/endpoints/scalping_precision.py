@@ -147,7 +147,24 @@ async def get_scalping_signals():
         
         # 獲取當前活躍信號
         current_signals = await _get_active_signals_from_db()
-        signal_map = {signal['symbol']: signal for signal in current_signals}
+        
+        # 🔧 修復：為每個幣種只保留信心度最高的信號
+        signal_map = {}
+        for signal in current_signals:
+            symbol = signal['symbol']
+            if symbol not in signal_map:
+                signal_map[symbol] = signal
+            else:
+                # 比較信心度，保留更高的
+                existing_confidence = signal_map[symbol].get('confidence', 0)
+                current_confidence = signal.get('confidence', 0)
+                
+                if current_confidence > existing_confidence:
+                    # 當前信號信心度更高，替換之
+                    signal_map[symbol] = signal
+                    logger.info(f"🔄 {symbol} 信號篩選：保留信心度更高的信號 ({current_confidence:.1f}% > {existing_confidence:.1f}%)")
+                else:
+                    logger.info(f"🔄 {symbol} 信號篩選：保留原有信號 ({existing_confidence:.1f}% >= {current_confidence:.1f}%)")
         
         all_signals = []
         
@@ -194,7 +211,8 @@ async def get_scalping_signals():
                             'remaining_time_minutes': remaining_minutes,
                             'validity_info': _calculate_signal_validity(
                                 existing_signal.get('timeframe', '5m'), 
-                                parse_time_to_taiwan(existing_signal['created_at'])
+                                parse_time_to_taiwan(existing_signal['created_at']),
+                                expires_at  # 傳遞實際的過期時間
                             )
                         }
                         
@@ -238,7 +256,9 @@ async def get_scalping_signals():
                         'timing_score': precision_signal.timing_score,
                         'remaining_time_minutes': (precision_signal.expires_at - get_taiwan_now().replace(tzinfo=None)).total_seconds() / 60,
                         'validity_info': _calculate_signal_validity(
-                            precision_signal.timeframe, precision_signal.created_at
+                            precision_signal.timeframe, 
+                            precision_signal.created_at,
+                            precision_signal.expires_at  # 傳遞實際的過期時間
                         )
                     }
                     
@@ -305,63 +325,127 @@ async def get_precision_signal(symbol: str):
 
 @router.get("/dashboard-precision-signals")
 async def get_dashboard_precision_signals():
-    """為儀表板提供精準篩選的信號 (每幣種最多一個)"""
+    """為儀表板提供精準篩選的信號 (每幣種最多一個) - 從資料庫讀取"""
     
-    target_symbols = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'XRPUSDT', 'BNBUSDT']
-    precision_signals = []
-    
-    # 並行獲取各幣種的精準信號
-    tasks = [
-        precision_filter.execute_precision_selection(symbol) 
-        for symbol in target_symbols
-    ]
-    
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    
-    for symbol, result in zip(target_symbols, results):
-        if isinstance(result, PrecisionSignal):
-            precision_signals.append({
-                "symbol": symbol,
-                "signal": result.dict(),
-                "precision_score": result.precision_score,
-                "is_precision_verified": True
-            })
-        elif isinstance(result, Exception):
-            logger.error(f"獲取 {symbol} 精準信號失敗: {result}")
-    
-    return {
-        "signals": precision_signals,
-        "total_evaluated_symbols": len(target_symbols),
-        "precision_signals_found": len(precision_signals),
-        "updated_at": get_taiwan_now().isoformat(),
-        "next_update": (get_taiwan_now() + timedelta(minutes=15)).isoformat()
-    }
+    try:
+        # 先處理過期信號
+        await _auto_process_expired_signals()
+        
+        # 獲取當前活躍信號
+        current_signals = await _get_active_signals_from_db()
+        
+        # 🔧 修復：為每個幣種只保留信心度最高的信號
+        signal_map = {}
+        for signal in current_signals:
+            symbol = signal['symbol']
+            if symbol not in signal_map:
+                signal_map[symbol] = signal
+            else:
+                # 比較信心度，保留更高的
+                existing_confidence = signal_map[symbol].get('confidence', 0)
+                current_confidence = signal.get('confidence', 0)
+                
+                if current_confidence > existing_confidence:
+                    signal_map[symbol] = signal
+        
+        # 轉換為儀表板格式
+        precision_signals = []
+        target_symbols = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'XRPUSDT', 'BNBUSDT']
+        
+        for symbol in target_symbols:
+            if symbol in signal_map:
+                signal = signal_map[symbol]
+                taiwan_now = get_taiwan_now().replace(tzinfo=None)
+                expires_at = parse_time_to_taiwan(signal['expires_at'])
+                
+                # 只返回未過期的信號
+                if expires_at > taiwan_now:
+                    precision_signals.append({
+                        "id": signal.get('id'),  # 🔧 添加缺失的 id 字段
+                        "symbol": symbol,
+                        "strategy_name": signal.get('strategy_name', '精準篩選'),
+                        "confidence": signal.get('confidence', 0),
+                        "precision_score": signal.get('precision_score', 0),
+                        "entry_price": signal.get('entry_price', 0),
+                        "stop_loss": signal.get('stop_loss', 0),
+                        "take_profit": signal.get('take_profit', 0),
+                        "signal_type": signal.get('signal_type', 'BUY'),
+                        "timeframe": signal.get('timeframe', '5m'),
+                        "created_at": signal.get('created_at'),
+                        "expires_at": signal.get('expires_at'),
+                        "is_precision_verified": signal.get('is_precision_selected', 0) == 1,
+                        "remaining_time_minutes": (expires_at - taiwan_now).total_seconds() / 60
+                    })
+        
+        return {
+            "signals": precision_signals,
+            "total_evaluated_symbols": len(target_symbols),
+            "precision_signals_found": len(precision_signals),
+            "updated_at": get_taiwan_now().isoformat(),
+            "next_update": (get_taiwan_now() + timedelta(minutes=15)).isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"獲取儀表板精準信號失敗: {e}")
+        return {
+            "signals": [],
+            "total_evaluated_symbols": 0,
+            "precision_signals_found": 0,
+            "error": str(e)
+        }
 
 # ==================== 輔助函數 ====================
 
 async def _auto_process_expired_signals():
-    """自動處理過期信號"""
+    """自動處理過期信號 - 每個幣種只保留信心度最高的信號到歷史"""
     try:
         db = SessionLocal()
         taiwan_now = get_taiwan_now().replace(tzinfo=None)
         
         # 查詢過期信號
         expired_query = text("""
-            SELECT id, symbol, entry_price, signal_type, confidence
+            SELECT id, symbol, entry_price, signal_type, confidence, strategy_name, precision_score
             FROM trading_signals 
             WHERE datetime(expires_at) <= datetime(:taiwan_now)
             AND (status IS NULL OR status != 'expired')
+            ORDER BY symbol, confidence DESC
         """)
         
         expired_result = db.execute(expired_query, {"taiwan_now": taiwan_now.isoformat()})
         expired_signals = list(expired_result)
         
+        # 🔧 修復：按幣種分組，只保留信心度最高的信號
+        signals_by_symbol = {}
         for signal_row in expired_signals:
-            signal_id = signal_row.id
             symbol = signal_row.symbol
-            
+            if symbol not in signals_by_symbol:
+                signals_by_symbol[symbol] = []
+            signals_by_symbol[symbol].append(signal_row)
+        
+        signals_to_archive = []
+        signals_to_delete = []
+        
+        for symbol, symbol_signals in signals_by_symbol.items():
+            if len(symbol_signals) > 1:
+                # 排序，確保信心度最高的在前面
+                symbol_signals.sort(key=lambda x: x.confidence, reverse=True)
+                
+                # 保留信心度最高的信號到歷史
+                best_signal = symbol_signals[0]
+                signals_to_archive.append(best_signal)
+                
+                # 其他信號直接刪除
+                for signal in symbol_signals[1:]:
+                    signals_to_delete.append(signal)
+                    
+                logger.info(f"🔄 {symbol} 信號過期篩選：保留信心度最高 {best_signal.confidence:.1f}%，刪除 {len(symbol_signals)-1} 個低信心度信號")
+            else:
+                # 只有一個信號，直接歸檔
+                signals_to_archive.append(symbol_signals[0])
+        
+        # 歸檔最佳信號
+        for signal_row in signals_to_archive:
             try:
-                # 更新信號狀態為過期
                 update_query = text("""
                     UPDATE trading_signals 
                     SET status = 'expired', archived_at = :archived_at
@@ -369,18 +453,30 @@ async def _auto_process_expired_signals():
                 """)
                 
                 db.execute(update_query, {
-                    "signal_id": signal_id,
+                    "signal_id": signal_row.id,
                     "archived_at": taiwan_now.isoformat()
                 })
                 
             except Exception as e:
-                logger.error(f"處理過期信號 {signal_id} 失敗: {e}")
+                logger.error(f"歸檔過期信號 {signal_row.id} 失敗: {e}")
+        
+        # 刪除低信心度信號
+        for signal_row in signals_to_delete:
+            try:
+                delete_query = text("""
+                    DELETE FROM trading_signals WHERE id = :signal_id
+                """)
+                
+                db.execute(delete_query, {"signal_id": signal_row.id})
+                
+            except Exception as e:
+                logger.error(f"刪除低信心度信號 {signal_row.id} 失敗: {e}")
         
         db.commit()
         db.close()
         
         if expired_signals:
-            logger.info(f"✅ 處理了 {len(expired_signals)} 個過期信號")
+            logger.info(f"✅ 處理了 {len(expired_signals)} 個過期信號：歸檔 {len(signals_to_archive)} 個，刪除 {len(signals_to_delete)} 個")
         
     except Exception as e:
         logger.error(f"自動處理過期信號失敗: {e}")
@@ -450,9 +546,34 @@ async def _cleanup_signals_older_than_7_days():
         return 0
 
 async def _save_precision_signal_to_db(signal: PrecisionSignal):
-    """保存精準信號到數據庫"""
+    """保存精準信號到數據庫 - 確保每個幣種只有一個最佳信號"""
     try:
         db = SessionLocal()
+        
+        # 🔧 修復：檢查是否已有同幣種的活躍信號
+        existing_query = text("""
+            SELECT id, confidence, strategy_name FROM trading_signals 
+            WHERE symbol = :symbol AND (status IS NULL OR status = 'active')
+            ORDER BY confidence DESC
+        """)
+        
+        existing_result = db.execute(existing_query, {"symbol": signal.symbol})
+        existing_signals = list(existing_result)
+        
+        # 如果有現有信號，比較信心度
+        if existing_signals:
+            for existing in existing_signals:
+                existing_confidence = existing.confidence
+                if signal.confidence > existing_confidence:
+                    # 新信號信心度更高，刪除舊信號
+                    delete_query = text("DELETE FROM trading_signals WHERE id = :id")
+                    db.execute(delete_query, {"id": existing.id})
+                    logger.info(f"🔄 {signal.symbol} 替換低信心度信號：{existing_confidence:.1f}% → {signal.confidence:.1f}%")
+                else:
+                    # 新信號信心度不如現有信號，不保存
+                    logger.info(f"🚫 {signal.symbol} 新信號信心度不足：{signal.confidence:.1f}% <= {existing_confidence:.1f}%，不保存")
+                    db.close()
+                    return
         
         # 計算風險回報比
         risk = abs(signal.entry_price - signal.stop_loss) / signal.entry_price if signal.entry_price > 0 else 0
@@ -504,28 +625,41 @@ async def _save_precision_signal_to_db(signal: PrecisionSignal):
         logger.error(f"保存精準信號失敗: {e}")
         raise e
 
-def _calculate_signal_validity(timeframe: str, created_time: datetime) -> dict:
-    """計算信號時效性"""
+def _calculate_signal_validity(timeframe: str, created_time: datetime, expires_at: datetime = None) -> dict:
+    """計算信號時效性 - 優先使用實際的 expires_at 時間"""
     try:
         now = get_taiwan_now().replace(tzinfo=None)
         
         if isinstance(created_time, str):
             created_time = parse_time_to_taiwan(created_time)
         
-        # 根據時間框架確定有效期
-        validity_hours = {
-            "1m": 1,
-            "3m": 2,
-            "5m": 4,
-            "15m": 8,
-            "30m": 12,
-            "1h": 24
-        }.get(timeframe, 4)
-        
-        total_seconds = validity_hours * 3600
-        elapsed_seconds = (now - created_time).total_seconds()
-        remaining_seconds = max(0, total_seconds - elapsed_seconds)
-        remaining_minutes = remaining_seconds / 60
+        if expires_at is not None:
+            # 🎯 優先使用實際的 expires_at 時間
+            if isinstance(expires_at, str):
+                expires_at = parse_time_to_taiwan(expires_at)
+            
+            total_seconds = (expires_at - created_time).total_seconds()
+            elapsed_seconds = (now - created_time).total_seconds()
+            remaining_seconds = max(0, total_seconds - elapsed_seconds)
+            remaining_minutes = remaining_seconds / 60
+            
+            logger.info(f"🎯 使用實際過期時間計算: 總時長 {total_seconds/60:.2f}分鐘, 剩餘 {remaining_minutes:.2f}分鐘")
+        else:
+            # 🔧 後備方案：使用時間框架預設值
+            logger.warning(f"⚠️ 缺少 expires_at，使用時間框架預設值: {timeframe}")
+            validity_hours = {
+                "1m": 1,
+                "3m": 2,
+                "5m": 4,
+                "15m": 8,
+                "30m": 12,
+                "1h": 24
+            }.get(timeframe, 4)
+            
+            total_seconds = validity_hours * 3600
+            elapsed_seconds = (now - created_time).total_seconds()
+            remaining_seconds = max(0, total_seconds - elapsed_seconds)
+            remaining_minutes = remaining_seconds / 60
         
         percentage = (remaining_seconds / total_seconds) * 100 if total_seconds > 0 else 0
         
