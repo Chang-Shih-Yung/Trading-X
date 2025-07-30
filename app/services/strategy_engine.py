@@ -281,7 +281,7 @@ class StrategyEngine:
     async def start_signal_generation(self):
         """啟動信號生成 - 多時間框架分析"""
         self.running = True
-        symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT']  # 五個主要幣種
+        symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT', 'SOLUSDT', 'DOGEUSDT']  # 七個主要幣種
         timeframes = ['1h', '4h', '1d', '1w']  # 增加週線分析
         
         while self.running:

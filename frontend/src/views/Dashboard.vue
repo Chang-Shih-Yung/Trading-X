@@ -1297,7 +1297,7 @@ const soundNotificationEnabled = ref(true)
 
 // ===== 短線信號管理系統 (簡化版) =====
 // 目標幣種列表
-const TARGET_COINS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT']
+const TARGET_COINS = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT']
 
 // 短線信號分析相關數據
 const shortTermStats = reactive({
@@ -1459,7 +1459,7 @@ const printExpiredSignals = async () => {
 // 獲取即時幣安價格
 const fetchRealtimePrices = async () => {
   try {
-    const symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT'] // 只包含指定的5個幣種
+    const symbols = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT'] // 包含7個幣種
     const response = await api.get('/api/v1/scalping/prices', {
       params: { symbols }
     })
@@ -1521,7 +1521,7 @@ const fetchScalpingSignals = async (): Promise<any[]> => {
 
     const response = await api.get('/api/v1/scalping/signals', {
       params: {
-        symbols: ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT'],
+        symbols: ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT'],
         timeframes: ['1m', '3m', '5m', '15m', '30m'],
         min_confidence: 0.85,
         urgency_levels: ['urgent', 'high', 'medium'],
@@ -1768,7 +1768,7 @@ const generateInstantAdvice = async () => {
     showLoading('正在生成即時中長線建議...')
 
     const response = await api.post('/api/v1/signals/generate-instant-advice', {
-      symbols: ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT'],
+      symbols: ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT'],
       analysis_depth: 'comprehensive'
     })
 
@@ -2674,9 +2674,9 @@ const archiveExpiredShortTermSignals = async (expiredSignals: Signal[]) => {
   }
 }
 
-// 確保最少5個主要幣種的信號覆蓋
+// 確保最少7個主要幣種的信號覆蓋
 const ensureMinimumCoinCoverage = async () => {
-  const targetCoins = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT']
+  const targetCoins = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT']
   const currentCoins = new Set(shortTermSignals.value.map(s => s.symbol))
   const missingCoins = targetCoins.filter(coin => !currentCoins.has(coin))
 

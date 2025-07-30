@@ -1,0 +1,169 @@
+{
+  "api_tests": {
+    "API格式_實時價格": {
+      "success": true,
+      "message": "響應格式正確",
+      "timestamp": "2025-07-30T11:30:40.288319",
+      "data": {
+        "status": 200,
+        "fields": [
+          "success",
+          "data",
+          "timestamp"
+        ]
+      }
+    },
+    "API格式_所有實時數據": {
+      "success": true,
+      "message": "響應格式正確",
+      "timestamp": "2025-07-30T11:30:40.289057",
+      "data": {
+        "status": 200,
+        "fields": [
+          "success",
+          "data",
+          "timestamp"
+        ]
+      }
+    },
+    "API格式_服務狀態": {
+      "success": true,
+      "message": "響應格式正確",
+      "timestamp": "2025-07-30T11:30:40.289652",
+      "data": {
+        "status": 200,
+        "fields": [
+          "success",
+          "data",
+          "timestamp"
+        ]
+      }
+    }
+  },
+  "websocket_tests": {
+    "服務狀態_服務運行狀態": {
+      "success": true,
+      "message": "服務運行狀態: True",
+      "timestamp": "2025-07-30T11:30:40.287437",
+      "data": {
+        "service_running": true
+      }
+    },
+    "服務狀態_WebSocket啟用狀態": {
+      "success": true,
+      "message": "WebSocket啟用狀態: True",
+      "timestamp": "2025-07-30T11:30:40.287468",
+      "data": {
+        "websocket_enabled": true
+      }
+    },
+    "服務狀態_活躍WebSocket連接數": {
+      "success": true,
+      "message": "活躍WebSocket連接數: 0",
+      "timestamp": "2025-07-30T11:30:40.287476",
+      "data": {
+        "active_websocket_connections": 0
+      }
+    },
+    "價格數據_BTCUSDT": {
+      "success": true,
+      "message": "價格: $118,099.99",
+      "timestamp": "2025-07-30T11:30:41.522615",
+      "data": {
+        "symbol": "BTCUSDT",
+        "price": 118099.99,
+        "change": -267.21,
+        "change_percent": -0.226,
+        "high_24h": 119273.36,
+        "low_24h": 116950.75,
+        "volume_24h": 14360.8104,
+        "timestamp": "2025-07-30T11:30:41.461585"
+      }
+    },
+    "價格數據_ETHUSDT": {
+      "success": true,
+      "message": "價格: $3,820.75",
+      "timestamp": "2025-07-30T11:30:41.522651",
+      "data": {
+        "symbol": "ETHUSDT",
+        "price": 3820.75,
+        "change": 36.28,
+        "change_percent": 0.959,
+        "high_24h": 3886.44,
+        "low_24h": 3716.04,
+        "volume_24h": 553571.0911,
+        "timestamp": "2025-07-30T11:30:41.521456"
+      }
+    },
+    "WebSocket連接": {
+      "success": true,
+      "message": "連接建立成功",
+      "timestamp": "2025-07-30T11:30:41.548358",
+      "data": null
+    },
+    "WebSocket歡迎消息": {
+      "success": true,
+      "message": "收到連接確認",
+      "timestamp": "2025-07-30T11:30:41.548488",
+      "data": {
+        "type": "connection_established",
+        "message": "WebSocket連接已建立",
+        "timestamp": "2025-07-30T11:30:41.547619"
+      }
+    },
+    "WebSocket訂閱發送": {
+      "success": true,
+      "message": "訂閱請求已發送",
+      "timestamp": "2025-07-30T11:30:41.548610",
+      "data": {
+        "action": "subscribe",
+        "symbols": [
+          "BTCUSDT",
+          "ETHUSDT"
+        ]
+      }
+    },
+    "WebSocket訂閱確認": {
+      "success": true,
+      "message": "訂閱確認: ['BTCUSDT', 'ETHUSDT']",
+      "timestamp": "2025-07-30T11:30:41.654781",
+      "data": {
+        "type": "subscription_confirmed",
+        "symbols": [
+          "BTCUSDT",
+          "ETHUSDT"
+        ],
+        "timestamp": "2025-07-30T11:30:41.548778"
+      }
+    },
+    "WebSocket價格更新_1": {
+      "success": true,
+      "message": "收到BTCUSDT價格更新",
+      "timestamp": "2025-07-30T11:30:41.654943",
+      "data": {
+        "type": "price_update",
+        "symbol": "BTCUSDT"
+      }
+    },
+    "WebSocket價格更新_2": {
+      "success": true,
+      "message": "收到ETHUSDT價格更新",
+      "timestamp": "2025-07-30T11:30:41.655066",
+      "data": {
+        "type": "price_update",
+        "symbol": "ETHUSDT"
+      }
+    },
+    "WebSocket心跳": {
+      "success": true,
+      "message": "ping-pong測試成功",
+      "timestamp": "2025-07-30T11:30:56.665353",
+      "data": {
+        "type": "pong",
+        "timestamp": "2025-07-30T11:30:56.663730"
+      }
+    }
+  },
+  "start_time": "2025-07-30T11:30:40.274672",
+  "errors": []
+}

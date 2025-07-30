@@ -48,6 +48,11 @@ const router = createRouter({
             path: '/strategies',
             name: 'Strategies',
             component: () => import('@/views/Strategies.vue')
+        },
+        {
+            path: '/trading-strategy',
+            name: 'TradingStrategy',
+            component: () => import('@/views/TradingStrategy.vue')
         }
     ]
 })

@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 # 新增請求模型
 class InstantAdviceRequest(BaseModel):
-    symbols: List[str] = ["BTCUSDT", "ETHUSDT", "BNBUSDT"]
+    symbols: List[str] = ["BTCUSDT", "ETHUSDT", "ADAUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT"]
     analysis_depth: str = "comprehensive"
 
 router = APIRouter()
@@ -48,7 +48,7 @@ async def get_market_trend(symbol: str):
 async def get_market_overview():
     """獲取市場總覽 - 主要幣種的牛熊市狀況"""
     try:
-        symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT']
+        symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT', 'SOLUSDT', 'DOGEUSDT']
         engine = StrategyEngine()
         
         market_overview = {}
@@ -148,7 +148,7 @@ async def generate_live_signals():
         strategy_engine = StrategyEngine()
         
         # 主要交易對
-        symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT']
+        symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'XRPUSDT', 'SOLUSDT', 'DOGEUSDT']
         timeframes = ['1h', '4h', '1d', '1w']
         
         generated_signals = []

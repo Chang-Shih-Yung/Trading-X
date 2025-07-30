@@ -7,7 +7,7 @@ alembic==1.12.1
 psycopg2-binary==2.9.9
 
 # HTTP 客戶端
-httpx==0.28.1
+httpx==0.27.0
 feedparser==6.0.11
 
 # 數據處理與技術分析
@@ -15,7 +15,10 @@ pandas==2.1.4
 numpy==1.25.2
 pandas-ta==0.3.14b
 ccxt==4.1.35
+
+# WebSocket 支援
 websocket-client==1.6.4
+websockets==12.0
 
 # 機器學習（簡化版本）
 scikit-learn==1.3.2

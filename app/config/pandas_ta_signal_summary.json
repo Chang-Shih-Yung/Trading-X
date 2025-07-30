@@ -1,0 +1,40 @@
+{
+  "system_info": {
+    "name": "pandas-ta 交易信號系統",
+    "version": "1.0",
+    "created": "2025-07-30T10:30:10.594607",
+    "supported_strategies": [
+      "scalping",
+      "swing",
+      "trend"
+    ],
+    "supported_timeframes": [
+      "5m",
+      "15m",
+      "1h",
+      "4h",
+      "1d"
+    ]
+  },
+  "indicators_count": {
+    "trend_indicators": 7,
+    "momentum_indicators": 6,
+    "volatility_indicators": 4,
+    "volume_indicators": 5,
+    "candlestick_patterns": 4
+  },
+  "signal_types": {
+    "BUY": "買入信號 - 價格預期上漲",
+    "SELL": "賣出信號 - 價格預期下跌",
+    "NEUTRAL": "中性信號 - 無明確方向",
+    "STRONG_BUY": "強烈買入 - 多重指標確認上漲",
+    "STRONG_SELL": "強烈賣出 - 多重指標確認下跌"
+  },
+  "confidence_levels": {
+    "0.9+": "極高信心 - 建議重倉操作",
+    "0.7-0.9": "高信心 - 建議正常倉位",
+    "0.5-0.7": "中等信心 - 建議輕倉試探",
+    "0.3-0.5": "低信心 - 建議觀望",
+    "0.0-0.3": "極低信心 - 不建議操作"
+  }
+}

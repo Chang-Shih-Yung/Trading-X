@@ -1,0 +1,155 @@
+{
+  "version": "1.0.0",
+  "description": "智能共振濾波器配置 - AI混合決策系統",
+  "assets": ["BTCUSDT", "ETHUSDT", "ADAUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT"],
+  "strategy_type": "short_term",
+  "timeframes": ["5m", "15m", "1h"],
+  
+  "consensus_filter": {
+    "required_consensus": 5,
+    "min_consensus": 3,
+    "indicators": {
+      "RSI": {
+        "weight": 0.2,
+        "period": 14,
+        "thresholds": {
+          "long_entry": 30,
+          "long_exit": 70,
+          "short_entry": 70,
+          "short_exit": 30,
+          "extreme_oversold": 20,
+          "extreme_overbought": 80
+        },
+        "enabled": true
+      },
+      "MACD": {
+        "weight": 0.25,
+        "params": {
+          "fast": 12,
+          "slow": 26,
+          "signal": 9
+        },
+        "conditions": {
+          "bullish_crossover": "MACD_line > Signal_line AND previous_MACD_line <= previous_Signal_line",
+          "bearish_crossover": "MACD_line < Signal_line AND previous_MACD_line >= previous_Signal_line",
+          "histogram_momentum": "MACD_histogram > 0 AND MACD_histogram > previous_histogram"
+        },
+        "enabled": true
+      },
+      "Stochastic": {
+        "weight": 0.15,
+        "params": {
+          "k_period": 14,
+          "d_period": 3
+        },
+        "thresholds": {
+          "oversold": 20,
+          "overbought": 80,
+          "crossover_confirmation": true
+        },
+        "enabled": true
+      },
+      "OBV": {
+        "weight": 0.2,
+        "trend_periods": 5,
+        "conditions": {
+          "bullish_trend": "OBV_slope > 0 for 3+ periods",
+          "bearish_trend": "OBV_slope < 0 for 3+ periods",
+          "divergence_detection": true
+        },
+        "enabled": true
+      },
+      "BollingerBands": {
+        "weight": 0.2,
+        "params": {
+          "period": 20,
+          "std_dev": 2
+        },
+        "conditions": {
+          "squeeze_detection": "band_width < percentile_20",
+          "breakout_confirmation": "close_position relative to bands",
+          "mean_reversion": "price touch bands + reversal"
+        },
+        "enabled": true
+      }
+    }
+  },
+  
+  "sentiment_guard": {
+    "enabled": true,
+    "extreme_conditions": {
+      "rsi_overheat": {
+        "threshold": 90,
+        "action": "block_long",
+        "cooldown_minutes": 30,
+        "severity": "high"
+      },
+      "rsi_oversold_extreme": {
+        "threshold": 10,
+        "action": "block_short",
+        "cooldown_minutes": 15,
+        "severity": "medium"
+      },
+      "volume_spike": {
+        "threshold_multiplier": 2.0,
+        "baseline_periods": 20,
+        "action": "cautious_mode",
+        "cooldown_minutes": 20,
+        "severity": "medium"
+      },
+      "price_volatility_extreme": {
+        "threshold_multiplier": 3.0,
+        "baseline_periods": 10,
+        "action": "block_all",
+        "cooldown_minutes": 45,
+        "severity": "critical"
+      }
+    }
+  },
+  
+  "adaptive_parameters": {
+    "learning_enabled": true,
+    "performance_tracking": {
+      "window_size": 100,
+      "success_threshold": 0.6,
+      "adjustment_frequency": "daily"
+    },
+    "parameter_ranges": {
+      "required_consensus": {
+        "min": 3,
+        "max": 7,
+        "step": 1
+      },
+      "confidence_threshold": {
+        "min": 0.3,
+        "max": 0.8,
+        "step": 0.05
+      },
+      "sentiment_sensitivity": {
+        "min": 0.1,
+        "max": 0.9,
+        "step": 0.1
+      }
+    }
+  },
+  
+  "market_regime_adaptation": {
+    "regimes": {
+      "trending": {
+        "required_consensus": 6,
+        "trend_indicators_weight": 1.2,
+        "sentiment_sensitivity": 0.7
+      },
+      "sideways": {
+        "required_consensus": 4,
+        "mean_reversion_weight": 1.3,
+        "sentiment_sensitivity": 0.5
+      },
+      "volatile": {
+        "required_consensus": 7,
+        "volatility_filters": true,
+        "sentiment_sensitivity": 0.9
+      }
+    }
+  }
+}

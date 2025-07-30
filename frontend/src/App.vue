@@ -30,6 +30,7 @@ import { reactive } from 'vue'
 const navigation = reactive([
   { name: '儀表板', href: '/' },
   { name: '交易信號', href: '/signals' },
+  { name: '實時策略', href: '/trading-strategy' },
   { name: '信號歷史', href: '/signal-history' },
   { name: '市場數據', href: '/market' },
   { name: '新聞分析', href: '/news' },

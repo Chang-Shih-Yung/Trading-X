@@ -18,9 +18,17 @@ from .time_utils import (
     TAIWAN_TZ
 )
 
+from .log_manager import (
+    log_manager,
+    start_log_management,
+    stop_log_management,
+    get_log_stats,
+    manual_cleanup
+)
+
 __all__ = [
     'get_taiwan_now',
-    'get_taiwan_now_naive', 
+    'get_taiwan_now_naive',
     'utc_to_taiwan',
     'taiwan_to_utc',
     'to_taiwan_naive',
@@ -31,5 +39,10 @@ __all__ = [
     'time_until_expiry',
     'now',
     'utcnow',
-    'TAIWAN_TZ'
+    'TAIWAN_TZ',
+    'log_manager',
+    'start_log_management',
+    'stop_log_management',
+    'get_log_stats',
+    'manual_cleanup'
 ]

@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     GITHUB_COPILOT_TOKEN: str = ""
     GITHUB_ACCESS_TOKEN: str = ""
     
+    # Gmail 通知設定
+    GMAIL_SENDER: Optional[str] = None
+    GMAIL_APP_PASSWORD: Optional[str] = None  
+    GMAIL_RECIPIENT: Optional[str] = None
+    
     # 安全設定
     SECRET_KEY: str = "your-secret-key-here"
     ALLOWED_HOSTS: List[str] = ["*"]

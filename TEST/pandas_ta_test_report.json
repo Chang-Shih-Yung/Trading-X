@@ -1,0 +1,21 @@
+{
+  "test_date": "2025-07-30T10:02:24.655828",
+  "pandas_ta_version": "0.3.14b0",
+  "test_scenarios": [
+    "market_regime_detection",
+    "adaptive_indicators",
+    "comprehensive_analysis",
+    "parameter_adaptation",
+    "performance_comparison"
+  ],
+  "summary": {
+    "total_tests": 5,
+    "framework": "pandas-ta 優化版本",
+    "key_improvements": [
+      "自適應參數調整",
+      "市場狀態自動檢測",
+      "策略模板化",
+      "多指標融合分析"
+    ]
+  }
+}

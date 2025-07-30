@@ -1,0 +1,86 @@
+{
+  "test_date": "2025-07-30T10:07:44.184567",
+  "performance_results": {
+    "old_time": 0.004490089416503906,
+    "new_time": 1.1447003126144408,
+    "old_success": true,
+    "new_success": true
+  },
+  "adaptability_results": [
+    {
+      "scenario": "bull_trend",
+      "old_signals": 2,
+      "new_signals": 2,
+      "old_strength": 1.8,
+      "new_strength": 2.0,
+      "new_confidence": 0.5022657292691175
+    },
+    {
+      "scenario": "bear_trend",
+      "old_signals": 0,
+      "new_signals": 1,
+      "old_strength": 0,
+      "new_strength": 1.0,
+      "new_confidence": 0.4598834433362024
+    },
+    {
+      "scenario": "sideways",
+      "old_signals": 1,
+      "new_signals": 0,
+      "old_strength": 1.0,
+      "new_strength": 0,
+      "new_confidence": 0.4208524531515006
+    },
+    {
+      "scenario": "volatile",
+      "old_signals": 1,
+      "new_signals": 0,
+      "old_strength": 1.0,
+      "new_strength": 0,
+      "new_confidence": 0.6850574690927993
+    }
+  ],
+  "integration_guide": {
+    "integration_steps": [
+      {
+        "step": 1,
+        "title": "導入新服務",
+        "code": "from app.services.pandas_ta_indicators import PandasTAIndicators",
+        "description": "導入 pandas-ta 優化的指標服務"
+      },
+      {
+        "step": 2,
+        "title": "替換舊服務調用",
+        "old_code": "indicators = TechnicalIndicatorsService()\ntrend_signals = indicators.calculate_trend_indicators(df)",
+        "new_code": "indicators = PandasTAIndicators()\nanalysis = indicators.get_comprehensive_analysis(df, 'scalping')",
+        "description": "用綜合分析替換分散的指標計算"
+      },
+      {
+        "step": 3,
+        "title": "利用自適應功能",
+        "code": "market_condition = indicators.detect_market_regime(df)\nadaptive_signals = indicators.calculate_adaptive_indicators(df, 'scalping')",
+        "description": "利用市場狀態檢測和自適應參數調整"
+      },
+      {
+        "step": 4,
+        "title": "整合策略選擇",
+        "code": "strategy_type = 'scalping' if market_condition.volatility > 0.5 else 'swing'\nanalysis = indicators.get_comprehensive_analysis(df, strategy_type)",
+        "description": "根據市場狀況動態選擇策略類型"
+      }
+    ],
+    "benefits": [
+      "自動市場狀態檢測",
+      "自適應參數調整",
+      "統一的分析接口",
+      "更高的信號準確性",
+      "標準化的指標計算"
+    ],
+    "migration_notes": [
+      "逐步替換現有指標計算",
+      "保留舊版本作為備份",
+      "測試新版本在生產環境的表現",
+      "調整前端顯示邏輯以適配新數據格式"
+    ]
+  },
+  "recommendation": "pandas-ta 優化版本展現出更好的自適應能力和標準化程度，建議逐步集成"
+}

@@ -1,0 +1,410 @@
+{
+  "trend_indicators": {
+    "ema": {
+      "pandas_ta_function": "ta.ema(close, length=20)",
+      "buy": "價格 > EMA 且 EMA 斜率向上",
+      "sell": "價格 < EMA 且 EMA 斜率向下", 
+      "neutral": "價格圍繞 EMA 震盪",
+      "parameters": {
+        "length": [8, 13, 21, 50, 200],
+        "scalping": 8,
+        "swing": 21,
+        "trend": 50
+      },
+      "note": "指數移動平均線，趨勢跟隨指標",
+      "signal_strength": "中等",
+      "best_timeframes": ["5m", "1h", "4h", "1d"]
+    },
+    "sma": {
+      "pandas_ta_function": "ta.sma(close, length=20)",
+      "buy": "價格突破 SMA 向上",
+      "sell": "價格跌破 SMA 向下",
+      "neutral": "價格在 SMA 附近整理",
+      "parameters": {
+        "length": [10, 20, 50, 100, 200]
+      },
+      "note": "簡單移動平均線，較平滑但滯後",
+      "signal_strength": "中等",
+      "best_timeframes": ["1h", "4h", "1d"]
+    },
+    "macd": {
+      "pandas_ta_function": "ta.macd(close, fast=12, slow=26, signal=9)",
+      "buy": "MACD 線上穿訊號線 且 柱狀圖 > 0",
+      "sell": "MACD 線下穿訊號線 且 柱狀圖 < 0",
+      "neutral": "MACD 線與訊號線糾纏",
+      "parameters": {
+        "fast": [8, 12, 15],
+        "slow": [21, 26, 35],
+        "signal": [7, 9, 12],
+        "scalping": {"fast": 8, "slow": 21, "signal": 7},
+        "swing": {"fast": 12, "slow": 26, "signal": 9}
+      },
+      "note": "移動平均收斂發散，動量與趨勢確認",
+      "signal_strength": "強",
+      "best_timeframes": ["15m", "1h", "4h"]
+    },
+    "adx": {
+      "pandas_ta_function": "ta.adx(high, low, close, length=14)",
+      "buy": "DI+ > DI- 且 ADX > 25",
+      "sell": "DI- > DI+ 且 ADX > 25",
+      "neutral": "ADX < 20 (無趨勢)",
+      "parameters": {
+        "length": [14, 20, 28]
+      },
+      "note": "平均趨向指數，趨勢強度確認",
+      "signal_strength": "強",
+      "best_timeframes": ["1h", "4h", "1d"]
+    },
+    "aroon": {
+      "pandas_ta_function": "ta.aroon(high, low, length=14)",
+      "buy": "Aroon Up > 70 且 Aroon Down < 30",
+      "sell": "Aroon Down > 70 且 Aroon Up < 30",
+      "neutral": "兩線在 30-70 區間交錯",
+      "parameters": {
+        "length": [14, 25, 50]
+      },
+      "note": "阿隆指標，識別趨勢變化的早期信號",
+      "signal_strength": "中等",
+      "best_timeframes": ["1h", "4h", "1d"]
+    },
+    "supertrend": {
+      "pandas_ta_function": "ta.supertrend(high, low, close, length=10, multiplier=3.0)",
+      "buy": "收盤價 > SuperTrend 線 且線轉為綠色",
+      "sell": "收盤價 < SuperTrend 線 且線轉為紅色",
+      "neutral": "價格剛好在 SuperTrend 線上",
+      "parameters": {
+        "length": [7, 10, 14],
+        "multiplier": [2.0, 3.0, 4.0],
+        "scalping": {"length": 7, "multiplier": 2.0},
+        "swing": {"length": 10, "multiplier": 3.0}
+      },
+      "note": "超級趨勢線，強力的趨勢跟隨指標",
+      "signal_strength": "強",
+      "best_timeframes": ["15m", "1h", "4h"]
+    },
+    "psar": {
+      "pandas_ta_function": "ta.psar(high, low, close)",
+      "buy": "價格突破 PSAR 點位向上",
+      "sell": "價格跌破 PSAR 點位向下",
+      "neutral": "價格剛好在 PSAR 點位",
+      "parameters": {
+        "af": [0.02, 0.05],
+        "max_af": [0.2, 0.5]
+      },
+      "note": "拋物線停損轉向，動態止損指標",
+      "signal_strength": "中等",
+      "best_timeframes": ["15m", "1h", "4h"]
+    }
+  },
+  "momentum_indicators": {
+    "rsi": {
+      "pandas_ta_function": "ta.rsi(close, length=14)",
+      "buy": "RSI < 30 (超賣) 且開始回升",
+      "sell": "RSI > 70 (超買) 且開始回落",
+      "neutral": "30 <= RSI <= 70",
+      "parameters": {
+        "length": [7, 14, 21],
+        "oversold": [20, 25, 30],
+        "overbought": [70, 75, 80],
+        "scalping": {"length": 7, "oversold": 25, "overbought": 75},
+        "swing": {"length": 14, "oversold": 30, "overbought": 70}
+      },
+      "note": "相對強弱指標，超買超賣判斷",
+      "signal_strength": "強",
+      "best_timeframes": ["5m", "15m", "1h", "4h"]
+    },
+    "stoch": {
+      "pandas_ta_function": "ta.stoch(high, low, close, k=14, d=3)",
+      "buy": "%K < 20 且 %K 上穿 %D",
+      "sell": "%K > 80 且 %K 下穿 %D",
+      "neutral": "20 <= %K <= 80 或兩線糾纏",
+      "parameters": {
+        "k": [5, 14, 21],
+        "d": [3, 5, 9],
+        "scalping": {"k": 5, "d": 3},
+        "swing": {"k": 14, "d": 3}
+      },
+      "note": "隨機指標，動量震盪指標",
+      "signal_strength": "中等",
+      "best_timeframes": ["15m", "1h", "4h"]
+    },
+    "willr": {
+      "pandas_ta_function": "ta.willr(high, low, close, length=14)",
+      "buy": "Williams %R > -20 且回升",
+      "sell": "Williams %R < -80 且回落",
+      "neutral": "-80 <= Williams %R <= -20",
+      "parameters": {
+        "length": [14, 21, 28]
+      },
+      "note": "威廉指標，類似隨機指標的動量震盪器",
+      "signal_strength": "中等",
+      "best_timeframes": ["15m", "1h", "4h"]
+    },
+    "cci": {
+      "pandas_ta_function": "ta.cci(high, low, close, length=20)",
+      "buy": "CCI > 100 (突破超買) 或 CCI 從 -100 以下回升",
+      "sell": "CCI < -100 (突破超賣) 或 CCI 從 100 以上回落",
+      "neutral": "-100 <= CCI <= 100",
+      "parameters": {
+        "length": [14, 20, 28]
+      },
+      "note": "商品通道指數，識別異常價格行為",
+      "signal_strength": "中等",
+      "best_timeframes": ["1h", "4h", "1d"]
+    },
+    "roc": {
+      "pandas_ta_function": "ta.roc(close, length=10)",
+      "buy": "ROC > 0 且持續上升",
+      "sell": "ROC < 0 且持續下降",
+      "neutral": "ROC 接近 0 或橫向",
+      "parameters": {
+        "length": [10, 14, 21]
+      },
+      "note": "變化率指標，衡量價格動量",
+      "signal_strength": "中等",
+      "best_timeframes": ["1h", "4h", "1d"]
+    },
+    "cmo": {
+      "pandas_ta_function": "ta.cmo(close, length=14)",
+      "buy": "CMO > 50 (強勢動量)",
+      "sell": "CMO < -50 (弱勢動量)",
+      "neutral": "-50 <= CMO <= 50",
+      "parameters": {
+        "length": [9, 14, 21]
+      },
+      "note": "錢德動量震盪器，未平滑的動量指標",
+      "signal_strength": "中等",
+      "best_timeframes": ["1h", "4h"]
+    }
+  },
+  "volatility_indicators": {
+    "bbands": {
+      "pandas_ta_function": "ta.bbands(close, length=20, std=2.0)",
+      "buy": "價格觸及下軌反彈 或 突破上軌確認",
+      "sell": "價格觸及上軌回落 或 跌破下軌確認",
+      "neutral": "價格在中軌附近波動",
+      "parameters": {
+        "length": [10, 20, 50],
+        "std": [1.5, 2.0, 2.5],
+        "scalping": {"length": 10, "std": 1.5},
+        "swing": {"length": 20, "std": 2.0}
+      },
+      "note": "布林通道，價格波動範圍與反轉信號",
+      "signal_strength": "強",
+      "best_timeframes": ["15m", "1h", "4h"]
+    },
+    "atr": {
+      "pandas_ta_function": "ta.atr(high, low, close, length=14)",
+      "buy": "配合突破策略，ATR 擴大確認",
+      "sell": "配合止損策略，ATR 擴大警示",
+      "neutral": "ATR 低位，市場平靜",
+      "parameters": {
+        "length": [7, 14, 21]
+      },
+      "note": "平均真實波幅，非方向性，用於止損止盈",
+      "signal_strength": "輔助",
+      "best_timeframes": ["所有時間框架"]
+    },
+    "donchian": {
+      "pandas_ta_function": "ta.donchian(high, low, close, lower_length=20, upper_length=20)",
+      "buy": "價格突破上通道",
+      "sell": "價格跌破下通道",
+      "neutral": "價格在通道內",
+      "parameters": {
+        "length": [10, 20, 55]
+      },
+      "note": "唐奇安通道，趨勢突破系統",
+      "signal_strength": "強",
+      "best_timeframes": ["1h", "4h", "1d"]
+    },
+    "kc": {
+      "pandas_ta_function": "ta.kc(high, low, close, length=20, scalar=2.0)",
+      "buy": "價格突破上軌",
+      "sell": "價格跌破下軌",
+      "neutral": "價格在通道內",
+      "parameters": {
+        "length": [10, 20, 30],
+        "scalar": [1.5, 2.0, 2.5]
+      },
+      "note": "肯特納通道，基於 ATR 的波動通道",
+      "signal_strength": "中等",
+      "best_timeframes": ["1h", "4h"]
+    }
+  },
+  "volume_indicators": {
+    "obv": {
+      "pandas_ta_function": "ta.obv(close, volume)",
+      "buy": "OBV 持續上升且價格上漲",
+      "sell": "OBV 持續下降且價格下跌",
+      "neutral": "OBV 橫向或與價格背離",
+      "parameters": {},
+      "note": "能量潮指標，用成交量確認趨勢",
+      "signal_strength": "強",
+      "best_timeframes": ["1h", "4h", "1d"]
+    },
+    "ad": {
+      "pandas_ta_function": "ta.ad(high, low, close, volume)",
+      "buy": "A/D Line 上升趨勢",
+      "sell": "A/D Line 下降趨勢",
+      "neutral": "A/D Line 橫向",
+      "parameters": {},
+      "note": "聚散指標，累積/派發線",
+      "signal_strength": "中等",
+      "best_timeframes": ["1h", "4h", "1d"]
+    },
+    "cmf": {
+      "pandas_ta_function": "ta.cmf(high, low, close, volume, length=20)",
+      "buy": "CMF > 0.05 (資金流入)",
+      "sell": "CMF < -0.05 (資金流出)",
+      "neutral": "-0.05 <= CMF <= 0.05",
+      "parameters": {
+        "length": [14, 20, 21]
+      },
+      "note": "柴金資金流量指標",
+      "signal_strength": "中等",
+      "best_timeframes": ["1h", "4h"]
+    },
+    "mfi": {
+      "pandas_ta_function": "ta.mfi(high, low, close, volume, length=14)",
+      "buy": "MFI < 20 (超賣) 且回升",
+      "sell": "MFI > 80 (超買) 且回落",
+      "neutral": "20 <= MFI <= 80",
+      "parameters": {
+        "length": [14, 21]
+      },
+      "note": "資金流量指標，含成交量的 RSI",
+      "signal_strength": "強",
+      "best_timeframes": ["1h", "4h"]
+    },
+    "vwap": {
+      "pandas_ta_function": "ta.vwap(high, low, close, volume)",
+      "buy": "價格突破 VWAP 向上",
+      "sell": "價格跌破 VWAP 向下",
+      "neutral": "價格在 VWAP 附近",
+      "parameters": {},
+      "note": "成交量加權平均價，機構重要參考",
+      "signal_strength": "強",
+      "best_timeframes": ["日內所有時間框架"]
+    }
+  },
+  "cycle_indicators": {
+    "htsine": {
+      "pandas_ta_function": "ta.htsine(close)",
+      "buy": "Sine > Lead Sine 且兩線向上",
+      "sell": "Sine < Lead Sine 且兩線向下",
+      "neutral": "兩線糾纏或平行",
+      "parameters": {},
+      "note": "希爾伯特正弦波，周期性分析",
+      "signal_strength": "特殊",
+      "best_timeframes": ["4h", "1d"]
+    }
+  },
+  "candlestick_patterns": {
+    "doji": {
+      "pandas_ta_function": "ta.cdl_doji(open, high, low, close)",
+      "buy": "多頭趨勢中出現 Doji 後確認反彈",
+      "sell": "空頭趨勢中出現 Doji 後確認下跌",
+      "neutral": "Doji 本身表示不確定性",
+      "note": "十字星，市場猶豫不決",
+      "signal_strength": "弱-中等",
+      "best_timeframes": ["15m", "1h", "4h", "1d"]
+    },
+    "hammer": {
+      "pandas_ta_function": "ta.cdl_hammer(open, high, low, close)",
+      "buy": "下跌趨勢中出現錘子線",
+      "sell": "上升趨勢中的倒錘子線(shooting star)",
+      "neutral": "錘子線需要後續確認",
+      "note": "錘子線/上吊線，潛在反轉信號",
+      "signal_strength": "中等",
+      "best_timeframes": ["1h", "4h", "1d"]
+    },
+    "engulfing": {
+      "pandas_ta_function": "ta.cdl_engulfing(open, high, low, close)",
+      "buy": "看漲吞噬形態",
+      "sell": "看跌吞噬形態",
+      "neutral": "需要兩根 K 線確認",
+      "note": "吞噬形態，強力反轉信號",
+      "signal_strength": "強",
+      "best_timeframes": ["1h", "4h", "1d"]
+    },
+    "morning_star": {
+      "pandas_ta_function": "ta.cdl_morningstar(open, high, low, close)",
+      "buy": "三根 K 線組成的晨星形態",
+      "sell": "三根 K 線組成的黃昏星形態",
+      "neutral": "需要三根 K 線確認",
+      "note": "晨星/黃昏星，三 K 線反轉形態",
+      "signal_strength": "強",
+      "best_timeframes": ["4h", "1d"]
+    }
+  },
+  "custom_composite_indicators": {
+    "trend_strength_score": {
+      "components": ["adx", "aroon", "supertrend", "ema_slope"],
+      "buy": "綜合趨勢分數 > 70",
+      "sell": "綜合趨勢分數 < 30",
+      "neutral": "30 <= 趨勢分數 <= 70",
+      "note": "多指標綜合趨勢強度評分",
+      "signal_strength": "強",
+      "calculation": "weighted_average(ADX/50, AroonUp/100, SuperTrend_signal, EMA_slope_normalized)"
+    },
+    "momentum_divergence": {
+      "components": ["rsi", "macd", "price_action"],
+      "buy": "價格新低但動量指標走高(看漲背離)",
+      "sell": "價格新高但動量指標走低(看跌背離)",
+      "neutral": "價格與動量指標同步",
+      "note": "動量背離分析，預警反轉",
+      "signal_strength": "強",
+      "calculation": "compare_price_highs_lows_with_indicator_highs_lows"
+    },
+    "volatility_breakout_score": {
+      "components": ["atr", "bbands_squeeze", "volume_surge"],
+      "buy": "低波動後突破 + 成交量放大",
+      "sell": "高波動後回落 + 成交量萎縮",
+      "neutral": "波動性正常",
+      "note": "波動突破綜合評分",
+      "signal_strength": "中等",
+      "calculation": "normalized(ATR_expansion + BB_squeeze_release + volume_ratio)"
+    }
+  },
+  "market_regime_indicators": {
+    "trend_vs_range": {
+      "components": ["adx", "atr_normalized", "price_efficiency"],
+      "trending": "ADX > 25 且價格效率 > 0.7",
+      "ranging": "ADX < 20 且價格效率 < 0.4",
+      "transitioning": "20 <= ADX <= 25",
+      "note": "識別市場是趨勢還是盤整",
+      "calculation": "price_efficiency = abs(close - close[n]) / sum(abs(close[i] - close[i-1]))"
+    },
+    "volatility_regime": {
+      "components": ["atr_percentile", "garch_vol", "realized_vol"],
+      "low_vol": "ATR 百分位 < 25",
+      "normal_vol": "25 <= ATR 百分位 <= 75",
+      "high_vol": "ATR 百分位 > 75",
+      "note": "波動性制度識別",
+      "calculation": "percentile_rank(ATR_20, lookback=252)"
+    }
+  },
+  "implementation_notes": {
+    "pandas_ta_installation": "pip install pandas-ta",
+    "basic_usage": "import pandas_ta as ta; df.ta.strategy('all')",
+    "custom_strategy": "df.ta.strategy(ta.Strategy(name='custom', ta=[{'kind': 'rsi'}, {'kind': 'macd'}]))",
+    "performance_tips": [
+      "批量計算多個指標比單獨計算更高效",
+      "使用 .ta.cores 設置多核心計算",
+      "對於大數據集，考慮分塊處理",
+      "緩存常用指標計算結果"
+    ],
+    "signal_validation": [
+      "多時間框架確認",
+      "成交量配合驗證", 
+      "關鍵支撐阻力位確認",
+      "市場環境適配性檢查"
+    ],
+    "risk_management": [
+      "使用 ATR 動態設置止損",
+      "根據波動性調整倉位大小",
+      "多指標確認減少假信號",
+      "設置最大回撤限制"
+    ]
+  }
+}

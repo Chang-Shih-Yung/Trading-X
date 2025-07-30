@@ -317,7 +317,7 @@ async def get_realtime_updates():
         from datetime import datetime, timedelta
         
         # 🎯 從幣安API獲取真實數據
-        symbols = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT", "XRPUSDT"]
+        symbols = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT", "XRPUSDT", "SOLUSDT", "DOGEUSDT"]
         updates = []
         bullish_count = 0
         bearish_count = 0
