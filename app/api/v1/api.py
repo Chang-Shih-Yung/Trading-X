@@ -3,6 +3,7 @@ from app.api.v1.endpoints import signals, market_data, backtest, strategies, new
 from app.api.v1.endpoints.scalping_precision import router as scalping_router
 from app.api.v1.endpoints.realtime_market import router as realtime_router
 from app.api.v1.endpoints.enhanced_analysis import router as enhanced_analysis_router
+from app.api.v1.event_coordination import router as event_coordination_router
 
 api_router = APIRouter()
 
@@ -19,3 +20,4 @@ api_router.include_router(scalping_router, prefix="/scalping", tags=["短線交�
 api_router.include_router(market_analysis.router, prefix="/market-analysis", tags=["高級市場分析"])
 api_router.include_router(smart_timing.router, prefix="/config", tags=["智能時間配置"])
 api_router.include_router(log_management.router, prefix="/admin", tags=["系統管理-日誌"])  # 新增日誌管理
+api_router.include_router(event_coordination_router, prefix="/event", tags=["事件協調引擎"])  # Phase 3 Week 3

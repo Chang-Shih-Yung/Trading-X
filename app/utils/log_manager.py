@@ -250,8 +250,11 @@ class LogManager:
         }
 
 # 全局日誌管理器實例
+# 使用相對路徑，避免硬編碼路徑問題
+import os
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 log_manager = LogManager(
-    log_dir="/Users/henrychang/Desktop/Trading-X",
+    log_dir=project_root,  # 使用項目根目錄
     max_log_size_mb=50,  # 50MB 後輪轉
     max_backup_age_hours=24,  # 保留24小時
     max_backup_count=5,  # 最多5個備份
