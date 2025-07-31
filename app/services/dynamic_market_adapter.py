@@ -55,8 +55,15 @@ class DynamicThresholds:
     regime_adapted_bb_period: int        # 布林帶週期
     position_size_multiplier: float      # 倉位大小倍數（基於機制和F&G）
     holding_period_hours: int            # 建議持倉時間
+    calculation_timestamp: datetime      # 計算時間戳
     
-    calculation_timestamp: datetime
+    # 有預設值的參數必須放在最後
+    macd_fast: int = 12                  # MACD 快線週期
+    macd_slow: int = 26                  # MACD 慢線週期
+    macd_signal: int = 9                 # MACD 信號線週期
+    stoch_k_period: int = 14             # 隨機指標 K 週期
+    stoch_d_period: int = 3              # 隨機指標 D 週期
+    williams_r_period: int = 14          # Williams %R 週期
 
 class DynamicMarketAdapter:
     """動態市場適應引擎 - Phase 2 增強版本（整合外部 API）"""
@@ -355,21 +362,22 @@ class DynamicMarketAdapter:
         base_threshold = 0.25  # 基礎25%（移除35%的第二層過濾）
         
         # 🌊 波動率調整：高波動市場降低門檻
-        volatility_adjust = max(0.15, 0.35 - (market_state.volatility_score - 1.0) * 0.05)
+        volatility_adjust = max(0.20, 0.30 - (market_state.volatility_score - 1.0) * 0.03)
         
         # 📊 成交量調整：高成交量降低門檻
-        volume_adjust = max(0.15, 0.30 - (market_state.volume_strength - 1.0) * 0.03)
+        volume_adjust = max(0.20, 0.28 - (market_state.volume_strength - 1.0) * 0.025)
         
         # 💧 流動性調整：高流動性降低門檻
-        liquidity_adjust = max(0.15, 0.28 - (market_state.liquidity_score - 1.0) * 0.02)
+        liquidity_adjust = max(0.20, 0.27 - (market_state.liquidity_score - 1.0) * 0.02)
         
         # 🧠 情緒調整：極端情緒時放寬條件
-        if market_state.sentiment_multiplier < 0.7 or market_state.sentiment_multiplier > 1.3:
-            sentiment_adjust = 0.20  # 極端情緒：更寬鬆
+        if market_state.sentiment_multiplier < 0.8 or market_state.sentiment_multiplier > 1.2:
+            sentiment_adjust = 0.22  # 極端情緒：更寬鬆
         else:
             sentiment_adjust = min(volatility_adjust, volume_adjust, liquidity_adjust)
         
         final_threshold = min(sentiment_adjust, 0.35)  # 上限35%
+        final_threshold = max(final_threshold, 0.20)   # 下限20%，確保不會過於寬鬆
         
         logger.info(f"🎯 {market_state.symbol} 動態信心度閾值: {final_threshold:.3f} "
                    f"(波動: {market_state.volatility_score:.2f}, "

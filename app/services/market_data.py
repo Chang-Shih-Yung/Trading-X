@@ -232,6 +232,22 @@ class MarketDataService:
             logger.error(f"儲存市場數據失敗: {e}")
             # 不要重新拋出異常，避免中斷主流程
     
+    async def get_latest_price(self, symbol: str, exchange: str = "binance") -> Optional[float]:
+        """獲取最新價格 - API 兼容性方法"""
+        try:
+            # 優先從 WebSocket 數據獲取
+            if symbol in self.realtime_data['prices']:
+                price_data = self.realtime_data['prices'][symbol]
+                return price_data.get('price') if price_data else None
+            
+            # 備用：從交易所 API 獲取
+            price_data = await self._get_price_from_api(symbol)
+            return price_data.get('price') if price_data else None
+            
+        except Exception as e:
+            logger.error(f"獲取最新價格失敗: {e}")
+            return None
+
     async def get_realtime_price(self, symbol: str) -> Optional[Dict]:
         """獲取即時價格數據"""
         try:

@@ -564,7 +564,7 @@
                       <div class="flex justify-between">
                         <span>趨勢一致性:</span>
                         <span class="font-mono">{{ (param.market_regime.trend_alignment_score * 100).toFixed(1)
-                          }}%</span>
+                        }}%</span>
                       </div>
                     </div>
                   </div>

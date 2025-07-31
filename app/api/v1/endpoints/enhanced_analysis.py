@@ -1,13 +1,15 @@
 """
 增強技術分析 API 端點
 提供即時技術指標、多時間框架分析、數據存儲狀態等功能
+包含市場機制識別、Fear & Greed 指數、多時間框架趨勢分析
 """
 
-from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Request
 from typing import List, Optional, Dict, Any
 import asyncio
 import logging
-from datetime import datetime
+import numpy as np
+from datetime import datetime, timedelta
 
 from app.services.realtime_technical_analysis import RealTimeTechnicalAnalysis
 from app.services.enhanced_data_storage import EnhancedDataStorage
@@ -20,22 +22,115 @@ logger = logging.getLogger(__name__)
 enhanced_storage = EnhancedDataStorage()
 realtime_analysis = None  # 將在 startup 時初始化
 
+class MarketRegimeAnalyzer:
+    """市場機制分析器"""
+    
+    @staticmethod
+    def analyze_market_regime(price_data: Dict[str, Any]) -> str:
+        """分析市場機制"""
+        try:
+            # 適應不同的價格數據格式
+            if 'price' in price_data:
+                # API 格式
+                current_price = price_data.get('price', 0)
+                high_price = price_data.get('high_24h', current_price)
+                low_price = price_data.get('low_24h', current_price)
+                change_percent = price_data.get('change_percent', 0) / 100
+            else:
+                # WebSocket 格式 (假設有這些欄位)
+                current_price = price_data.get('c', price_data.get('close', 0))
+                high_price = price_data.get('h', price_data.get('high', current_price))
+                low_price = price_data.get('l', price_data.get('low', current_price))
+                open_price = price_data.get('o', price_data.get('open', current_price))
+                change_percent = (current_price - open_price) / open_price if open_price > 0 else 0
+            
+            # 價格波動性分析
+            price_range = (high_price - low_price) / current_price if current_price > 0 else 0
+            
+            # 市場機制判斷邏輯
+            if price_range > 0.05:  # 高波動性
+                if abs(change_percent) > 0.03:
+                    return "震盪市場" if change_percent > 0 else "恐慌性下跌"
+                else:
+                    return "高波動區間"
+            elif change_percent > 0.02:
+                return "牛市趨勢"
+            elif change_percent < -0.02:
+                return "熊市趨勢"
+            else:
+                return "橫盤整理"
+                
+        except Exception as e:
+            logger.error(f"市場機制分析錯誤: {e}")
+            return "正常市場條件"
+
+class FearGreedIndex:
+    """Fear & Greed 指數計算器"""
+    
+    @staticmethod
+    def calculate_fear_greed_index(market_data: Dict[str, Any]) -> Dict[str, Any]:
+        """計算 Fear & Greed 指數"""
+        try:
+            # 基於價格動量、波動性、成交量等因素
+            price_momentum = market_data.get('price_change_24h', 0)
+            volatility = market_data.get('volatility', 0)
+            volume_change = market_data.get('volume_change_24h', 0)
+            
+            # 指數計算 (0-100, 50為中性)
+            momentum_score = min(max((price_momentum + 0.1) * 250, 0), 100)
+            volatility_score = min(max(100 - volatility * 1000, 0), 100)
+            volume_score = min(max((volume_change + 0.2) * 250, 0), 100)
+            
+            # 加權平均
+            fear_greed_score = (momentum_score * 0.4 + volatility_score * 0.3 + volume_score * 0.3)
+            
+            # 分類
+            if fear_greed_score >= 75:
+                sentiment = "極度貪婪"
+            elif fear_greed_score >= 55:
+                sentiment = "貪婪"
+            elif fear_greed_score >= 45:
+                sentiment = "中性"
+            elif fear_greed_score >= 25:
+                sentiment = "恐懼"
+            else:
+                sentiment = "極度恐懼"
+            
+            return {
+                "score": round(fear_greed_score, 2),
+                "sentiment": sentiment,
+                "components": {
+                    "momentum_score": round(momentum_score, 2),
+                    "volatility_score": round(volatility_score, 2),
+                    "volume_score": round(volume_score, 2)
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Fear & Greed 指數計算錯誤: {e}")
+            return {
+                "score": 50.0,
+                "sentiment": "中性",
+                "components": {
+                    "momentum_score": 50.0,
+                    "volatility_score": 50.0,
+                    "volume_score": 50.0
+                }
+            }
+
 @router.post("/start-realtime-analysis")
 async def start_realtime_analysis(
+    request: Request,
     symbols: List[str] = Query(..., description="交易對列表"),
     timeframes: List[str] = Query(default=["1m", "5m", "15m", "1h"], description="時間框架列表")
 ):
     """啟動即時技術分析"""
     try:
         global realtime_analysis
-        
         if realtime_analysis is None:
-            from main import app
-            market_service: MarketDataService = app.state.market_service
+            market_service: MarketDataService = request.app.state.market_service
             realtime_analysis = RealTimeTechnicalAnalysis(market_service)
-        
         await realtime_analysis.start_realtime_analysis(symbols, timeframes)
-        
         return {
             "success": True,
             "message": "即時技術分析已啟動",
@@ -43,7 +138,6 @@ async def start_realtime_analysis(
             "timeframes": timeframes,
             "timestamp": datetime.now().isoformat()
         }
-        
     except Exception as e:
         logger.error(f"啟動即時技術分析失敗: {e}")
         raise HTTPException(status_code=500, detail=f"啟動即時技術分析失敗: {str(e)}")
@@ -159,6 +253,87 @@ async def get_multi_timeframe_analysis(
     except Exception as e:
         logger.error(f"獲取多時間框架分析失敗: {e}")
         raise HTTPException(status_code=500, detail=f"獲取多時間框架分析失敗: {str(e)}")
+
+@router.get("/market-regime/{symbol}")
+async def get_market_regime_analysis(symbol: str, request: Request):
+    """獲取市場機制分析"""
+    try:
+        global realtime_analysis
+        
+        if realtime_analysis is None:
+            raise HTTPException(status_code=503, detail="即時分析服務未啟動")
+        
+        # 獲取最新價格數據
+        market_service: MarketDataService = request.app.state.market_service
+        price_data = await market_service.get_realtime_price(symbol.upper())
+        
+        if not price_data:
+            raise HTTPException(status_code=404, detail=f"找不到 {symbol} 的價格數據")
+        
+        # 分析市場機制
+        market_regime = MarketRegimeAnalyzer.analyze_market_regime(price_data)
+        
+        # 獲取額外的市場指標
+        indicators = await realtime_analysis.get_current_indicators(symbol.upper(), "1h")
+        
+        return {
+            "success": True,
+            "data": {
+                "symbol": symbol.upper(),
+                "market_regime": market_regime,
+                "price_data": price_data,
+                "indicators_count": len(indicators) if indicators else 0,
+                "analysis_timestamp": datetime.now().isoformat()
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"獲取市場機制分析失敗: {e}")
+        raise HTTPException(status_code=500, detail=f"獲取市場機制分析失敗: {str(e)}")
+
+@router.get("/fear-greed-index/{symbol}")
+async def get_fear_greed_index(symbol: str, request: Request):
+    """獲取 Fear & Greed 指數"""
+    try:
+        global realtime_analysis
+        
+        if realtime_analysis is None:
+            raise HTTPException(status_code=503, detail="即時分析服務未啟動")
+        
+        # 獲取市場數據
+        market_service: MarketDataService = request.app.state.market_service
+        # 獲取24小時價格變化數據
+        current_price = await market_service.get_realtime_price(symbol.upper())
+        if not current_price:
+            raise HTTPException(status_code=404, detail=f"找不到 {symbol} 的價格數據")
+        
+        # 模擬24小時數據變化 (實際應用中應該從歷史數據計算)
+        market_data = {
+            "price_change_24h": current_price.get('change_percent', 0) / 100 if 'change_percent' in current_price else 0,
+            "volatility": abs(current_price.get('high_24h', 0) - current_price.get('low_24h', 0)) / current_price.get('price', 1) if 'price' in current_price else 0,
+            "volume_change_24h": 0.05  # 模擬數據，實際應從歷史數據計算
+        }
+        
+        # 計算 Fear & Greed 指數
+        fear_greed_result = FearGreedIndex.calculate_fear_greed_index(market_data)
+        
+        return {
+            "success": True,
+            "data": {
+                "symbol": symbol.upper(),
+                "fear_greed_index": fear_greed_result,
+                "market_data": market_data,
+                "analysis_timestamp": datetime.now().isoformat()
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"獲取 Fear & Greed 指數失敗: {e}")
+        raise HTTPException(status_code=500, detail=f"獲取 Fear & Greed 指數失敗: {str(e)}")
 
 @router.get("/analysis-status")
 async def get_analysis_status():

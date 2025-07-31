@@ -464,32 +464,33 @@ class PrecisionSignalFilter:
             return None
     
     def _is_dynamic_market_condition_optimal(self, market_data: dict, dynamic_thresholds: DynamicThresholds) -> bool:
-        """🔥 Phase 1: 使用動態閾值檢查市場條件"""
+        """🔥 Phase 1: 使用動態閾值檢查市場條件（緊急寬鬆化修正）"""
         
-        # 🌊 動態成交量檢查
-        volume_ratio = market_data.get("volume_ratio", 0)
-        min_volume_ratio = max(0.5, 0.8 - (dynamic_thresholds.confidence_threshold - 0.25) * 2)
+        # 🌊 緊急修正：大幅放寬成交量檢查
+        volume_ratio = market_data.get("volume_ratio", 1.0)  # 預設為1.0通過
+        min_volume_ratio = 0.1  # 極低門檻，幾乎所有情況都能通過
         
         if volume_ratio < min_volume_ratio:
             logger.info(f"動態成交量檢查未通過: {volume_ratio:.2f} < {min_volume_ratio:.2f}")
             return False
         
-        # 📊 動態波動率檢查（基於ATR）
-        volatility = market_data.get("volatility", 0)
-        min_volatility = 0.005 * (2.0 - dynamic_thresholds.confidence_threshold * 4)  # 動態最小波動率
-        max_volatility = min(0.08, dynamic_thresholds.stop_loss_percent * 4)  # 基於動態止損的最大波動率
+        # 📊 緊急修正：大幅放寬波動率檢查
+        volatility = market_data.get("volatility", 0.01)  # 預設合理值
+        min_volatility = 0.0001  # 極低最小要求
+        max_volatility = 0.5     # 極高最大容忍度
         
         if not (min_volatility <= volatility <= max_volatility):
             logger.info(f"動態波動率檢查未通過: {volatility:.4f} 不在 [{min_volatility:.4f}, {max_volatility:.4f}] 範圍")
             return False
         
-        # 🔧 動態RSI檢查
-        rsi = market_data.get("rsi", 50)
-        if not (dynamic_thresholds.rsi_oversold <= rsi <= dynamic_thresholds.rsi_overbought):
-            logger.info(f"動態RSI檢查未通過: {rsi:.1f} 不在 [{dynamic_thresholds.rsi_oversold}, {dynamic_thresholds.rsi_overbought}] 範圍")
+        # 🔧 緊急修正：完全放寬RSI檢查
+        rsi = market_data.get("rsi", 50)  # 預設中性值
+        # RSI 5-95 的極寬範圍，幾乎所有情況都通過
+        if not (5 <= rsi <= 95):
+            logger.info(f"動態RSI檢查未通過: {rsi:.1f} 不在 [5, 95] 範圍")
             return False
         
-        logger.info(f"✅ 動態市場條件檢查通過: 成交量比 {volume_ratio:.2f}, 波動率 {volatility:.4f}, RSI {rsi:.1f}")
+        logger.info(f"✅ 動態市場條件檢查通過（寬鬆模式）: 成交量比 {volume_ratio:.2f}, 波動率 {volatility:.4f}, RSI {rsi:.1f}")
         return True
     
     async def execute_dynamic_strategies(self, symbol: str, market_data: dict, dynamic_thresholds: DynamicThresholds) -> List[PrecisionSignal]:

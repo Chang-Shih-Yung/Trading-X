@@ -1101,16 +1101,20 @@ async def get_pandas_ta_direct_signals():
                 signal_type = best_signal.get('signal_type', 'NEUTRAL')
                 confidence = best_signal.get('confidence', 0)
                 
-                # 🔥 Phase 2: 機制適應性信心度閾值
+                # 🔥 Phase 2: 機制適應性信心度閾值（更寬鬆的調整）
                 regime_threshold_adjustment = 1.0
                 if market_state.market_regime == "BULL_TREND":
-                    regime_threshold_adjustment = 0.9  # 牛市降低門檻
+                    regime_threshold_adjustment = 0.85  # 牛市降低門檻更多
                 elif market_state.market_regime == "BEAR_TREND":
-                    regime_threshold_adjustment = 1.1  # 熊市提高門檻
+                    regime_threshold_adjustment = 0.95  # 熊市只輕微提高門檻
                 elif market_state.market_regime == "VOLATILE":
-                    regime_threshold_adjustment = 1.2  # 高波動提高門檻
+                    regime_threshold_adjustment = 1.05  # 高波動只輕微提高門檻
+                elif market_state.market_regime in ["SIDEWAYS", "ACCUMULATION"]:
+                    regime_threshold_adjustment = 0.90  # 橫盤市場降低門檻
                 
                 adapted_threshold = dynamic_thresholds.confidence_threshold * regime_threshold_adjustment
+                adapted_threshold = max(adapted_threshold, 0.15)  # 最低不低於15%
+                adapted_threshold = min(adapted_threshold, 0.40)  # 最高不超過40%
                 
                 if signal_type == 'NEUTRAL' or confidence < adapted_threshold:
                     logger.info(f"⚠️ {symbol} 信號未達機制適應閾值: {signal_type} "
