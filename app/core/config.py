@@ -73,6 +73,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"  # 忽略額外的環境變數
 
 # 創建設定實例
 settings = Settings()

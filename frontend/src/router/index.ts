@@ -32,7 +32,7 @@ const router = createRouter({
         {
             path: '/market',
             name: 'Market',
-            component: () => import('@/views/Market.vue')
+            component: () => import('@/views/Market_New.vue')
         },
         {
             path: '/news',
@@ -53,6 +53,11 @@ const router = createRouter({
             path: '/trading-strategy',
             name: 'TradingStrategy',
             component: () => import('@/views/TradingStrategy.vue')
+        },
+        {
+            path: '/sniper-strategy',
+            name: 'SniperStrategy',
+            component: () => import('@/views/TradingStrategySniperIntegrated.vue')
         }
     ]
 })

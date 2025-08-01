@@ -38,36 +38,26 @@ class ConnectionManager:
 
     async def send_personal_message(self, message: str, websocket: WebSocket):
         try:
-            # 檢查連接狀態
-            if websocket.client_state.name != "CONNECTED":
-                logger.warning(f"嘗試向已斷開的連接發送消息，狀態: {websocket.client_state.name}")
-                self.disconnect(websocket)
-                return
-                
+            # 簡化狀態檢查，直接嘗試發送
             await websocket.send_text(message)
         except Exception as e:
-            logger.error(f"發送個人消息失敗: {e}")
-            # 移除無效連接
+            # 只有在發送失敗時才移除連接
+            logger.debug(f"發送個人消息失敗，移除連接: {e}")
             self.disconnect(websocket)
 
     async def broadcast(self, message: str):
         """廣播消息到所有連接的客戶端，自動清理斷開的連接"""
         disconnected = []
         
+        # 使用 copy() 避免在迭代時修改列表
         for connection in self.active_connections.copy():
             try:
-                # 檢查連接狀態
-                if connection.client_state.name != "CONNECTED":
-                    logger.debug(f"跳過已斷開的連接，狀態: {connection.client_state.name}")
-                    disconnected.append(connection)
-                    continue
-                    
                 await connection.send_text(message)
             except Exception as e:
-                logger.error(f"廣播消息失敗: {e}")
+                logger.debug(f"廣播消息失敗，標記連接移除: {e}")
                 disconnected.append(connection)
         
-        # 清理斷開的連接
+        # 批量清理斷開的連接
         for conn in disconnected:
             self.disconnect(conn)
             
@@ -143,25 +133,18 @@ class ConnectionManager:
         
         for connection in self.active_connections.copy():
             try:
-                # 檢查連接狀態
-                if connection.client_state.name != "CONNECTED":
-                    logger.debug(f"發現已斷開的連接，狀態: {connection.client_state.name}")
-                    disconnected.append(connection)
-                    continue
-                
-                # 對於看似連接的，嘗試發送ping來進一步驗證
-                await connection.ping()
-                
-            except Exception as e:
-                # 連接無效，移除
-                logger.debug(f"連接ping失敗: {e}")
+                # 簡化連接驗證，只嘗試ping
+                await asyncio.wait_for(connection.ping(), timeout=2.0)
+            except Exception:
+                # ping失敗表示連接無效
                 disconnected.append(connection)
         
         # 清理無效連接
         for conn in disconnected:
             self.disconnect(conn)
                 
-        logger.info(f"清理完成，當前有效連接數: {len(self.active_connections)}")
+        if disconnected:
+            logger.info(f"清理了 {len(disconnected)} 個無效連接，當前有效連接數: {len(self.active_connections)}")
         
     def get_connection_stats(self):
         """獲取連接統計信息"""
@@ -385,13 +368,27 @@ async def websocket_endpoint(websocket: WebSocket):
             websocket
         )
         
+        # 主要的消息接收循環
         while True:
-            # 接收客戶端消息
             try:
-                # 設置超時以避免無限等待
+                # 接收客戶端消息，設置合理超時
                 data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
-                message = json.loads(data)
                 
+                # 解析JSON消息
+                try:
+                    message = json.loads(data)
+                except json.JSONDecodeError:
+                    await manager.send_personal_message(
+                        json.dumps({
+                            "type": "error",
+                            "message": "無效的JSON格式",
+                            "timestamp": datetime.now().isoformat()
+                        }),
+                        websocket
+                    )
+                    continue
+                
+                # 處理不同類型的消息
                 if message.get("action") == "subscribe":
                     symbols = message.get("symbols", [])
                     manager.symbol_subscriptions[websocket] = symbols
@@ -399,7 +396,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     # 發送訂閱確認
                     await manager.send_personal_message(
                         json.dumps({
-                            "type": "subscription_confirmed",
+                            "type": "subscription_confirmed", 
                             "symbols": symbols,
                             "timestamp": datetime.now().isoformat()
                         }),
@@ -441,9 +438,9 @@ async def websocket_endpoint(websocket: WebSocket):
                         }),
                         websocket
                     )
-                
+                    
             except asyncio.TimeoutError:
-                # 發送心跳包保持連接
+                # 超時，發送心跳包
                 try:
                     await manager.send_personal_message(
                         json.dumps({
@@ -452,44 +449,43 @@ async def websocket_endpoint(websocket: WebSocket):
                         }),
                         websocket
                     )
-                except:
+                except Exception:
+                    # 心跳失敗說明連接已斷開
                     break
                     
-            except json.JSONDecodeError:
-                await manager.send_personal_message(
-                    json.dumps({
-                        "type": "error",
-                        "message": "無效的JSON格式",
-                        "timestamp": datetime.now().isoformat()
-                    }),
-                    websocket
-                )
+            except WebSocketDisconnect:
+                # 客戶端主動斷開連接
+                break
+                
             except Exception as e:
-                logger.error(f"處理WebSocket消息錯誤: {e}")
-                # 發送錯誤消息但不斷開連接
-                try:
-                    await manager.send_personal_message(
-                        json.dumps({
-                            "type": "error",
-                            "message": f"處理消息時發生錯誤: {str(e)}",
-                            "timestamp": datetime.now().isoformat()
-                        }),
-                        websocket
-                    )
-                except:
+                # 檢查是否是連接斷開相關的錯誤
+                error_msg = str(e).lower()
+                if any(keyword in error_msg for keyword in ['disconnect', 'closed', 'cannot call', 'connection']):
+                    logger.debug(f"WebSocket連接斷開: {e}")
                     break
+                else:
+                    # 其他錯誤，記錄但繼續處理
+                    logger.error(f"處理WebSocket消息錯誤: {e}")
+                    try:
+                        await manager.send_personal_message(
+                            json.dumps({
+                                "type": "error",
+                                "message": f"處理消息時發生錯誤: {str(e)}",
+                                "timestamp": datetime.now().isoformat()
+                            }),
+                            websocket
+                        )
+                    except Exception:
+                        # 發送錯誤消息失敗，說明連接已斷開
+                        break
                 
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
         logger.info("WebSocket 客戶端正常斷開連接")
     except Exception as e:
-        logger.error(f"WebSocket 錯誤: {e}")
+        logger.error(f"WebSocket 處理錯誤: {e}")
+    finally:
+        # 確保連接被正確清理
         manager.disconnect(websocket)
-        # 嘗試發送斷開連接通知
-        try:
-            await websocket.close(code=1000, reason="服務器錯誤")
-        except:
-            pass
 
 @router.get("/status")
 async def get_realtime_status():
@@ -526,9 +522,9 @@ async def broadcast_price_updates():
     
     while True:
         try:
-            # 每12次廣播（1分鐘）執行一次連接清理
+            # 每6次廣播（1分鐘）執行一次連接清理
             cleanup_counter += 1
-            if cleanup_counter >= 12:
+            if cleanup_counter >= 6:
                 await manager.cleanup_invalid_connections()
                 cleanup_counter = 0
             
@@ -548,11 +544,11 @@ async def broadcast_price_updates():
                     
                     await manager.broadcast(message)
             
-            await asyncio.sleep(5)  # 每5秒廣播一次
+            await asyncio.sleep(10)  # 每10秒廣播一次，降低頻率
             
         except Exception as e:
             logger.error(f"廣播價格更新錯誤: {e}")
-            await asyncio.sleep(10)
+            await asyncio.sleep(15)  # 錯誤時延長等待時間
 
 # 啟動背景廣播任務（在應用啟動時調用）
 def start_broadcast_task():
