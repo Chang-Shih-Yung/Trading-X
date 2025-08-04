@@ -1321,10 +1321,17 @@ const getTimeframeDisplay = (strategy: any) => {
     timeframeText = '長線'
   }
 
-  // 顯示實際的過期時間
-  const timeDisplay = expiry_hours >= 24 ?
-    `${Math.round(expiry_hours / 24 * 10) / 10}天` :
-    `${Math.round(expiry_hours * 10) / 10}小時`
+  // 🎯 顯示實際的過期時間（小時+分鐘）
+  let timeDisplay = ''
+  if (expiry_hours >= 24) {
+    const days = Math.round(expiry_hours / 24 * 10) / 10
+    const totalMinutes = Math.round(expiry_hours * 60)
+    timeDisplay = `${days}天 (${totalMinutes}分鐘)`
+  } else {
+    const hours = Math.round(expiry_hours * 10) / 10
+    const totalMinutes = Math.round(expiry_hours * 60)
+    timeDisplay = `${hours}小時 (${totalMinutes}分鐘)`
+  }
 
   return `${timeframeText} · ${timeDisplay}`
 }

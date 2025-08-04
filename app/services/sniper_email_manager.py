@@ -42,15 +42,15 @@ class SniperEmailManager:
             return
             
         self.is_running = True
-        logger.info("🚀 啟動 Email 自動掃描 (間隔: 30秒)")
+        logger.info("🚀 啟動 Email 自動掃描 (間隔: 90秒)")
         
         while self.is_running:
             try:
                 await self._scan_and_send_pending_emails()
-                await asyncio.sleep(30)  # 30秒
+                await asyncio.sleep(90)  # 🎯 改為90秒，避免過於頻繁掃描
             except Exception as e:
                 logger.error(f"❌ Email 自動掃描異常: {e}")
-                await asyncio.sleep(30)  # 出錯時等待 30 秒再重試
+                await asyncio.sleep(90)  # 出錯時等待 90 秒再重試
     
     async def stop_auto_scanning(self):
         """停止自動掃描任務"""

@@ -18,6 +18,7 @@ from app.services.pandas_ta_trading_signal_parser import PandasTATradingSignals
 from app.services.realtime_technical_analysis import RealTimeTechnicalAnalysis
 from app.services.candlestick_patterns import analyze_candlestick_patterns
 from app.services.gmail_notification import GmailNotificationService
+from app.services.intelligent_timeframe_classifier import IntelligentTimeframeClassifier
 from app.models.sniper_signal_history import (
     SniperSignalDetails, 
     EmailStatus, 
@@ -107,6 +108,9 @@ class RealtimeSignalEngine:
         try:
             self.market_service = market_service
             self.technical_analysis = RealTimeTechnicalAnalysis(market_service)
+            
+            # 初始化動態時間分類器
+            self.timeframe_classifier = IntelligentTimeframeClassifier()
             
             # 設置默認監控的交易對
             self.monitored_symbols = [
@@ -691,22 +695,81 @@ class RealtimeSignalEngine:
         )
     
     def _calculate_entry_exit(self, current_price: float, signal_type: str, df: pd.DataFrame) -> tuple:
-        """計算進出場點位"""
-        atr = df['high'].rolling(14).max() - df['low'].rolling(14).min()
-        avg_atr = atr.mean()
+        """計算進出場點位 - 使用動態ATR和智能風險管理"""
         
+        # 🎯 使用真實的 ATR 計算動態止損止盈
+        try:
+            # 計算真實 ATR (Average True Range)
+            high = df['high']
+            low = df['low'] 
+            close = df['close'].shift(1)
+            
+            tr1 = high - low
+            tr2 = abs(high - close)
+            tr3 = abs(low - close)
+            
+            true_range = pd.DataFrame({
+                'tr1': tr1,
+                'tr2': tr2, 
+                'tr3': tr3
+            }).max(axis=1)
+            
+            atr = true_range.rolling(window=14).mean().iloc[-1]
+            
+            # 如果 ATR 無效，使用價格的2%作為後備
+            if pd.isna(atr) or atr <= 0:
+                atr = current_price * 0.02
+                
+        except Exception as e:
+            logger.warning(f"ATR計算失敗，使用後備方案: {e}")
+            atr = current_price * 0.02
+        
+        # 🔥 動態風險參數計算
+        volatility = atr / current_price  # 波動率
+        
+        # 根據波動率調整風險參數
+        if volatility > 0.06:  # 高波動
+            stop_loss_multiplier = 1.8
+            take_profit_multiplier = 3.0
+        elif volatility > 0.03:  # 中等波動
+            stop_loss_multiplier = 1.5
+            take_profit_multiplier = 2.5
+        else:  # 低波動
+            stop_loss_multiplier = 1.2
+            take_profit_multiplier = 2.0
+        
+        # 計算止損止盈距離
+        stop_loss_distance = atr * stop_loss_multiplier
+        take_profit_distance = atr * take_profit_multiplier
+        
+        # 限制風險在合理範圍內 (0.5% - 5%)
+        max_risk = current_price * 0.05
+        min_risk = current_price * 0.005
+        stop_loss_distance = max(min_risk, min(stop_loss_distance, max_risk))
+        
+        # 確保盈虧比至少 2:1
+        take_profit_distance = max(take_profit_distance, stop_loss_distance * 2.0)
+        
+        # 🎯 根據信號類型計算實際價格
         if signal_type in ["BUY", "STRONG_BUY"]:
-            entry_price = current_price * 1.001  # 略高於當前價格
-            stop_loss = current_price * 0.97     # 3% 止損
-            take_profit = current_price * 1.06   # 6% 止盈
+            entry_price = current_price * 1.0005  # 略高於當前價格 (滑點)
+            stop_loss = entry_price - stop_loss_distance
+            take_profit = entry_price + take_profit_distance
         elif signal_type in ["SELL", "STRONG_SELL"]:
-            entry_price = current_price * 0.999  # 略低於當前價格
-            stop_loss = current_price * 1.03     # 3% 止損
-            take_profit = current_price * 0.94   # 6% 止盈
-        else:
+            entry_price = current_price * 0.9995  # 略低於當前價格 (滑點)
+            stop_loss = entry_price + stop_loss_distance
+            take_profit = entry_price - take_profit_distance
+        else:  # HOLD
             entry_price = current_price
-            stop_loss = current_price * 0.95
-            take_profit = current_price * 1.05
+            stop_loss = current_price - stop_loss_distance
+            take_profit = current_price + take_profit_distance
+        
+        # 🛡️ 確保價格為正數
+        stop_loss = max(0.000001, stop_loss)
+        take_profit = max(0.000001, take_profit)
+        
+        logger.debug(f"💰 動態價格計算: ATR={atr:.6f}, 波動率={volatility:.3%}, "
+                    f"止損距離={stop_loss_distance:.6f}, 止盈距離={take_profit_distance:.6f}")
         
         return entry_price, stop_loss, take_profit
     
@@ -765,19 +828,48 @@ class RealtimeSignalEngine:
     async def _save_to_sniper_database(self, signal: TradingSignalAlert) -> Optional[str]:
         """儲存信號到狙擊手資料庫 - 返回 signal_id"""
         try:
-            # 生成唯一信號ID
-            signal_id = f"{signal.symbol}_{signal.timeframe}_{int(signal.timestamp.timestamp())}"
+            # 🎯 改進信號ID生成 - 加入信號特徵避免重複
+            price_hash = str(int(signal.entry_price * 10000))  # 價格特徵
+            confidence_hash = str(int(signal.confidence * 1000))  # 信心度特徵
+            signal_id = f"{signal.symbol}_{signal.timeframe}_{price_hash}_{confidence_hash}_{int(signal.timestamp.timestamp())}"
             
-            # 防重複檢查
+            # 防重複檢查 - 檢查信號ID和相似價格
             async with AsyncSessionLocal() as session:
+                # 檢查相同信號ID
                 existing = await session.execute(
                     select(SniperSignalDetails).where(
                         SniperSignalDetails.signal_id == signal_id
                     )
                 )
                 if existing.scalar_one_or_none():
-                    logger.warning(f"⚠️ 信號已存在，跳過: {signal_id}")
+                    logger.warning(f"⚠️ 信號ID已存在，跳過: {signal_id}")
                     return signal_id
+                
+                # 🎯 檢查相同幣種和相近價格的信號（最近10分鐘內）
+                from app.utils.timezone_utils import get_taiwan_now
+                ten_minutes_ago = get_taiwan_now() - timedelta(minutes=10)
+                price_tolerance = 0.02  # 2%價格容忍度（更寬鬆）
+                
+                similar_signals = await session.execute(
+                    select(SniperSignalDetails).where(
+                        SniperSignalDetails.symbol == signal.symbol,
+                        SniperSignalDetails.signal_type == signal.signal_type,
+                        SniperSignalDetails.created_at >= ten_minutes_ago,
+                        SniperSignalDetails.status == SignalStatus.ACTIVE
+                    )
+                )
+                
+                # 手動檢查價格相似度
+                for existing_signal in similar_signals.scalars():
+                    price_diff = abs(existing_signal.entry_price - signal.entry_price) / signal.entry_price
+                    if price_diff <= price_tolerance:
+                        logger.warning(f"⚠️ 發現相似信號，跳過重複: {signal.symbol} 新價格:{signal.entry_price} vs 已有:{existing_signal.entry_price} (差異:{price_diff:.4f})")
+                        return signal_id
+                
+                # 🎯 動態時間計算 - 整合 Phase 1ABC + Phase 1+2+3 系統
+                logger.info(f"🎯 開始為 {signal.symbol} 計算動態過期時間...")
+                dynamic_hours = await self._calculate_dynamic_expiry_time(signal)
+                logger.info(f"✅ {signal.symbol} 動態時間計算完成: {dynamic_hours}小時")
                 
                 # 映射時間框架和品質
                 timeframe_map = {
@@ -807,13 +899,13 @@ class RealtimeSignalEngine:
                     confluence_count=3,  # 基於技術指標數量
                     signal_quality=quality_map.get(signal.urgency, SignalQuality.MEDIUM),
                     timeframe=timeframe_map.get(signal.timeframe, TradingTimeframe.MEDIUM_TERM),
-                    expiry_hours=24,
+                    expiry_hours=dynamic_hours,
                     risk_reward_ratio=signal.risk_reward_ratio,
                     market_volatility=0.15,  # 可以後續從市場數據獲取
                     atr_value=100.0,  # 可以後續從市場數據獲取
                     market_regime="BULL",  # 可以後續添加市場判斷邏輯
                     created_at=get_taiwan_now(),
-                    expires_at=get_taiwan_now() + timedelta(hours=24),
+                    expires_at=get_taiwan_now() + timedelta(hours=dynamic_hours),
                     status=SignalStatus.ACTIVE,
                     email_status=EmailStatus.PENDING,  # 🎯 自動觸發郵件發送
                     email_retry_count=0,
@@ -937,6 +1029,89 @@ class RealtimeSignalEngine:
                 for key, data in self.last_signals.items()
             }
         }
+    
+    async def _calculate_dynamic_expiry_time(self, signal: TradingSignalAlert) -> float:
+        """
+        🎯 動態時間計算 - 調用 sniper_smart_layer 的計算方法
+        """
+        try:
+            logger.info(f"🔧 計算 {signal.symbol} 動態過期時間...")
+            
+            from app.services.sniper_smart_layer import SniperSmartLayerSystem
+            from app.services.intelligent_timeframe_classifier import TimeframeCategory
+            
+            # 準備分析結果
+            analysis_result = {
+                'symbol': signal.symbol,
+                'confidence': signal.confidence,
+                'technical_strength': signal.confidence,  # 使用confidence作為技術強度
+                'market_conditions': 0.7,  # 中性市場條件
+                'indicator_count': 3,  # 基礎指標數量
+                'precision': signal.confidence,
+                'risk_reward_ratio': signal.risk_reward_ratio
+            }
+            
+            # 映射時間框架到類別
+            category_map = {
+                '1m': TimeframeCategory.SHORT,
+                '5m': TimeframeCategory.SHORT, 
+                '15m': TimeframeCategory.SHORT,
+                '30m': TimeframeCategory.MEDIUM,
+                '1h': TimeframeCategory.MEDIUM,
+                '4h': TimeframeCategory.MEDIUM,
+                '1d': TimeframeCategory.LONG,
+                '1w': TimeframeCategory.LONG
+            }
+            
+            timeframe_category = category_map.get(signal.timeframe, TimeframeCategory.MEDIUM)
+            logger.info(f"📊 {signal.symbol} 時間框架類別: {timeframe_category.value}")
+            
+            # 基於信心度計算品質評分
+            quality_score = self._calculate_quality_score(signal)
+            logger.info(f"⭐ {signal.symbol} 品質評分: {quality_score}")
+            
+            # 🎯 調用sniper_smart_layer的動態時間計算
+            sniper_system = SniperSmartLayerSystem()
+            expires_at = sniper_system._calculate_dynamic_expiry(
+                category=timeframe_category,
+                quality_score=quality_score,
+                analysis_result=analysis_result
+            )
+            
+            # 計算小時數
+            from app.utils.timezone_utils import get_taiwan_now
+            time_diff = expires_at - get_taiwan_now()
+            dynamic_hours = time_diff.total_seconds() / 3600
+            
+            logger.info(f"🎯 {signal.symbol} 動態時間計算結果: {timeframe_category.value} → {dynamic_hours:.1f}小時")
+            return dynamic_hours
+            
+        except Exception as e:
+            logger.error(f"❌ {signal.symbol} 動態時間計算失敗: {e}")
+            import traceback
+            logger.error(f"錯誤詳情: {traceback.format_exc()}")
+            return 24.0  # 回退到默認值
+    
+    def _calculate_quality_score(self, signal: TradingSignalAlert) -> float:
+        """計算品質評分 (4-10分)"""
+        base_score = 5.0  # 基礎分
+        
+        # 基於信心度調整
+        confidence_bonus = (signal.confidence - 0.5) * 4  # 0.5-1.0 → 0-2分
+        
+        # 基於風險回報比調整  
+        rr_bonus = min(2.0, signal.risk_reward_ratio - 1.0)  # RR>1時加分
+        
+        # 基於急迫性調整
+        urgency_bonus = {
+            'low': 0,
+            'medium': 1,
+            'high': 2,
+            'critical': 3
+        }.get(signal.urgency, 1)
+        
+        total_score = base_score + confidence_bonus + rr_bonus + urgency_bonus
+        return max(4.0, min(10.0, total_score))  # 限制在4-10分
 
 # 全局實例
 realtime_signal_engine = RealtimeSignalEngine()

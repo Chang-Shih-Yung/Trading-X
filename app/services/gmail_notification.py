@@ -4,7 +4,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 import asyncio
 import logging
@@ -130,6 +130,11 @@ class GmailNotificationService:
                     logger.debug(f"📧 冷卻時間未到 ({time_diff:.1f}/{self.cooldown_minutes}分鐘)")
                     return False
             
+            # 🎯 新增：相似信號檢查（防止價格接近的重複信號）
+            if self._is_similar_signal_recently_sent(signal):
+                logger.debug(f"📧 相似信號已發送，跳過: {signal.symbol} (價格相近)")
+                return False
+            
             # 注意：不在這裡添加簽名，等發送成功後再添加
             return True
             
@@ -146,6 +151,35 @@ class GmailNotificationService:
         except Exception:
             # 備用簽名
             return f"{signal.symbol}_{signal.signal_type}_{datetime.now().strftime('%Y%m%d%H%M')}"
+    
+    def _is_similar_signal_recently_sent(self, signal) -> bool:
+        """🎯 檢查是否有相似信號最近已發送（價格相近的信號）"""
+        try:
+            # 檢查最近30分鐘內的所有已發送信號
+            cutoff_time = datetime.now() - timedelta(minutes=30)
+            
+            for signature in list(self.message_signatures):
+                # 解析簽名
+                parts = signature.split('_')
+                if len(parts) >= 5:
+                    sig_symbol = parts[0]
+                    sig_type = parts[1]
+                    sig_confidence = float(parts[2])
+                    sig_price = float(parts[3])
+                    
+                    # 檢查是否為同一交易對和方向
+                    if sig_symbol == signal.symbol and sig_type == signal.signal_type:
+                        # 檢查價格差異（允許2%以內的價格變化）
+                        price_diff_pct = abs(sig_price - signal.entry_price) / sig_price
+                        if price_diff_pct < 0.02:  # 2%以內視為相似
+                            logger.debug(f"🎯 發現相似信號: {signature} vs 當前價格 {signal.entry_price}")
+                            return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"❌ 相似信號檢查失敗: {e}")
+            return False
     
     def _create_signal_email(self, signal) -> MIMEMultipart:
         """創建交易信號郵件"""

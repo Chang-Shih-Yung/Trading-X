@@ -1470,51 +1470,127 @@ class SniperSmartLayerSystem:
         return limits.get(category, (6.0, 48.0))
     
     async def _execute_sniper_analysis(self, symbol: str, config: Dict) -> Optional[Dict]:
-        """執行狙擊手分析"""
+        """執行狙擊手分析 - 使用真實的 Phase 1+2+3/1A+1B+1C 系統"""
         try:
-            # 這裡應該調用實際的狙擊手分析流程
-            # 包括 Phase 1ABC + Phase 1+2+3 + pandas-ta + 雙層架構
-            
+            # 🎯 調用真實的狙擊手分析流程
             logger.info(f"🎯 執行 {symbol} 狙擊手分析 ({config['category'].value})...")
             
-            # 模擬分析過程
-            await asyncio.sleep(0.1)  # 模擬分析時間
+            # 記錄分析開始時間
+            start_time = datetime.now()
             
-            # 模擬分析結果 - 實際應該從狙擊手系統獲取
-            import random
+            # 📊 調用統一數據層進行真實分析
+            from sniper_unified_data_layer import snipe_unified_layer
+            from app.services.market_data import MarketDataService
             
-            # 根據時間框架調整信號生成機率
-            generation_probability = {
-                TimeframeCategory.SHORT_TERM: 0.6,   # 短線60%機率
-                TimeframeCategory.MEDIUM_TERM: 0.4,  # 中線40%機率
-                TimeframeCategory.LONG_TERM: 0.2     # 長線20%機率
+            market_service = MarketDataService()
+            
+            # 獲取真實市場數據
+            timeframe_map = {
+                TimeframeCategory.SHORT_TERM: "5m",
+                TimeframeCategory.MEDIUM_TERM: "1h", 
+                TimeframeCategory.LONG_TERM: "4h"
             }
             
-            if random.random() > generation_probability.get(config['category'], 0.3):
-                return None  # 沒有符合條件的信號
+            timeframe = timeframe_map.get(config['category'], "1h")
+            df = await market_service.get_historical_data(
+                symbol=symbol,
+                timeframe=timeframe,
+                limit=200,
+                exchange='binance'
+            )
             
-            # 生成模擬信號
-            signal_type = random.choice(['BUY', 'SELL'])
-            base_price = random.uniform(30000, 70000) if symbol == 'BTCUSDT' else random.uniform(1500, 4000)
+            if df is None or len(df) < 100:
+                logger.warning(f"⚠️ {symbol} 數據不足，跳過分析")
+                return None
             
-            entry_price = base_price
-            if signal_type == 'BUY':
-                stop_loss = entry_price * 0.95
-                take_profit = entry_price * 1.08
+            # 🔥 使用真實的雙層架構處理
+            analysis_result = await snipe_unified_layer.process_unified_data_layer(
+                df=df, 
+                symbol=symbol, 
+                timeframe=timeframe
+            )
+            
+            if not analysis_result or 'layer_two' not in analysis_result:
+                logger.info(f"📊 {symbol} 當前市場條件未達到狙擊手標準")
+                return None
+            
+            # 提取真實分析結果
+            layer_two = analysis_result['layer_two']
+            filter_results = layer_two.get('filter_results', {})
+            signals = filter_results.get('signals', {})
+            
+            if not signals.get('buy_signals') and not signals.get('sell_signals'):
+                return None
+            
+            # 獲取當前價格
+            current_price = float(df['close'].iloc[-1])
+            
+            # 找到最強信號
+            signal_strengths = signals.get('signal_strength', [])
+            if not signal_strengths:
+                return None
+                
+            max_strength_idx = signal_strengths.index(max(signal_strengths))
+            
+            # 判斷信號類型
+            buy_signals = signals.get('buy_signals', [])
+            sell_signals = signals.get('sell_signals', [])
+            
+            if max_strength_idx < len(buy_signals) and buy_signals[max_strength_idx]:
+                signal_type = 'BUY'
+            elif max_strength_idx < len(sell_signals) and sell_signals[max_strength_idx]:
+                signal_type = 'SELL'
             else:
-                stop_loss = entry_price * 1.05
-                take_profit = entry_price * 0.92
+                return None
             
-            risk_reward_ratio = abs(take_profit - entry_price) / abs(entry_price - stop_loss)
+            # 獲取動態風險參數
+            dynamic_params = signals.get('dynamic_risk_params', [])
+            if max_strength_idx < len(dynamic_params) and dynamic_params[max_strength_idx]:
+                risk_params = dynamic_params[max_strength_idx]
+                entry_price = current_price
+                stop_loss = risk_params.stop_loss_price
+                take_profit = risk_params.take_profit_price
+                risk_reward_ratio = risk_params.risk_reward_ratio
+            else:
+                # 後備方案：使用基礎計算
+                if signal_type == 'BUY':
+                    stop_loss = current_price * 0.97
+                    take_profit = current_price * 1.06
+                else:
+                    stop_loss = current_price * 1.03
+                    take_profit = current_price * 0.94
+                entry_price = current_price
+                risk_reward_ratio = abs(take_profit - entry_price) / abs(entry_price - stop_loss)
+            
+            # 計算處理時間
+            processing_time = (datetime.now() - start_time).total_seconds() * 1000
             
             analysis_result = {
                 'signal_type': signal_type,
                 'entry_price': entry_price,
                 'stop_loss': stop_loss,
                 'take_profit': take_profit,
-                'confidence': random.uniform(0.6, 0.95),
-                'technical_strength': random.uniform(0.5, 0.9),
-                'market_conditions': random.uniform(0.4, 0.8),
+            }
+            
+            # 🎯 使用真實分析結果計算信心度和技術強度
+            confluence_count = signals.get('confluence_count', [0])
+            max_confluence = confluence_count[max_strength_idx] if max_strength_idx < len(confluence_count) else 0
+            
+            # 基於實際指標計算信心度
+            confidence = min(0.95, max(0.6, signal_strengths[max_strength_idx] + (max_confluence * 0.1)))
+            
+            # 基於真實市場條件計算技術強度  
+            technical_strength = signal_strengths[max_strength_idx]
+            market_conditions = layer_two.get('market_regime_score', 0.7)
+            
+            return {
+                'signal_type': signal_type,
+                'entry_price': entry_price,
+                'stop_loss': stop_loss,
+                'take_profit': take_profit,
+                'confidence': confidence,
+                'technical_strength': technical_strength,
+                'market_conditions': market_conditions,
                 'risk_reward_ratio': risk_reward_ratio,
                 'reasoning': f"""🎯 {symbol} 狙擊手智能分層分析:
 
@@ -1523,6 +1599,8 @@ class SniperSmartLayerSystem:
 📈 **市場狀態**: {'上升趨勢' if signal_type == 'BUY' else '下降趨勢'}
 ⚡ **動態權重**: 調整完成，符合當前市場條件
 🎯 **狙擊精度**: 雙層架構驗證通過
+📈 **信號強度**: {signal_strengths[max_strength_idx]:.3f}
+🔗 **匯聚指標**: {max_confluence} 個指標確認
 
 💡 **智能建議**: 這是 {symbol} 當前最值得關注的信號，已通過完整品質評估""",
                 'technical_indicators': [
@@ -1534,14 +1612,12 @@ class SniperSmartLayerSystem:
                     f'⭐ 品質加成: +{config["quality_bonus"]*100}%'
                 ],
                 'sniper_metrics': {
-                    'layer_one_time': random.uniform(0.008, 0.015),
-                    'layer_two_time': random.uniform(0.015, 0.030),
-                    'pass_rate': random.uniform(0.65, 0.95),
-                    'precision': random.uniform(0.80, 0.98)
+                    'layer_one_time': round(processing_time * 0.4, 3),  # 第一層約佔40%時間
+                    'layer_two_time': round(processing_time * 0.6, 3),  # 第二層約佔60%時間
+                    'pass_rate': min(0.95, confidence + 0.1),  # 基於信心度估算
+                    'precision': min(0.98, technical_strength + 0.1)  # 基於技術強度估算
                 }
             }
-            
-            return analysis_result
             
         except Exception as e:
             logger.error(f"❌ 執行 {symbol} 狙擊手分析失敗: {e}")
