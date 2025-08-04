@@ -5,6 +5,10 @@ from app.api.v1.endpoints.scalping_precision import router as scalping_precision
 from app.api.v1.endpoints.realtime_market import router as realtime_router
 from app.api.v1.endpoints.enhanced_analysis import router as enhanced_analysis_router
 from app.api.v1.event_coordination import router as event_coordination_router
+from app.api.v1.endpoints.sniper_signal_history import router as sniper_history_router
+from app.api.v1.endpoints.sniper_smart_layer import router as sniper_smart_layer_router
+from app.api.v1.endpoints.sniper_email import router as sniper_email_router
+from app.api.v1.endpoints.sniper_backtest import router as sniper_backtest_router
 
 api_router = APIRouter()
 
@@ -24,3 +28,7 @@ api_router.include_router(smart_timing.router, prefix="/config", tags=["智能�
 api_router.include_router(log_management.router, prefix="/admin", tags=["系統管理-日誌"])  # 新增日誌管理
 api_router.include_router(event_coordination_router, prefix="/event", tags=["事件協調引擎"])  # Phase 3 Week 3
 api_router.include_router(notifications.router, prefix="/notifications", tags=["🎯 狙擊手通知系統"])  # 狙擊手 Email 通知
+api_router.include_router(sniper_history_router, prefix="/sniper", tags=["🎯 狙擊手信號歷史管理"])  # 狙擊手信號歷史管理
+api_router.include_router(sniper_smart_layer_router, prefix="/sniper", tags=["🎯 狙擊手智能層系統"])  # 狙擊手智能分層系統
+api_router.include_router(sniper_email_router, prefix="", tags=["🎯 狙擊手 Email 管理"])  # 狙擊手 Email 管理
+api_router.include_router(sniper_backtest_router, prefix="", tags=["🎯 狙擊手策略回測"])  # 狙擊手回測系統

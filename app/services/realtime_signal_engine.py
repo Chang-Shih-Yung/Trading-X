@@ -1,6 +1,6 @@
 """
 即時信號引擎
-監聽 WebSocket 數據更新，自動觸發 pandas-ta 分析並廣播結果
+監聽 WebSocket 數據流，自動觸發 pandas-ta 分析並廣播結果
 """
 
 import asyncio
@@ -18,7 +18,25 @@ from app.services.pandas_ta_trading_signal_parser import PandasTATradingSignals
 from app.services.realtime_technical_analysis import RealTimeTechnicalAnalysis
 from app.services.candlestick_patterns import analyze_candlestick_patterns
 from app.services.gmail_notification import GmailNotificationService
-from app.utils.time_utils import get_taiwan_now_naive
+from app.models.sniper_signal_history import (
+    SniperSignalDetails, 
+    EmailStatus, 
+    SignalStatus, 
+    SignalQuality, 
+    TradingTimeframe
+)
+from app.core.database import AsyncSessionLocal
+from app.utils.timezone_utils import get_taiwan_now
+from sqlalchemy import select, and_
+from app.models.sniper_signal_history import (
+    SniperSignalDetails, 
+    EmailStatus, 
+    SignalStatus, 
+    SignalQuality, 
+    TradingTimeframe
+)
+from app.core.database import AsyncSessionLocal
+from app.utils.timezone_utils import get_taiwan_now
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +76,7 @@ class RealtimeSignalEngine:
         
         # 配置參數
         self.min_history_points = 200  # 最少歷史數據點
-        self.signal_cooldown = 300  # 信號冷卻時間(秒)
+        self.signal_cooldown = 60  # 信號冷卻時間(秒) - 改為1分鐘
         self.confidence_threshold = 0.65  # 信號信心度閾值
         
         # 運行狀態
@@ -496,21 +514,35 @@ class RealtimeSignalEngine:
             logger.error(f"❌ 更新信號統計失敗: {e}")
     
     async def _should_generate_signal(self, symbol: str, timeframe: str) -> bool:
-        """判斷是否應該生成新信號"""
-        key = f"{symbol}_{timeframe}"
+        """判斷是否應該生成新信號 - 基於資料庫的重複檢查"""
         
         # 檢查服務是否已初始化
         if not self.market_service:
             return False
         
-        # 檢查冷卻時間
-        if key in self.last_signals:
-            last_time = self.last_signals[key].get('timestamp')
-            if last_time:
-                time_diff = (datetime.now() - last_time).total_seconds()
-                if time_diff < self.signal_cooldown:
-                    logger.debug(f"📧 信號冷卻中: {symbol} {timeframe} ({time_diff:.1f}/{self.signal_cooldown}秒)")
+        # 🎯 改為基於資料庫的冷卻檢查（而不是記憶體）
+        try:
+            from datetime import datetime, timedelta
+            cooldown_time = datetime.now() - timedelta(seconds=self.signal_cooldown)
+            
+            async with AsyncSessionLocal() as session:
+                # 檢查最近冷卻時間內是否已有相同交易對的信號
+                recent_signal = await session.execute(
+                    select(SniperSignalDetails).where(
+                        and_(
+                            SniperSignalDetails.symbol == symbol,
+                            SniperSignalDetails.created_at >= cooldown_time
+                        )
+                    ).order_by(SniperSignalDetails.created_at.desc()).limit(1)
+                )
+                
+                if recent_signal.scalar_one_or_none():
+                    logger.debug(f"📧 資料庫冷卻中: {symbol} {timeframe} (最近{self.signal_cooldown}秒內已有信號)")
                     return False
+                
+        except Exception as e:
+            logger.warning(f"檢查信號冷卻失敗 {symbol}: {e}")
+            # 如果檢查失敗，允許生成信號（寧可多生成也不要漏掉）
         
         # 檢查數據充足性
         try:
@@ -654,7 +686,7 @@ class RealtimeSignalEngine:
             indicators_used=indicators_used,
             reasoning=" | ".join(reasoning_parts) if reasoning_parts else "技術指標綜合分析",
             timeframe=timeframe,
-            timestamp=get_taiwan_now_naive(),
+            timestamp=get_taiwan_now(),
             urgency=urgency
         )
     
@@ -690,23 +722,34 @@ class RealtimeSignalEngine:
             return "low"
     
     async def _process_new_signal(self, signal: TradingSignalAlert):
-        """處理新生成的信號"""
+        """處理新生成的信號 - 優化版：直接以資料庫為主"""
         try:
-            # 1. 更新快取
+            # 🎯 第一優先：立即儲存到狙擊手資料庫 (持久化 + 郵件自動發送)
+            db_signal_id = await self._save_to_sniper_database(signal)
+            
+            if not db_signal_id:
+                logger.error(f"❌ 信號儲存失敗，跳過後續處理: {signal.symbol}")
+                return
+            
+            # 📊 更新即時快取 (僅用於快速查詢最新信號)
             key = f"{signal.symbol}_{signal.timeframe}"
-            self.last_signals[key] = asdict(signal)
+            signal_dict = asdict(signal)
+            signal_dict['db_signal_id'] = db_signal_id  # 關聯資料庫ID
+            self.last_signals[key] = signal_dict
             
-            # 2. 添加到歷史記錄
+            # 📈 限制記憶體歷史記錄 (最多保留最近100筆，避免記憶體洩漏)
             self.signal_history.append(signal)
+            if len(self.signal_history) > 100:
+                self.signal_history = self.signal_history[-100:]
             
-            # 3. 執行回調函數
+            # 🔔 執行回調函數 (通知前端等)
             for callback in self.signal_callbacks:
                 try:
                     await callback(signal)
                 except Exception as e:
                     logger.error(f"信號回調執行失敗: {e}")
             
-            # 4. 發送通知
+            # 📧 高優先級信號額外通知
             if signal.urgency in ["high", "critical"]:
                 for callback in self.notification_callbacks:
                     try:
@@ -714,10 +757,82 @@ class RealtimeSignalEngine:
                     except Exception as e:
                         logger.error(f"通知回調執行失敗: {e}")
             
-            logger.info(f"📢 新信號生成: {signal.symbol} {signal.signal_type} (信心度:{signal.confidence:.2f})")
+            logger.info(f"✅ 信號處理完成: {signal.symbol} {signal.signal_type} (DB_ID: {db_signal_id})")
             
         except Exception as e:
-            logger.error(f"處理新信號失敗: {e}")
+            logger.error(f"❌ 處理新信號失敗: {e}")
+    
+    async def _save_to_sniper_database(self, signal: TradingSignalAlert) -> Optional[str]:
+        """儲存信號到狙擊手資料庫 - 返回 signal_id"""
+        try:
+            # 生成唯一信號ID
+            signal_id = f"{signal.symbol}_{signal.timeframe}_{int(signal.timestamp.timestamp())}"
+            
+            # 防重複檢查
+            async with AsyncSessionLocal() as session:
+                existing = await session.execute(
+                    select(SniperSignalDetails).where(
+                        SniperSignalDetails.signal_id == signal_id
+                    )
+                )
+                if existing.scalar_one_or_none():
+                    logger.warning(f"⚠️ 信號已存在，跳過: {signal_id}")
+                    return signal_id
+                
+                # 映射時間框架和品質
+                timeframe_map = {
+                    "1m": TradingTimeframe.SHORT_TERM,
+                    "5m": TradingTimeframe.SHORT_TERM, 
+                    "15m": TradingTimeframe.SHORT_TERM,
+                    "1h": TradingTimeframe.MEDIUM_TERM,
+                    "4h": TradingTimeframe.MEDIUM_TERM,
+                    "1d": TradingTimeframe.LONG_TERM
+                }
+                
+                quality_map = {
+                    "high": SignalQuality.HIGH,
+                    "medium": SignalQuality.MEDIUM,
+                    "low": SignalQuality.LOW
+                }
+                
+                # 創建資料庫記錄
+                sniper_signal = SniperSignalDetails(
+                    signal_id=signal_id,
+                    symbol=signal.symbol,
+                    signal_type=signal.signal_type,
+                    entry_price=signal.entry_price,
+                    stop_loss_price=signal.stop_loss,
+                    take_profit_price=signal.take_profit,
+                    signal_strength=signal.confidence,
+                    confluence_count=3,  # 基於技術指標數量
+                    signal_quality=quality_map.get(signal.urgency, SignalQuality.MEDIUM),
+                    timeframe=timeframe_map.get(signal.timeframe, TradingTimeframe.MEDIUM_TERM),
+                    expiry_hours=24,
+                    risk_reward_ratio=signal.risk_reward_ratio,
+                    market_volatility=0.15,  # 可以後續從市場數據獲取
+                    atr_value=100.0,  # 可以後續從市場數據獲取
+                    market_regime="BULL",  # 可以後續添加市場判斷邏輯
+                    created_at=get_taiwan_now(),
+                    expires_at=get_taiwan_now() + timedelta(hours=24),
+                    status=SignalStatus.ACTIVE,
+                    email_status=EmailStatus.PENDING,  # 🎯 自動觸發郵件發送
+                    email_retry_count=0,
+                    layer_one_time=0.5,
+                    layer_two_time=1.2,
+                    pass_rate=signal.confidence * 100,  # 轉換為百分比
+                    reasoning=f"🎯 實時信號引擎: {signal.symbol} {signal.signal_type} | 信心度: {signal.confidence:.2f} | 使用指標: {', '.join(signal.indicators_used) if hasattr(signal, 'indicators_used') else 'RSI, MACD, EMA'}"
+                )
+                
+                session.add(sniper_signal)
+                await session.commit()
+                
+                logger.info(f"🎯 信號已存入資料庫: {signal_id} (email_status=PENDING)")
+                return signal_id
+                
+        except Exception as e:
+            logger.error(f"❌ 儲存信號到資料庫失敗: {e}")
+            return None
+    
     
     async def _data_cleanup_loop(self):
         """數據清理循環 - 每7天清除一次舊數據"""

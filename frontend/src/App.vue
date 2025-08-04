@@ -5,7 +5,6 @@
         <div class="flex justify-between h-16">
           <div class="flex items-center">
             <h1 class="text-white text-xl font-bold">Trading X</h1>
-            <span class="text-gray-300 ml-2">進階交易策略系統</span>
           </div>
           <div class="flex items-center space-x-4">
             <router-link v-for="item in navigation" :key="item.name" :to="item.href"

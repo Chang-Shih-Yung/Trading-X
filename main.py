@@ -3,14 +3,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import asyncio
 import os
+from dotenv import load_dotenv
 from app.core.config import settings
 from app.api.v1.api import api_router
 from app.core.database import engine, create_tables
 from app.services.market_data import MarketDataService
 from app.services.strategy_engine import StrategyEngine
 from app.services.realtime_signal_engine import RealtimeSignalEngine
+from app.services.sniper_email_manager import SniperEmailManager
 from app.utils.log_manager import start_log_management, stop_log_management
 from app.utils.realtime_log_filter import setup_realtime_logging, disable_noisy_loggers
+
+# 加載環境變數
+load_dotenv()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -24,15 +29,26 @@ async def lifespan(app: FastAPI):
         await create_tables()
         print("✅ 數據庫初始化完成")
         
+        # 🎯 創建狙擊手信號歷史管理表
+        try:
+            from app.models.sniper_signal_history import create_tables_async
+            await create_tables_async(engine)
+            print("✅ 狙擊手信號歷史管理表已就緒")
+        except Exception as e:
+            print(f"⚠️ 狙擊手信號歷史管理表創建失敗: {e}")
+            print("   系統將繼續運行，但信號歷史功能可能不可用")
+        
         # 創建服務實例
         market_service = MarketDataService()
         strategy_engine = StrategyEngine()
         realtime_signal_engine = RealtimeSignalEngine()
+        sniper_email_manager = SniperEmailManager()
         
         # 儲存服務實例到應用程式狀態
         app.state.market_service = market_service
         app.state.strategy_engine = strategy_engine
         app.state.realtime_signal_engine = realtime_signal_engine
+        app.state.sniper_email_manager = sniper_email_manager
         
         print("✅ 服務實例創建完成")
         
@@ -74,6 +90,20 @@ async def lifespan(app: FastAPI):
                     )
                     print(f"📧 Gmail通知已設置: {gmail_sender} → {gmail_recipient}")
                     
+                    # 🎯 初始化並啟動狙擊手郵件自動發送系統
+                    sniper_email_init_success = sniper_email_manager.initialize_gmail_service(
+                        sender_email=gmail_sender,
+                        sender_password=gmail_password,
+                        recipient_email=gmail_recipient
+                    )
+                    
+                    if sniper_email_init_success:
+                        # 啟動自動掃描（背景任務）
+                        asyncio.create_task(sniper_email_manager.start_auto_scanning())
+                        print("🎯 狙擊手郵件自動發送系統已啟動 (90秒間隔掃描)")
+                    else:
+                        print("⚠️ 狙擊手郵件系統初始化失敗")
+                    
                     # 只在需要時才進行測試（通過環境變數控制）
                     test_on_startup = os.getenv('GMAIL_TEST_ON_STARTUP', 'false').lower() == 'true'
                     if test_on_startup:
@@ -112,6 +142,17 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"⚠️ 日誌管理系統啟動警告: {e}")
         
+        # 🎯 啟動狙擊手信號過期調度器
+        try:
+            from app.services.signal_expiration_scheduler import signal_expiration_scheduler
+            await signal_expiration_scheduler.start_scheduler()
+            print("🎯 狙擊手信號過期調度器已啟動 - 每5分鐘自動檢查")
+            
+            # 儲存調度器實例到應用程式狀態
+            app.state.signal_expiration_scheduler = signal_expiration_scheduler
+        except Exception as e:
+            print(f"⚠️ 狙擊手信號過期調度器啟動警告: {e}")
+        
     except Exception as e:
         print(f"⚠️ 初始化警告: {e}")
         # 即使出錯也繼續啟動，避免服務無法啟動
@@ -120,9 +161,19 @@ async def lifespan(app: FastAPI):
     
     # 關閉時清理
     try:
+        # 停止狙擊手郵件管理器
+        if hasattr(app.state, 'sniper_email_manager'):
+            await app.state.sniper_email_manager.stop_auto_scanning()
+            print("✅ 狙擊手郵件管理器已停止")
+        
         # 停止日誌管理
         await stop_log_management()
         print("✅ 日誌管理系統已停止")
+        
+        # 🎯 停止狙擊手信號過期調度器
+        if hasattr(app.state, 'signal_expiration_scheduler'):
+            await app.state.signal_expiration_scheduler.stop_scheduler()
+            print("🎯 狙擊手信號過期調度器已停止")
         
         if hasattr(app.state, 'market_service'):
             await app.state.market_service.stop()

@@ -504,3 +504,133 @@ class GmailNotificationService:
         except Exception as e:
             logger.error(f"❌ 發送測試通知時發生錯誤: {e}")
             return False
+
+    async def send_sniper_signal_notification_async(self, signal_info: Dict[str, Any]) -> bool:
+        """
+        🎯 方案C：狙擊手專用信號通知（優化版Email模板）
+        
+        Args:
+            signal_info: 包含信號詳細信息的字典
+            
+        Returns:
+            bool: 是否成功發送
+        """
+        try:
+            if not self.enabled:
+                logger.debug("Gmail通知功能已禁用")
+                return False
+            
+            # 建立郵件對象
+            message = MIMEMultipart()
+            message["From"] = self.sender_email
+            message["To"] = self.recipient_email
+            
+            # 🎯 方案C：根據優先級設定郵件標題
+            priority = signal_info.get('priority', 'MEDIUM')
+            symbol = signal_info.get('symbol', 'UNKNOWN')
+            signal_type = signal_info.get('signal_type', 'UNKNOWN')
+            update_type = signal_info.get('update_type', 'REGULAR')
+            
+            # 分級Email標題
+            email_subjects = {
+                'CRITICAL': f"🚨 緊急狙擊信號 - {symbol} {signal_type}",
+                'HIGH': f"🎯 高品質信號 - {symbol} {signal_type}", 
+                'MEDIUM': f"📊 標準信號 - {symbol} {signal_type}",
+                'LOW': f"📈 一般信號 - {symbol} {signal_type}"
+            }
+            
+            message["Subject"] = email_subjects.get(priority, f"🎯 狙擊手信號 - {symbol} {signal_type}")
+            
+            # 🎯 方案C：優化的Email內容模板
+            entry_price = signal_info.get('entry_price', 0)
+            stop_loss = signal_info.get('stop_loss', 0) 
+            take_profit = signal_info.get('take_profit', 0)
+            quality_score = signal_info.get('quality_score', 0)
+            confidence = signal_info.get('confidence', 0)
+            risk_reward_ratio = signal_info.get('risk_reward_ratio', 'N/A')
+            reasoning = signal_info.get('reasoning', '技術分析指標匯聚')
+            
+            # 計算風險收益百分比
+            if signal_type == "BUY":
+                risk_pct = abs((entry_price - stop_loss) / entry_price * 100)
+                reward_pct = abs((take_profit - entry_price) / entry_price * 100)
+            else:  # SELL
+                risk_pct = abs((stop_loss - entry_price) / entry_price * 100)
+                reward_pct = abs((entry_price - take_profit) / entry_price * 100)
+            
+            # 優先級標籤
+            priority_labels = {
+                'CRITICAL': '🚨 緊急信號',
+                'HIGH': '🎯 高品質',
+                'MEDIUM': '📊 標準',
+                'LOW': '📈 一般'
+            }
+            
+            # 更新類型標籤
+            update_labels = {
+                'EMERGENCY': '⚡ 緊急觸發',
+                'REGULAR': '📊 定期更新'
+            }
+            
+            email_body = f"""
+🎯 Trading-X 狙擊手系統信號通知
+
+═══════════════════════════════════════
+📊 信號概要
+═══════════════════════════════════════
+交易對: {symbol}
+方向: {"📈 做多" if signal_type == "BUY" else "📉 做空"}
+優先級: {priority_labels.get(priority, priority)}
+觸發: {update_labels.get(update_type, update_type)}
+
+═══════════════════════════════════════
+💰 交易設定
+═══════════════════════════════════════
+進場價格: ${entry_price:,.4f}
+止損價格: ${stop_loss:,.4f} (-{risk_pct:.2f}%)
+止盈價格: ${take_profit:,.4f} (+{reward_pct:.2f}%)
+風險報酬比: 1:{risk_reward_ratio}
+
+═══════════════════════════════════════
+📊 信號品質
+═══════════════════════════════════════
+品質分數: {quality_score:.2f}/10.0 {'🟢' if quality_score >= 7 else '🟡' if quality_score >= 5 else '🔴'}
+信心度: {confidence:.1%} {'🔥' if confidence >= 0.5 else '⚡' if confidence >= 0.3 else '📊'}
+分析理由: {reasoning}
+
+═══════════════════════════════════════
+⏰ 時間資訊
+═══════════════════════════════════════
+信號時間: {signal_info.get('created_at', 'N/A')}
+更新類型: {update_type}
+
+═══════════════════════════════════════
+💡 操作建議
+═══════════════════════════════════════
+{"🚨 這是緊急信號，建議立即關注市場動向！" if priority == 'CRITICAL' else ""}
+{"🎯 高品質信號，建議重點關注此交易機會。" if priority == 'HIGH' else ""}
+{"📊 標準信號，可考慮適度倉位參與。" if priority == 'MEDIUM' else ""}
+{"📈 一般信號，僅供參考，謹慎評估。" if priority == 'LOW' else ""}
+
+⚠️ 風險提醒: 任何投資都有風險，請謹慎評估並控制倉位。
+
+🤖 Trading-X 狙擊手系統 | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+            """
+            
+            message.attach(MIMEText(email_body, "plain", "utf-8"))
+            
+            # 發送郵件
+            success = await self._send_email(message)
+            
+            if success:
+                logger.info(f"✅ 狙擊手信號Email發送成功: {symbol} {signal_type} (優先級: {priority})")
+                return True
+            else:
+                logger.error(f"❌ 狙擊手信號Email發送失敗: {symbol}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ 狙擊手信號通知發送錯誤: {e}")
+            import traceback
+            traceback.print_exc()
+            return False

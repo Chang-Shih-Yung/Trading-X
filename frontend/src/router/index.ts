@@ -59,6 +59,7 @@ const router = createRouter({
             name: 'SniperStrategy',
             component: () => import('@/views/TradingStrategySniperIntegrated.vue')
         }
+        
     ]
 })
 

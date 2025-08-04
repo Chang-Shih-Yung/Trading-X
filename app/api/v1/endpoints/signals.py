@@ -200,14 +200,52 @@ async def generate_live_signals():
 
 @router.get("/latest")
 async def get_latest_signals(
-    hours: int = Query(24, description="過去幾小時的信號")
+    hours: int = Query(24, description="過去幾小時的信號"),
+    db: AsyncSession = Depends(get_db)
 ):
-    """獲取最新的精準交易信號 - 多時間軸分析 + 高勝率策略"""
+    """獲取最新的真實交易信號 - 只返回數據庫中的真實信號"""
     try:
-        from datetime import datetime, timedelta
-        import random
+        since_time = taiwan_now_minus(hours=hours)
         
-        current_time = get_taiwan_now_naive()
+        # 只查詢真實的數據庫信號
+        stmt = select(TradingSignal).filter(
+            and_(
+                TradingSignal.created_at >= since_time,
+                TradingSignal.signal_strength >= 60.0,  # 只返回高質量信號
+                TradingSignal.is_active == True
+            )
+        ).order_by(TradingSignal.confidence.desc()).limit(20)
+        
+        result = await db.execute(stmt)
+        db_signals = result.scalars().all()
+        
+        if not db_signals:
+            return []
+        
+        # 轉換為前端格式
+        real_signals = []
+        for signal in db_signals:
+            real_signals.append({
+                "id": f"real_signal_{signal.id}",
+                "symbol": signal.symbol,
+                "signal_type": signal.signal_type,
+                "entry_price": float(signal.entry_price) if signal.entry_price else 0.0,
+                "stop_loss": float(signal.stop_loss) if signal.stop_loss else 0.0,
+                "take_profit": float(signal.take_profit) if signal.take_profit else 0.0,
+                "risk_reward_ratio": float(signal.risk_reward_ratio) if signal.risk_reward_ratio else 0.0,
+                "confidence": float(signal.confidence),
+                "timeframe": signal.timeframe or "1h",
+                "reasoning": f"真實信號 - 信心度: {signal.confidence:.1%}",
+                "created_at": signal.created_at.isoformat() if signal.created_at else get_taiwan_now_naive().isoformat(),
+                "status": "ACTIVE" if signal.is_active else "INACTIVE",
+                "data_source": "REAL_DATABASE_ONLY"
+            })
+        
+        return real_signals
+        
+    except Exception as e:
+        logger.error(f"獲取真實信號失敗: {e}")
+        return []
         
         # 🎯 精準的市場價格數據 (更新至真實價格)
         price_data = {
@@ -435,56 +473,10 @@ async def get_latest_signals(
         return signal_responses
 
 def _generate_mock_signals() -> List[dict]:
-    """生成模擬交易信號用於演示"""
-    import random
-    
-    symbols = ["BTC/USDT", "ETH/USDT", "BNB/USDT", "ADA/USDT", "XRP/USDT"]
-    timeframes = ["1h", "4h", "1d"]
-    signal_types = ["LONG", "SHORT"]
-    
-    mock_signals = []
-    
-    base_prices = {
-        "BTC/USDT": 98500,
-        "ETH/USDT": 3425,
-        "BNB/USDT": 695,
-        "ADA/USDT": 0.89,
-        "XRP/USDT": 2.18
-    }
-    
-    for i, symbol in enumerate(symbols):
-        base_price = base_prices[symbol]
-        signal_type = random.choice(signal_types)
-        timeframe = random.choice(timeframes)
-        confidence = random.uniform(0.65, 0.92)
-        
-        if signal_type == "LONG":
-            entry_price = base_price * random.uniform(0.998, 1.002)
-            stop_loss = entry_price * 0.96
-            take_profit = entry_price * 1.08
-            reasoning = f"檢測到{symbol}看漲信號：早晨之星形態 + RSI超賣反彈"
-        else:
-            entry_price = base_price * random.uniform(0.998, 1.002) 
-            stop_loss = entry_price * 1.04
-            take_profit = entry_price * 0.92
-            reasoning = f"檢測到{symbol}看跌信號：黃昏十字星形態 + MACD死叉"
-        
-        risk_reward = abs(take_profit - entry_price) / abs(stop_loss - entry_price)
-        
-        mock_signals.append({
-            "id": 1000 + i,
-            "symbol": symbol,
-            "signal_type": signal_type,
-            "timeframe": timeframe,
-            "entry_price": round(entry_price, 6),
-            "stop_loss": round(stop_loss, 6),
-            "take_profit": round(take_profit, 6),
-            "risk_reward_ratio": round(risk_reward, 2),
-            "confidence": round(confidence, 3),
-            "reasoning": reasoning
-        })
-    
-    return mock_signals
+    """已禁用 - 不再生成模擬信號，僅返回空列表"""
+    # 🚨 此函數已被禁用，不再生成假信號
+    logger.warning("模擬信號生成已被禁用，返回空列表")
+    return []
 
 @router.get("/latest-original", response_model=List[SignalResponse])
 async def get_latest_signals_original(

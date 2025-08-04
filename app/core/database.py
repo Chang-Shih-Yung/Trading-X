@@ -25,6 +25,9 @@ metadata = MetaData()
 
 async def create_tables():
     """創建所有資料表"""
+    # 導入所有模型以確保它們被註冊到 Base.metadata
+    from app.models.sniper_signal_history import SniperSignalDetails, SniperSignalSummary
+    
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
