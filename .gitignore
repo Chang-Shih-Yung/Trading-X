@@ -51,6 +51,8 @@ yarn-debug.log*
 yarn-error.log*
 .npm
 .yarn/
+frontend/node_modules/
+.package-lock.json
 
 # Frontend Build
 frontend/dist/
@@ -74,3 +76,10 @@ config.local.json
 # Backup files
 *.bak
 *.backup
+
+# Windows specific
+*.bat
+setup_windows_environment.ps1
+QUICK_START_GUIDE.md
+
+.fake
