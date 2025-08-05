@@ -11,10 +11,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 class TradingTimeframe(Enum):
-    """交易時間框架枚舉"""
-    SHORT_TERM = "short"    # 短線: 5分鐘-1小時持倉
-    MEDIUM_TERM = "medium"  # 中線: 2-8小時持倉
-    LONG_TERM = "long"      # 長線: 1-3天持倉
+    """交易時間框架枚舉 - 統一標準"""
+    SHORT_TERM = "short"    # 短線: 1.5-8小時持倉
+    MEDIUM_TERM = "medium"  # 中線: 8-48小時持倉
+    LONG_TERM = "long"      # 長線: 24-120小時持倉
 
 @dataclass
 class SignalBlockWeights:

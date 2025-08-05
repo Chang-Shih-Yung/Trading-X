@@ -19,6 +19,7 @@ from app.services.realtime_technical_analysis import RealTimeTechnicalAnalysis
 from app.services.candlestick_patterns import analyze_candlestick_patterns
 from app.services.gmail_notification import GmailNotificationService
 from app.services.intelligent_timeframe_classifier import IntelligentTimeframeClassifier
+from app.services.price_logic_validator import price_validator, PriceValidationResult
 from app.models.sniper_signal_history import (
     SniperSignalDetails, 
     EmailStatus, 
@@ -695,9 +696,9 @@ class RealtimeSignalEngine:
         )
     
     def _calculate_entry_exit(self, current_price: float, signal_type: str, df: pd.DataFrame) -> tuple:
-        """計算進出場點位 - 使用動態ATR和智能風險管理"""
+        """計算進出場點位 - 修復版：正確的做多做空邏輯"""
         
-        # 🎯 使用真實的 ATR 計算動態止損止盈
+        # 🎯 使用真實的 ATR 計算動態止損止盈 - 禁止後備值
         try:
             # 計算真實 ATR (Average True Range)
             high = df['high']
@@ -716,60 +717,91 @@ class RealtimeSignalEngine:
             
             atr = true_range.rolling(window=14).mean().iloc[-1]
             
-            # 如果 ATR 無效，使用價格的2%作為後備
+            # 🚫 絕對禁止後備值 - 沒有有效ATR就拒絕計算
             if pd.isna(atr) or atr <= 0:
-                atr = current_price * 0.02
+                raise ValueError(f"無法計算有效ATR: {atr}, 拒絕使用後備值")
                 
         except Exception as e:
-            logger.warning(f"ATR計算失敗，使用後備方案: {e}")
-            atr = current_price * 0.02
+            logger.error(f"❌ ATR計算失敗，拒絕使用後備值: {e}")
+            raise ValueError(f"實時數據不可用，拒絕生成信號: {e}")
         
         # 🔥 動態風險參數計算
         volatility = atr / current_price  # 波動率
         
         # 根據波動率調整風險參數
         if volatility > 0.06:  # 高波動
-            stop_loss_multiplier = 1.8
-            take_profit_multiplier = 3.0
+            stop_loss_pct = 0.03  # 3%
+            take_profit_pct = 0.06  # 6%
         elif volatility > 0.03:  # 中等波動
-            stop_loss_multiplier = 1.5
-            take_profit_multiplier = 2.5
+            stop_loss_pct = 0.02  # 2%
+            take_profit_pct = 0.05  # 5%
         else:  # 低波動
-            stop_loss_multiplier = 1.2
-            take_profit_multiplier = 2.0
+            stop_loss_pct = 0.015  # 1.5%
+            take_profit_pct = 0.04  # 4%
         
-        # 計算止損止盈距離
-        stop_loss_distance = atr * stop_loss_multiplier
-        take_profit_distance = atr * take_profit_multiplier
+        # 確保最小風險回報比 2:1
+        if take_profit_pct < stop_loss_pct * 2:
+            take_profit_pct = stop_loss_pct * 2.5
         
-        # 限制風險在合理範圍內 (0.5% - 5%)
-        max_risk = current_price * 0.05
-        min_risk = current_price * 0.005
-        stop_loss_distance = max(min_risk, min(stop_loss_distance, max_risk))
+        # 滑點設置
+        slippage = 0.0005  # 0.05%
         
-        # 確保盈虧比至少 2:1
-        take_profit_distance = max(take_profit_distance, stop_loss_distance * 2.0)
-        
-        # 🎯 根據信號類型計算實際價格
+        # 🎯 修復版：正確的做多做空價格計算邏輯
         if signal_type in ["BUY", "STRONG_BUY"]:
-            entry_price = current_price * 1.0005  # 略高於當前價格 (滑點)
-            stop_loss = entry_price - stop_loss_distance
-            take_profit = entry_price + take_profit_distance
+            # 做多：進場稍高於當前價(市價買入，向上滑點)，止損在下方，止盈在上方
+            entry_price = current_price * (1 + slippage)  # 向上滑點
+            stop_loss = entry_price * (1 - stop_loss_pct)  # 在進場價下方
+            take_profit = entry_price * (1 + take_profit_pct)  # 在進場價上方
+            
         elif signal_type in ["SELL", "STRONG_SELL"]:
-            entry_price = current_price * 0.9995  # 略低於當前價格 (滑點)
-            stop_loss = entry_price + stop_loss_distance
-            take_profit = entry_price - take_profit_distance
-        else:  # HOLD
+            # 做空：進場稍低於當前價(市價賣出，向下滑點)，止損在上方，止盈在下方
+            entry_price = current_price * (1 - slippage)  # 向下滑點
+            stop_loss = entry_price * (1 + stop_loss_pct)  # 在進場價上方
+            take_profit = entry_price * (1 - take_profit_pct)  # 在進場價下方
+            
+        else:  # HOLD 或其他
             entry_price = current_price
-            stop_loss = current_price - stop_loss_distance
-            take_profit = current_price + take_profit_distance
+            stop_loss = current_price * (1 - stop_loss_pct)
+            take_profit = current_price * (1 + take_profit_pct)
         
-        # 🛡️ 確保價格為正數
+        # 🛡️ 確保價格為正數並驗證邏輯
+        entry_price = max(0.000001, entry_price)
         stop_loss = max(0.000001, stop_loss)
         take_profit = max(0.000001, take_profit)
         
-        logger.debug(f"💰 動態價格計算: ATR={atr:.6f}, 波動率={volatility:.3%}, "
-                    f"止損距離={stop_loss_distance:.6f}, 止盈距離={take_profit_distance:.6f}")
+        # 💡 邏輯驗證
+        if signal_type in ["BUY", "STRONG_BUY"]:
+            if not (stop_loss < entry_price < take_profit):
+                logger.error(f"❌ 做多邏輯錯誤: 止損={stop_loss:.6f} < 進場={entry_price:.6f} < 止盈={take_profit:.6f}")
+        elif signal_type in ["SELL", "STRONG_SELL"]:
+            if not (take_profit < entry_price < stop_loss):
+                logger.error(f"❌ 做空邏輯錯誤: 止盈={take_profit:.6f} < 進場={entry_price:.6f} < 止損={stop_loss:.6f}")
+        
+        risk_reward = abs(take_profit - entry_price) / abs(entry_price - stop_loss) if abs(entry_price - stop_loss) > 0 else 0
+        
+        # 🛡️ 價格邏輯驗證器 - 確保生成的價格邏輯正確
+        validation_result = price_validator.validate_trading_signal(
+            signal_type=signal_type,
+            entry_price=entry_price,
+            stop_loss=stop_loss,
+            take_profit=take_profit,
+            symbol="VALIDATION_CHECK"
+        )
+        
+        if not validation_result.is_valid:
+            logger.error(f"❌ 價格邏輯驗證失敗: {validation_result.error_message}")
+            raise ValueError(f"價格邏輯錯誤: {validation_result.error_message}")
+        
+        # ⚠️ 顯示驗證警告
+        if validation_result.warnings:
+            for warning in validation_result.warnings:
+                logger.warning(f"⚠️ 價格驗證警告: {warning}")
+        
+        logger.info(f"✅ 價格邏輯驗證通過: {signal_type}, 風險回報比={validation_result.risk_reward_ratio:.2f}")
+        
+        logger.debug(f"💰 修復版價格計算: {signal_type} "
+                    f"進場={entry_price:.6f}, 止損={stop_loss:.6f}, 止盈={take_profit:.6f}, "
+                    f"風險回報比={risk_reward:.2f}, ATR={atr:.6f}")
         
         return entry_price, stop_loss, take_profit
     
@@ -887,14 +919,14 @@ class RealtimeSignalEngine:
                     "low": SignalQuality.LOW
                 }
                 
-                # 創建資料庫記錄
+                # 創建資料庫記錄 - 修復欄位命名
                 sniper_signal = SniperSignalDetails(
                     signal_id=signal_id,
                     symbol=signal.symbol,
                     signal_type=signal.signal_type,
                     entry_price=signal.entry_price,
-                    stop_loss_price=signal.stop_loss,
-                    take_profit_price=signal.take_profit,
+                    stop_loss_price=signal.stop_loss,  # 保持資料庫欄位名稱
+                    take_profit_price=signal.take_profit,  # 保持資料庫欄位名稱
                     signal_strength=signal.confidence,
                     confluence_count=3,  # 基於技術指標數量
                     signal_quality=quality_map.get(signal.urgency, SignalQuality.MEDIUM),

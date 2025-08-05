@@ -1841,7 +1841,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
 
-from sniper_unified_data_layer import snipe_unified_layer, TradingTimeframe, DynamicRiskParameters
+# from sniper_unified_data_layer import snipe_unified_layer, TradingTimeframe, DynamicRiskParameters  # 已移除舊版檔案
 import pandas as pd
 import numpy as np
 
@@ -1915,8 +1915,56 @@ async def get_sniper_unified_data_layer(
                     }
                     continue
                 
-                # 使用狙擊手雙層架構處理
-                unified_result = await snipe_unified_layer.process_unified_data_layer(df, symbol)
+                # 🎯 使用修復後的真實策略分析引擎
+                try:
+                    from app.services.real_strategy_analysis_engine import analyze_trading_strategy
+                    
+                    # 執行真實策略分析
+                    strategy_result = await analyze_trading_strategy(df, symbol, timeframe)
+                    
+                    # 構建統一格式的結果
+                    unified_result = {
+                        'symbol': symbol,
+                        'timeframe': timeframe,
+                        'layer_two': {
+                            'signals': [{
+                                'signal_type': strategy_result.signal_type.value,
+                                'confidence': strategy_result.confidence,
+                                'confluence_count': strategy_result.confluence_count,
+                                'market_regime': strategy_result.market_regime,
+                                'volatility_assessment': strategy_result.volatility_assessment,
+                                'reasoning': strategy_result.reasoning,
+                                'risk_assessment': strategy_result.risk_assessment,
+                                'supporting_indicators': len(strategy_result.supporting_indicators),
+                                'opposing_indicators': len(strategy_result.opposing_indicators),
+                                'price': df['close'].iloc[-1] if not df.empty else 0.0
+                            }]
+                        }
+                    }
+                    
+                    logger.info(f"✅ {symbol} 真實策略分析完成: {strategy_result.signal_type.value}, 信心度: {strategy_result.confidence:.3f}")
+                    
+                except Exception as e:
+                    logger.error(f"❌ {symbol} 策略分析失敗: {e}")
+                    # 如果策略分析失敗，返回HOLD信號
+                    unified_result = {
+                        'symbol': symbol,
+                        'timeframe': timeframe,
+                        'layer_two': {
+                            'signals': [{
+                                'signal_type': 'HOLD',
+                                'confidence': 0.0,
+                                'confluence_count': 0,
+                                'market_regime': 'UNKNOWN',
+                                'volatility_assessment': 'UNKNOWN',
+                                'reasoning': f'策略分析失敗: {str(e)}',
+                                'risk_assessment': 'HIGH',
+                                'supporting_indicators': 0,
+                                'opposing_indicators': 0,
+                                'price': df['close'].iloc[-1] if not df.empty else 0.0
+                            }]
+                        }
+                    }
                 
                 results[symbol] = unified_result
                 
@@ -1957,10 +2005,10 @@ async def get_sniper_unified_data_layer(
                     # 將字典轉換為 TradingSignalAlert 物件
                     signal_data = signal_dict.get('data', {})
                     
-                    # 計算動態風險參數
+                    # 計算動態風險參數 - 使用標準變數命名
                     entry_price = float(signal_data.get('price', 0.0))
-                    stop_loss_price = entry_price * 0.98  # 2% 止損
-                    take_profit_price = entry_price * 1.04  # 4% 止盈
+                    stop_loss = entry_price * 0.98  # 2% 止損
+                    take_profit = entry_price * 1.04  # 4% 止盈
                     
                     # 創建 TradingSignalAlert 物件
                     trading_alert = TradingSignalAlert(
@@ -1968,8 +2016,8 @@ async def get_sniper_unified_data_layer(
                         signal_type=signal_data.get('signal_type', 'BUY'),
                         confidence=float(signal_data.get('confidence', 0.5)),
                         entry_price=entry_price,
-                        stop_loss=stop_loss_price,
-                        take_profit=take_profit_price,
+                        stop_loss=stop_loss,
+                        take_profit=take_profit,
                         risk_reward_ratio=2.0,
                         indicators_used=["狙擊手雙層架構", "技術指標匯合"],
                         reasoning=f"狙擊手信號 - 信心度: {signal_data.get('confidence', 0.5):.3f}, 匯合數: {signal_data.get('confluence_count', 0)}",
@@ -2042,13 +2090,13 @@ async def get_sniper_unified_data_layer(
                                 'market_regime': signal_data.get('market_regime', 'unknown')
                             })()
                             
-                            # 記錄信號到歷史數據庫
+                            # 記錄信號到歷史數據庫 - 修復變數命名
                             signal_id = await sniper_signal_tracker.record_new_signal(
                                 symbol=signal_data.get('symbol', ''),
                                 signal_type=signal_data.get('signal_type', 'BUY'),
                                 entry_price=entry_price,
-                                stop_loss_price=stop_loss_price,
-                                take_profit_price=take_profit_price,
+                                stop_loss_price=stop_loss,  # 資料庫使用 stop_loss_price 欄位名
+                                take_profit_price=take_profit,  # 資料庫使用 take_profit_price 欄位名
                                 signal_strength=float(signal_data.get('confidence', 0.5)),
                                 confluence_count=int(signal_data.get('confluence_count', 2)),
                                 timeframe=tf_enum,

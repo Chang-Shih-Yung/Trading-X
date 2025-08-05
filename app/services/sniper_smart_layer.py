@@ -286,11 +286,11 @@ class SmartSignal:
         return timeframe_map.get(self.timeframe_category, "未知")
     
     def _get_timeframe_description(self) -> str:
-        """獲取時間框架詳細說明"""
+        """獲取時間框架詳細說明 - 統一標準"""
         description_map = {
-            TimeframeCategory.SHORT_TERM: "短線 (1-4小時) - 適合日內交易",
-            TimeframeCategory.MEDIUM_TERM: "中線 (6-24小時) - 適合隔夜持倉",
-            TimeframeCategory.LONG_TERM: "長線 (1-3天) - 適合週期交易"
+            TimeframeCategory.SHORT_TERM: "短線 (1.5-8小時) - 快進快出",
+            TimeframeCategory.MEDIUM_TERM: "中線 (8-48小時) - 隔夜持倉",
+            TimeframeCategory.LONG_TERM: "長線 (24-120小時) - 週期交易"
         }
         return description_map.get(self.timeframe_category, "未定義時間框架")
 
@@ -1290,11 +1290,11 @@ class SniperSmartLayerSystem:
         return timeframe_map.get(timeframe, "未知")
     
     def _get_timeframe_description(self, timeframe: TradingTimeframe) -> str:
-        """獲取時間框架詳細說明"""
+        """獲取時間框架詳細說明 - 統一標準"""
         description_map = {
-            TradingTimeframe.SHORT_TERM: "短線 (1-4小時) - 適合日內交易",
-            TradingTimeframe.MEDIUM_TERM: "中線 (6-24小時) - 適合隔夜持倉",
-            TradingTimeframe.LONG_TERM: "長線 (1-3天) - 適合週期交易"
+            TradingTimeframe.SHORT_TERM: "短線 (1.5-8小時) - 快進快出",
+            TradingTimeframe.MEDIUM_TERM: "中線 (8-48小時) - 隔夜持倉",
+            TradingTimeframe.LONG_TERM: "長線 (24-120小時) - 週期交易"
         }
         return description_map.get(timeframe, "未定義時間框架")
     
@@ -1319,13 +1319,27 @@ class SniperSmartLayerSystem:
     
     def _calculate_dynamic_expiry(self, category: TimeframeCategory, quality_score: float, analysis_result: Dict = None) -> datetime:
         """
-        計算動態信號失效時間 - 基於狙擊手分析深度和市場條件
+        動態時間分層計算模組 - 統一標準
         
-        優化邏輯：
-        1. Phase 1ABC 深度分析 → 時間框架基礎調整
-        2. Phase 1+2+3 技術指標強度 → 持倉信心加成
-        3. 市場波動率和流動性 → 動態風險調整
-        4. 狙擊手精準度評分 → 品質時間加成
+        ### 計算示例：
+        
+        **短線信號（high quality）：**
+        - 基礎：3小時
+        - Phase1ABC：3 × 1.2 × 1.2 = 4.32小時
+        - Phase123：4.32 × 1.5 = 6.48小時
+        - 品質加成：6.48 × 1.4 = 9.07小時
+        - 範圍限制：min(8.0, 9.07) = 8小時
+        
+        **中線信號（medium quality）：**
+        - 基礎：18小時
+        - 各種加成後：約 24-36小時
+        
+        **長線信號（low quality）：**
+        - 基礎：48小時
+        - 品質折扣：48 × 0.8 = 38.4小時
+        - 市場調整：38.4 × 0.8 = 約30小時
+        
+        實際範圍：**1.5小時 到 120小時**，大部分信號在 **3-48小時** 之間。
         """
         
         # === 基於 Phase 1ABC 的時間框架優化 ===
@@ -1349,50 +1363,53 @@ class SniperSmartLayerSystem:
         
         expiry_time = get_taiwan_now() + timedelta(hours=int(final_hours))
         
-        logger.info(f"⏰ 智能持倉時間計算: {category.value}")
-        logger.info(f"   📊 Phase1ABC基礎: {base_expiry_hours}h")
+        logger.info(f"⏰ 動態時間分層計算: {category.value}")
+        logger.info(f"   📊 Phase1ABC基礎: {base_expiry_hours:.1f}h")
         logger.info(f"   🔍 Phase123加成: ×{technical_multiplier:.2f}")
         logger.info(f"   ⭐ 品質加成: ×{quality_multiplier:.2f}")
         logger.info(f"   🌊 市場調整: ×{market_adjustment:.2f}")
-        logger.info(f"   ✅ 最終持倉: {int(final_hours)}h")
+        logger.info(f"   ✅ 最終持倉: {int(final_hours)}h (範圍: {min_hours}-{max_hours}h)")
         
         return expiry_time
     
     def _calculate_phase1abc_timeframe(self, category: TimeframeCategory, analysis_result: Dict = None) -> float:
         """
-        基於 Phase 1ABC 分析深度計算基礎時間框架
+        基於 Phase 1ABC 分析深度計算基礎時間框架 - 統一標準
         
         Phase 1A (信號重構): 基礎時間框架
-        Phase 1B (多維分析): 分析深度加成
-        Phase 1C (精準篩選): 信號可靠性調整
+        Phase 1B (多維分析): phase1b_multiplier = 1.0 + (indicator_count - 3) * 0.1
+        Phase 1C (精準篩選): phase1c_multiplier = 0.7 + (precision * 0.6)
         """
         
-        # Phase 1A: 基礎時間框架 (基於技術分析週期特性)
+        # Phase 1A: 基礎時間框架 (統一標準)
         base_hours = {
-            TimeframeCategory.SHORT_TERM: 3.0,   # 短線: 3小時基礎 (日內交易特性)
-            TimeframeCategory.MEDIUM_TERM: 18.0, # 中線: 18小時基礎 (跨日持倉特性)
-            TimeframeCategory.LONG_TERM: 48.0    # 長線: 48小時基礎 (週期交易特性)
+            TimeframeCategory.SHORT_TERM: 3.0,   # 短線: 3小時基礎
+            TimeframeCategory.MEDIUM_TERM: 18.0, # 中線: 18小時基礎
+            TimeframeCategory.LONG_TERM: 48.0    # 長線: 48小時基礎
         }
         
         phase1a_base = base_hours.get(category, 18.0)
         
-        # Phase 1B: 多維分析深度加成
+        # Phase 1B: 多維分析加成 (統一公式)
         if analysis_result and analysis_result.get('technical_indicators'):
             indicator_count = len(analysis_result['technical_indicators'])
-            # 指標越多，分析越全面，持倉時間可以更長
-            phase1b_multiplier = 1.0 + (indicator_count - 3) * 0.1  # 每多一個指標+10%
-            phase1b_multiplier = max(0.8, min(1.5, phase1b_multiplier))  # 限制在80%-150%
+            # phase1b_multiplier = 1.0 + (indicator_count - 3) * 0.1
+            phase1b_multiplier = 1.0 + (indicator_count - 3) * 0.1
+            # 範圍限制：80%-150%
+            phase1b_multiplier = max(0.8, min(1.5, phase1b_multiplier))
         else:
             phase1b_multiplier = 1.0
         
-        # Phase 1C: 精準篩選可靠性調整
+        # Phase 1C: 精準度調整 (統一公式)
         if analysis_result and 'sniper_metrics' in analysis_result:
             metrics = analysis_result['sniper_metrics']
             precision = metrics.get('precision', 0.85)
-            # 精準度越高，可以持倉更久
-            phase1c_multiplier = 0.7 + (precision * 0.6)  # 精準度70%→1.0x, 95%→1.27x
+            # phase1c_multiplier = 0.7 + (precision * 0.6)
+            # 精準度70% → 1.0倍，精準度95% → 1.27倍
+            phase1c_multiplier = 0.7 + (precision * 0.6)
         else:
-            phase1c_multiplier = 1.0
+            precision = 0.85  # 默認精準度
+            phase1c_multiplier = 0.7 + (precision * 0.6)
         
         final_hours = phase1a_base * phase1b_multiplier * phase1c_multiplier
         
@@ -1402,27 +1419,26 @@ class SniperSmartLayerSystem:
     
     def _calculate_phase123_multiplier(self, analysis_result: Dict = None) -> float:
         """
-        基於 Phase 1+2+3 技術分析強度計算持倉信心加成
+        基於 Phase 1+2+3 技術分析強度計算持倉信心加成 - 統一標準
         
-        Phase 1: 基礎技術分析強度
-        Phase 2: 多空動態權重確信度  
-        Phase 3: 動態指標收斂程度
+        技術分析強度：0.8 + (technical_strength * 0.4) (0.8-1.2倍)
+        市場確信度：0.9 + (market_confidence * 0.3) (0.9-1.2倍)
+        指標收斂度：基於風險回報比，最高1.3倍
         """
         
         if not analysis_result:
             return 1.0
         
-        # Phase 1: 技術分析強度
+        # Phase 1+2+3 技術強度加成 (統一公式)
         technical_strength = analysis_result.get('technical_strength', 0.7)
         phase1_factor = 0.8 + (technical_strength * 0.4)  # 0.8-1.2倍
         
-        # Phase 2: 市場趋勢确信度 (從reasoning中提取或使用confidence)
+        # 市場確信度 (統一公式)
         market_confidence = analysis_result.get('confidence', 0.7)
         phase2_factor = 0.9 + (market_confidence * 0.3)   # 0.9-1.2倍
         
-        # Phase 3: 動態指標收斂度 (風險回報比反映收斂程度)
+        # 指標收斂度：基於風險回報比，最高1.3倍 (統一公式)
         risk_reward = analysis_result.get('risk_reward_ratio', 2.0)
-        # 風險回報比越好，指標收斂越好，可以持倉更久
         phase3_factor = min(1.3, 0.9 + (risk_reward - 1.5) * 0.2)  # RR 1.5→1.0x, 3.0→1.3x
         
         multiplier = phase1_factor * phase2_factor * phase3_factor
@@ -1435,18 +1451,18 @@ class SniperSmartLayerSystem:
         return multiplier
     
     def _calculate_quality_time_multiplier(self, quality_score: float) -> float:
-        """基於品質評分計算時間加成"""
+        """品質評分時間加成 - 統一標準"""
         if quality_score >= 8.0:
-            return 1.4  # 高品質信號可以持倉更久
+            return 1.4  # 高品質+40%
         elif quality_score >= 6.5:
-            return 1.2  # 中高品質信號適度延長
+            return 1.2  # 中高品質+20%
         elif quality_score >= 5.0:
-            return 1.0  # 中等品質標準時間
+            return 1.0  # 標準時間
         else:
-            return 0.8  # 低品質信號縮短持倉
+            return 0.8  # 低品質-20%
     
     def _calculate_market_time_adjustment(self, analysis_result: Dict = None) -> float:
-        """基於市場條件動態調整持倉時間"""
+        """市場條件調整 - 統一標準"""
         if not analysis_result:
             return 1.0
         
@@ -1454,14 +1470,14 @@ class SniperSmartLayerSystem:
         market_conditions = analysis_result.get('market_conditions', 0.6)
         
         if market_conditions >= 0.8:
-            return 1.2  # 市場條件非常好，可以持倉更久
+            return 1.2  # 好市場+20%
         elif market_conditions >= 0.6:
-            return 1.0  # 市場條件正常
+            return 1.0  # 正常市場
         else:
-            return 0.8  # 市場條件不佳，縮短持倉
+            return 0.8  # 差市場-20%
     
     def _get_timeframe_limits(self, category: TimeframeCategory) -> tuple:
-        """獲取時間框架的合理限制範圍"""
+        """最終時間範圍限制 - 統一標準"""
         limits = {
             TimeframeCategory.SHORT_TERM: (1.5, 8.0),    # 短線: 1.5-8小時
             TimeframeCategory.MEDIUM_TERM: (8.0, 48.0),  # 中線: 8-48小時

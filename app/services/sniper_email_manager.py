@@ -20,6 +20,7 @@ class SniperEmailManager:
         self.gmail_service: Optional[GmailNotificationService] = None
         self.scanning_task: Optional[asyncio.Task] = None
         self.is_running = False
+        self._sent_signals_today = set()  # 🎯 今日已發送的幣種記錄
         
     def initialize_gmail_service(self, sender_email: str, sender_password: str, recipient_email: str):
         """初始化 Gmail 服務"""
@@ -36,28 +37,41 @@ class SniperEmailManager:
             return False
     
     async def start_auto_scanning(self):
-        """啟動自動掃描任務 - 每 0.5 分鐘掃描一次未發送信號"""
+        """啟動自動掃描任務 - 每個幣種只發送最優秀的信號"""
         if self.is_running:
             logger.warning("Email 自動掃描已在運行中")
             return
             
         self.is_running = True
-        logger.info("🚀 啟動 Email 自動掃描 (間隔: 90秒)")
+        logger.info("🚀 啟動 Email 自動掃描 (30秒間隔，每幣種最優信號)")
+        
+        # 🎯 清理昨日記錄
+        self._cleanup_sent_signals_record()
         
         while self.is_running:
             try:
-                await self._scan_and_send_pending_emails()
-                await asyncio.sleep(90)  # 🎯 改為90秒，避免過於頻繁掃描
+                await self._scan_and_send_best_signals()
+                await asyncio.sleep(30)  # 🎯 30秒掃描間隔
             except Exception as e:
                 logger.error(f"❌ Email 自動掃描異常: {e}")
-                await asyncio.sleep(90)  # 出錯時等待 90 秒再重試
-    
+                await asyncio.sleep(30)
+
     async def stop_auto_scanning(self):
         """停止自動掃描任務"""
         self.is_running = False
         if self.scanning_task:
             self.scanning_task.cancel()
         logger.info("🛑 Email 自動掃描已停止")
+    
+    def _cleanup_sent_signals_record(self):
+        """清理過期的已發送記錄"""
+        today_prefix = datetime.now().strftime('%Y%m%d')
+        # 移除非今日的記錄
+        self._sent_signals_today = {
+            key for key in self._sent_signals_today 
+            if key.endswith(today_prefix)
+        }
+        logger.info(f"🧹 清理過期發送記錄，保留今日記錄: {len(self._sent_signals_today)} 筆")
     
     async def has_sent_signal_email(self, signal_id: str) -> bool:
         """檢查指定信號是否已發送過Email"""
@@ -192,6 +206,140 @@ class SniperEmailManager:
         except Exception as e:
             logger.error(f"記錄Email發送狀態失敗 {signal_id}: {e}")
     
+    
+    async def _scan_and_send_best_signals(self):
+        """掃描並發送每個幣種最優秀的信號 Email"""
+        if not self.gmail_service:
+            return
+            
+        try:
+            # 🧹 首先清理過期的已發送記錄
+            self._cleanup_sent_signals_record()
+            
+            db_gen = get_db()
+            db = await db_gen.__anext__()
+            
+            try:
+                from sqlalchemy import func, desc
+                
+                # 🎯 查詢每個幣種信心度最高且未發送的信號
+                subquery = (
+                    select(
+                        SniperSignalDetails.symbol,
+                        func.max(SniperSignalDetails.signal_strength).label('max_strength'),
+                        func.min(SniperSignalDetails.created_at).label('earliest_time')  # 🎯 找最早的時間
+                    )
+                    .where(
+                        and_(
+                            SniperSignalDetails.email_status.in_([EmailStatus.PENDING, EmailStatus.FAILED]),
+                            SniperSignalDetails.email_sent_at.is_(None),  # 🛡️ 確保未發送過
+                            SniperSignalDetails.email_retry_count < 5,    # 🛡️ 重試次數限制
+                            SniperSignalDetails.created_at >= datetime.now() - timedelta(hours=24)  # 只處理24小時內的信號
+                        )
+                    )
+                    .group_by(SniperSignalDetails.symbol)
+                    .subquery()
+                )
+                
+                # 獲取最優秀的信號詳情 (每個幣種只取最早的最佳品質信號)
+                result = await db.execute(
+                    select(SniperSignalDetails)
+                    .join(
+                        subquery,
+                        and_(
+                            SniperSignalDetails.symbol == subquery.c.symbol,
+                            SniperSignalDetails.signal_strength == subquery.c.max_strength
+                        )
+                    )
+                    .where(
+                        and_(
+                            SniperSignalDetails.email_status.in_([EmailStatus.PENDING, EmailStatus.FAILED]),
+                            SniperSignalDetails.email_sent_at.is_(None),  # 🛡️ 雙重確認未發送
+                            SniperSignalDetails.email_retry_count < 5      # 🛡️ 重試次數限制
+                        )
+                    )
+                    .order_by(
+                        SniperSignalDetails.symbol,
+                        desc(SniperSignalDetails.signal_strength),
+                        SniperSignalDetails.created_at.asc()  # 🎯 相同品質時，選擇最早的
+                    )
+                )
+                
+                best_signals = result.scalars().all()
+                
+                if not best_signals:
+                    logger.debug("📧 沒有待發送的最優信號")
+                    return
+                
+                # 🎯 去重：確保每個幣種只選擇一個信號（選擇最早的最佳品質信號）
+                unique_signals = {}
+                for signal in best_signals:
+                    if signal.symbol not in unique_signals:
+                        unique_signals[signal.symbol] = signal
+                    else:
+                        # 如果已存在該幣種，比較創建時間，選擇更早的
+                        existing = unique_signals[signal.symbol]
+                        if signal.created_at < existing.created_at:  # 🎯 選擇更早的
+                            unique_signals[signal.symbol] = signal
+                
+                best_signals = list(unique_signals.values())
+                logger.info(f"📧 找到 {len(best_signals)} 個幣種的最優信號 (已去重)")
+                
+                for signal in best_signals:
+                    try:
+                        # 🛡️ 檢查今日是否已發送該幣種信號
+                        symbol_key = f"{signal.symbol}_{datetime.now().strftime('%Y%m%d')}"
+                        if symbol_key in self._sent_signals_today:
+                            logger.debug(f"⏭️ 今日已發送 {signal.symbol} 信號，跳過")
+                            continue
+                        
+                        # 🛡️ 再次確認未發送過
+                        if signal.email_status == EmailStatus.SENT or signal.email_sent_at:
+                            logger.debug(f"⏭️ 跳過已發送信號: {signal.signal_id}")
+                            continue
+                        
+                        # 更新狀態為發送中
+                        await self._update_email_status(db, signal.signal_id, EmailStatus.SENDING)
+                        
+                        # 嘗試發送
+                        success = await self._attempt_send_email(signal, max_retries=3)
+                        
+                        if success:
+                            await self._update_email_status(db, signal.signal_id, EmailStatus.SENT,
+                                                          sent_at=datetime.utcnow())
+                            
+                            # 🎯 記錄今日已發送該幣種
+                            self._sent_signals_today.add(symbol_key)
+                            
+                            logger.info(f"✅ 發送成功: {signal.symbol} 最優信號 (信心度: {signal.signal_strength:.3f})")
+                        else:
+                            # 檢查重試次數限制
+                            current_retry_count = signal.email_retry_count + 1
+                            
+                            if current_retry_count >= 5:  # 最多重試 5 次
+                                await self._update_email_status(db, signal.signal_id, EmailStatus.FAILED,
+                                                              error_msg=f"發送失敗，已達最大重試次數 ({current_retry_count})")
+                                logger.error(f"❌ 發送徹底失敗: {signal.symbol} {signal.signal_id}，已達最大重試次數 {current_retry_count}")
+                            else:
+                                # 發送失敗，增加重試次數
+                                await self._increment_retry_count(db, signal.signal_id)
+                                await self._update_email_status(db, signal.signal_id, EmailStatus.FAILED,
+                                                              error_msg=f"發送失敗，30秒後重試 (次數: {current_retry_count})")
+                                logger.warning(f"❌ 發送失敗: {signal.symbol} {signal.signal_id}，30秒後重試 (次數: {current_retry_count})")
+                        
+                        # 發送間隔 - 避免過於頻繁
+                        await asyncio.sleep(3)
+                        
+                    except Exception as e:
+                        logger.error(f"❌ 處理信號 {signal.signal_id} 時異常: {e}")
+                        continue
+                        
+            finally:
+                await db.close()
+                
+        except Exception as e:
+            logger.error(f"❌ 掃描最優信號異常: {e}")
+    
     async def _scan_and_send_pending_emails(self):
         """掃描並發送待發送的 Email"""
         if not self.gmail_service:
@@ -202,7 +350,7 @@ class SniperEmailManager:
             db = await db_gen.__anext__()
             
             try:
-                # 查詢待發送和失敗的信號 (排除已發送的)
+                # 查詢待發送和失敗的信號 (排除已發送和發送中的)
                 result = await db.execute(
                     select(SniperSignalDetails).where(
                         and_(
@@ -210,7 +358,8 @@ class SniperEmailManager:
                                 EmailStatus.PENDING, 
                                 EmailStatus.FAILED
                             ]),
-                            SniperSignalDetails.email_retry_count < 5  # 最多重試 5 次
+                            SniperSignalDetails.email_retry_count < 5,  # 🎯 統一重試限制為 5 次
+                            SniperSignalDetails.email_sent_at.is_(None)  # 🛡️ 確保未發送過
                         )
                     )
                 )
@@ -224,6 +373,11 @@ class SniperEmailManager:
                 
                 for signal in pending_signals:
                     try:
+                        # 🛡️ 雙重檢查：確保信號未發送過
+                        if signal.email_status == EmailStatus.SENT or signal.email_sent_at:
+                            logger.debug(f"⏭️ 跳過已發送信號: {signal.signal_id}")
+                            continue
+                        
                         # 更新狀態為重試中
                         await self._update_email_status(db, signal.signal_id, EmailStatus.RETRYING)
                         
@@ -235,14 +389,22 @@ class SniperEmailManager:
                                                           sent_at=datetime.utcnow())
                             logger.info(f"✅ 補發成功: {signal.symbol} {signal.signal_id}")
                         else:
-                            # 增加重試次數
-                            await self._increment_retry_count(db, signal.signal_id)
-                            await self._update_email_status(db, signal.signal_id, EmailStatus.FAILED,
-                                                          error_msg=f"掃描重試失敗 (次數: {signal.email_retry_count + 1})")
-                            logger.warning(f"❌ 補發失敗: {signal.symbol} {signal.signal_id}")
+                            # 檢查重試次數限制
+                            current_retry_count = signal.email_retry_count + 1
+                            
+                            if current_retry_count >= 5:  # 最多重試 5 次
+                                await self._update_email_status(db, signal.signal_id, EmailStatus.FAILED,
+                                                              error_msg=f"補發徹底失敗，已達最大重試次數 ({current_retry_count})")
+                                logger.error(f"❌ 補發徹底失敗: {signal.symbol} {signal.signal_id}，已達最大重試次數 {current_retry_count}")
+                            else:
+                                # 增加重試次數
+                                await self._increment_retry_count(db, signal.signal_id)
+                                await self._update_email_status(db, signal.signal_id, EmailStatus.FAILED,
+                                                              error_msg=f"掃描重試失敗 (次數: {current_retry_count})")
+                                logger.warning(f"❌ 補發失敗: {signal.symbol} {signal.signal_id}，重試次數: {current_retry_count}")
                         
-                        # 避免發送過快
-                        await asyncio.sleep(2)
+                        # 避免發送過快 - 加長間隔
+                        await asyncio.sleep(15)  # 🎯 延長到5秒，避免頻繁操作
                         
                     except Exception as e:
                         logger.error(f"❌ 處理信號 {signal.signal_id} 時異常: {e}")

@@ -14,11 +14,11 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 class TimeframeCategory(Enum):
-    """時間框架分類"""
-    ULTRA_SHORT = "ultra_short"  # 超短線: 1-15分鐘
-    SHORT = "short"              # 短線: 15分鐘-2小時
-    MEDIUM = "medium"            # 中線: 2-24小時
-    LONG = "long"                # 長線: 1-7天
+    """時間框架分類 - 統一標準"""
+    ULTRA_SHORT = "ultra_short"  # 超短線: 1-90分鐘 (對應 SHORT_TERM)
+    SHORT = "short"              # 短線: 1.5-8小時
+    MEDIUM = "medium"            # 中線: 8-48小時
+    LONG = "long"                # 長線: 24-120小時
 
 @dataclass
 class TimeframeAdjustmentFactor:

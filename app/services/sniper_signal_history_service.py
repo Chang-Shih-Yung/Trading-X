@@ -16,7 +16,7 @@ from app.models.sniper_signal_history import (
     TradingTimeframe
 )
 from app.core.database import db_manager
-from sniper_unified_data_layer import TradingTimeframe as SniperTimeframe, DynamicRiskParameters
+# from sniper_unified_data_layer import TradingTimeframe as SniperTimeframe, DynamicRiskParameters  # 已移除舊版檔案
 import logging
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ class SniperSignalTracker:
         signal_strength: float,
         confluence_count: int,
         timeframe: TradingTimeframe,
-        risk_params: DynamicRiskParameters,
+        risk_params: Optional[Dict] = None,  # 改為字典型別，取代 DynamicRiskParameters
         metadata: Optional[Dict] = None
     ) -> str:
         """
@@ -65,8 +65,8 @@ class SniperSignalTracker:
             else:
                 quality = SignalQuality.LOW
             
-            # 計算過期時間
-            expiry_hours = risk_params.expiry_hours
+            # 計算過期時間 - 修復：使用字典訪問取代屬性訪問
+            expiry_hours = risk_params.get('expiry_hours', 24) if risk_params else 24
             expires_at = datetime.now() + timedelta(hours=expiry_hours)
             
             # 計算風險回報比
@@ -82,7 +82,7 @@ class SniperSignalTracker:
             # 準備額外元數據
             metadata_json = json.dumps(metadata or {})
             
-            # 創建詳細記錄
+            # 創建詳細記錄 - 修復：使用字典訪問
             signal_detail = SniperSignalDetails(
                 signal_id=signal_id,
                 symbol=symbol,
@@ -96,13 +96,13 @@ class SniperSignalTracker:
                 timeframe=timeframe,
                 expiry_hours=expiry_hours,
                 risk_reward_ratio=risk_reward_ratio,
-                market_volatility=risk_params.market_volatility,
-                atr_value=risk_params.atr_value,
-                market_regime=getattr(risk_params, 'market_regime', None),
+                market_volatility=risk_params.get('market_volatility', 0.15) if risk_params else 0.15,
+                atr_value=risk_params.get('atr_value', 100.0) if risk_params else 100.0,
+                market_regime=risk_params.get('market_regime', 'UNKNOWN') if risk_params else 'UNKNOWN',
                 expires_at=expires_at,
                 status=SignalStatus.ACTIVE,
-                layer_one_time=getattr(risk_params, 'layer_one_time', None),
-                layer_two_time=getattr(risk_params, 'layer_two_time', None),
+                layer_one_time=risk_params.get('layer_one_time') if risk_params else None,
+                layer_two_time=risk_params.get('layer_two_time') if risk_params else None,
                 pass_rate=getattr(risk_params, 'pass_rate', None),
                 metadata_json=metadata_json,
                 reasoning=metadata.get('reasoning', '') if metadata else ''

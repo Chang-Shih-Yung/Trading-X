@@ -29,10 +29,10 @@ class SignalQuality(PyEnum):
     LOW = "LOW"         # 低品質 (信號強度 < 0.4)
 
 class TradingTimeframe(PyEnum):
-    """交易時間框架枚舉"""
-    SHORT_TERM = "SHORT_TERM"   # 短線 (1-12小時)
-    MEDIUM_TERM = "MEDIUM_TERM" # 中線 (6-36小時)
-    LONG_TERM = "LONG_TERM"     # 長線 (12-96小時)
+    """交易時間框架枚舉 - 統一標準"""
+    SHORT_TERM = "SHORT_TERM"   # 短線 (1.5-8小時)
+    MEDIUM_TERM = "MEDIUM_TERM" # 中線 (8-48小時)
+    LONG_TERM = "LONG_TERM"     # 長線 (24-120小時)
 
 class SniperSignalDetails(Base):
     """
