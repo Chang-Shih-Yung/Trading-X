@@ -1,0 +1,27 @@
+{
+  "mode": "quick",
+  "start_time": "2025-08-05T20:14:58.386586",
+  "categories": {
+    "unit": {
+      "category": "unit",
+      "total_files": 0,
+      "test_results": [],
+      "summary": {
+        "passed": 0,
+        "failed": 0,
+        "errors": 0
+      }
+    },
+    "integration": {
+      "category": "integration",
+      "total_files": 0,
+      "test_results": [],
+      "summary": {
+        "passed": 0,
+        "failed": 0,
+        "errors": 0
+      }
+    }
+  },
+  "end_time": "2025-08-05T20:14:58.387250"
+}
