@@ -1,15 +1,21 @@
 {
   "strategy_dependency_graph": {
-    "strategy_name": "Phase1C 信號標準化引擎（生產級）",
-    "description": "統一信號格式化、品質評分、優先級排序與輸出標準化系統",
-    "version": "2.0.0",
+    "strategy_name": "Phase1C 信號標準化引擎（實戰級）",
+    "description": "統一信號格式化、品質評分、優先級排序與輸出標準化系統 - 延遲感知、跨市場驗證、ML適應",
+    "version": "2.1.0",
     "dependencies": {
       "core_dependencies": [
         "phase1b_volatility_adaptation",
         "indicator_dependency_graph",
         "pandas_ta_indicators"
       ],
-      "external_libraries": ["numpy", "pandas", "logging", "datetime"],
+      "external_libraries": ["numpy", "pandas", "logging", "datetime", "scipy"],
+      "market_regime_detector": "phase3_market_analyzer",
+      "cross_market_data": [
+        "btc_correlation",
+        "total_market_cap",
+        "liquidity_metrics"
+      ],
       "signal_sources": [
         "phase1b_volatility_regime_signals",
         "technical_indicator_signals",
@@ -26,15 +32,107 @@
       "expects_from_phase1b": "{symbol}_{timeframe}_volatility_regime",
       "expects_from_indicator_graph": "{symbol}_{timeframe}_{indicator_name}",
       "processes_multiple_signal_types": true,
-      "requires_quality_scoring": true
+      "requires_quality_scoring": true,
+      "cross_market_validation": true
     },
     "computation_flow": {
-      "layer_1_signal_collection": {
-        "description": "信號收集與初步驗證層",
+      "layer_0_cross_module_sync": {
+        "description": "跨模組時間戳統一同步層 - 解決上游數據同步衝突",
         "dependencies": [],
+        "sync_tolerance_ms": 200,
+        "implementation": {
+          "shared_timestamp_source": "system_utc_with_exchange_offset",
+          "sync_validation": "all_modules_use_same_reference",
+          "fallback_strategy": "use_latest_valid_timestamp"
+        },
+        "integration_points": {
+          "phase1b_sync": "inherit_from_cross_module_sync",
+          "indicator_graph_sync": "inherit_from_cross_module_sync",
+          "validation": "verify_all_inputs_synchronized"
+        },
+        "output": "synchronized_timestamp_reference",
+        "computation_time_ms": 1
+      },
+      "layer_1_signal_collection": {
+        "description": "信號收集與初步驗證層 - 延遲感知採樣",
+        "dependencies": ["layer_0_cross_module_sync"],
+        "market_regime_aware_processing": {
+          "extreme_market_detection": {
+            "btc_rapid_move_threshold": "> 2% in 5min",
+            "trigger_high_frequency_sampling": "5s mini-batch processing",
+            "priority_signal_fast_track": "< 2ms for tier_1_candidates"
+          },
+          "anomaly_isolation": {
+            "z_score_filtering": {
+              "enabled": true,
+              "threshold": 3.0,
+              "isolation_tag": "ANOMALY_CANDIDATE"
+            },
+            "mad_filtering": {
+              "enabled": true,
+              "threshold": 2.5,
+              "description": "Median Absolute Deviation 離群檢測"
+            }
+          }
+        },
         "operations": {
+          "signal_format_adapter": {
+            "description": "上游信號格式標準化適配器 - 解決格式不統一問題",
+            "input": "raw_upstream_signals",
+            "adapters": {
+              "phase1b_adapter": {
+                "input_format": "{symbol}_{timeframe}_volatility_regime",
+                "output_mapping": {
+                  "strategy": "volatility_adaptation",
+                  "signal_type": "extract_from_regime_type",
+                  "mapping_rules": {
+                    "VOLATILITY_BREAKOUT": "BREAKOUT",
+                    "VOLATILITY_MEAN_REVERSION": "MEAN_REVERSION",
+                    "VOLATILITY_REGIME_CHANGE": "REGIME_CHANGE"
+                  }
+                }
+              },
+              "indicator_adapter": {
+                "input_format": "{symbol}_{timeframe}_{indicator_name}",
+                "output_mapping": {
+                  "strategy": "technical_analysis",
+                  "signal_type": "derive_from_indicator_signal",
+                  "mapping_rules": {
+                    "RSI_oversold|RSI_overbought": "MEAN_REVERSION",
+                    "MACD_bullish|MACD_bearish": "TREND_FOLLOWING",
+                    "BB_breakout": "BREAKOUT",
+                    "volume_confirmation": "TECHNICAL_CONVERGENCE"
+                  }
+                }
+              }
+            },
+            "output": "format_standardized_signals",
+            "computation_time_ms": 2
+          },
+          "quality_score_standardization": {
+            "description": "統一品質評分轉換機制 - 解決評分標準差異",
+            "input": "format_standardized_signals",
+            "conversions": {
+              "phase1b_to_standard": {
+                "false_breakout_probability": "1.0 - false_breakout_probability",
+                "signal_stability_score": "signal_stability_score",
+                "multi_confirmation_status": {
+                  "CONFIRMED": 1.0,
+                  "PARTIAL": 0.7,
+                  "NONE": 0.4
+                },
+                "composite_formula": "min(1.0, (1-false_breakout) * stability * confirmation_factor)"
+              },
+              "indicator_to_standard": {
+                "numerical_quality": "use_directly_if_0_to_1_range",
+                "fallback_quality": "0.6_default_for_missing_scores"
+              }
+            },
+            "output": "quality_standardized_signals",
+            "computation_time_ms": 1
+          },
           "volatility_signal_collection": {
-            "input": "phase1b_volatility_adaptation_signals",
+            "input": "quality_standardized_signals",
             "signal_types": [
               "VOLATILITY_BREAKOUT",
               "VOLATILITY_MEAN_REVERSION",
@@ -47,10 +145,10 @@
               "source_verification": "phase1b_volatility_adaptation_v2"
             },
             "output": "validated_volatility_signals",
-            "computation_time_ms": 3
+            "computation_time_ms": 2
           },
           "technical_indicator_signal_collection": {
-            "input": "indicator_dependency_graph_outputs",
+            "input": "quality_standardized_signals",
             "indicators": [
               "RSI_signals",
               "MACD_signals",
@@ -60,13 +158,38 @@
             "quality_filtering": {
               "minimum_quality_score": 0.6,
               "multi_indicator_confirmation": true,
-              "data_sync_verification": "layer_-1_data_sync"
+              "data_sync_verification": "layer_0_cross_module_sync"
             },
             "output": "validated_technical_signals",
-            "computation_time_ms": 5
+            "computation_time_ms": 3
+          },
+          "enhanced_conflict_prevention": {
+            "description": "預防上游信號衝突的智能機制",
+            "input": ["validated_volatility_signals", "validated_technical_signals"],
+            "conflict_detection": {
+              "temporal_conflict": {
+                "detection_window": "30s",
+                "phase1b_vs_indicator_signals": "check_contradictory_directions",
+                "resolution_strategy": "weighted_confidence_based_selection"
+              },
+              "quality_conflict": {
+                "low_quality_phase1b_vs_high_quality_indicator": "prefer_indicator",
+                "high_quality_phase1b_vs_low_quality_indicator": "prefer_phase1b",
+                "similar_quality": "use_signal_diversity_preference"
+              }
+            },
+            "preprocessing_optimization": {
+              "upstream_signal_pre_filtering": {
+                "phase1b_minimum_stability": 0.7,
+                "indicator_minimum_quality": 0.6,
+                "early_rejection": "reduce_downstream_processing_load"
+              }
+            },
+            "output": "conflict_resolved_signals",
+            "computation_time_ms": 2
           },
           "signal_integrity_check": {
-            "input": "all_collected_signals",
+            "input": "conflict_resolved_signals",
             "checks": {
               "timestamp_alignment": "所有信號時間戳對齊檢查",
               "duplicate_detection": "重複信號識別與去除",
@@ -78,14 +201,27 @@
               "quality_based": "higher_quality_score_wins",
               "timestamp_based": "latest_signal_wins"
             },
+            "intelligent_conflict_handling": {
+              "conflicting_signal_diversion": {
+                "enabled": true,
+                "examples": "RSI_oversold + Phase1B_breakout 同時觸發",
+                "action": "route_to_secondary_validation_module",
+                "validation_timeout": "3s max"
+              },
+              "cross_exchange_alignment": {
+                "enabled": true,
+                "latency_compensation": "binance_futures vs binance_spot time_diff",
+                "max_acceptable_drift": "200ms"
+              }
+            },
             "output": "integrity_verified_signals",
-            "computation_time_ms": 4
+            "computation_time_ms": 2
           }
         }
       },
       "layer_2_signal_standardization": {
-        "description": "信號標準化與格式統一層",
-        "dependencies": ["layer_1_signal_collection"],
+        "description": "信號標準化與格式統一層 - 跨市場驗證",
+        "dependencies": ["layer_0_cross_module_sync", "layer_1_signal_collection"],
         "operations": {
           "signal_format_standardization": {
             "input": "integrity_verified_signals",
@@ -108,7 +244,7 @@
               "source": "strategy_module_version"
             },
             "output": "standardized_signals",
-            "computation_time_ms": 6
+            "computation_time_ms": 4
           },
           "quality_score_enhancement": {
             "input": "standardized_signals",
@@ -136,17 +272,51 @@
               "historical_accuracy": {
                 "enabled": true,
                 "weight": 0.15,
-                "description": "歷史準確率加權"
+                "description": "歷史準確率加權",
+                "dynamic_weighting": {
+                  "low_volatility_period": "reduce_volatility_strategy_weight by 30%",
+                  "high_volatility_period": "increase_volatility_strategy_weight by 20%",
+                  "market_regime_adaptive": true
+                }
+              }
+            },
+            "cross_market_validation": {
+              "enabled": true,
+              "btc_correlation_check": {
+                "for_altcoins": "check_btc_totalcap_synchronization",
+                "correlation_threshold": 0.7,
+                "boost_factor": 1.15
+              },
+              "liquidity_weighting": {
+                "formula": "24h_volume / order_book_depth",
+                "low_liquidity_penalty": "multiply by 0.85",
+                "high_liquidity_boost": "multiply by 1.1"
+              }
+            },
+            "trading_session_adaptation": {
+              "asian_session": {
+                "technical_convergence_weight": 0.35,
+                "volume_weight": 0.15
+              },
+              "european_session": {
+                "technical_convergence_weight": 0.25,
+                "volume_weight": 0.25
+              },
+              "american_session": {
+                "volume_weight": 0.35,
+                "technical_convergence_weight": 0.15
               }
             },
             "quality_calculation": {
               "base_score": "original_signal_quality",
               "enhancement_multiplier": "weighted_sum_of_factors",
-              "final_score": "min(1.0, base_score * enhancement_multiplier)",
+              "session_adjustment": "trading_session_specific_weights",
+              "liquidity_adjustment": "liquidity_weighting_factor",
+              "final_score": "min(1.0, base_score * enhancement_multiplier * session_adjustment * liquidity_adjustment)",
               "confidence_boost": "quality_score_based_confidence_adjustment"
             },
             "output": "enhanced_quality_signals",
-            "computation_time_ms": 8
+            "computation_time_ms": 6
           },
           "signal_metadata_enrichment": {
             "input": "enhanced_quality_signals",
@@ -155,13 +325,16 @@
                 "current_volatility": "absolute_volatility_level",
                 "volatility_percentile": "timeframe_specific_percentile",
                 "market_activity_level": "HIGH|NORMAL|LOW",
-                "trading_session": "ASIAN|EUROPEAN|AMERICAN|OVERLAP"
+                "trading_session": "ASIAN|EUROPEAN|AMERICAN|OVERLAP",
+                "btc_correlation": "current_correlation_coefficient",
+                "market_regime": "trending|sideways|volatile"
               },
               "risk_metrics": {
                 "signal_risk_level": "LOW|MEDIUM|HIGH",
                 "recommended_position_size": "volatility_adjusted_size",
                 "stop_loss_suggestion": "atr_based_stop_loss",
-                "take_profit_suggestion": "risk_reward_optimized"
+                "take_profit_suggestion": "risk_reward_optimized",
+                "liquidity_score": "0.0-1.0"
               },
               "execution_guidance": {
                 "optimal_execution_timeframe": "strategy_recommended_timeframe",
@@ -170,13 +343,30 @@
               }
             },
             "output": "enriched_metadata_signals",
-            "computation_time_ms": 5
+            "computation_time_ms": 3
           }
         }
       },
       "layer_3_signal_prioritization": {
-        "description": "信號優先級排序與篩選層",
-        "dependencies": ["layer_2_signal_standardization"],
+        "description": "信號優先級排序與篩選層 - 動態調整",
+        "dependencies": ["layer_0_cross_module_sync", "layer_2_signal_standardization"],
+        "extreme_market_fast_track": {
+          "description": "極端市場快速通道 - 解決延遲預算超標問題",
+          "detection_threshold": "btc_move > 2% in 5min",
+          "tier_1_fast_track": {
+            "target_latency_ms": 15,
+            "allocation": {
+              "signal_collection": "3ms (cached_volatility + priority_indicators)",
+              "format_adaptation": "2ms (pre_computed_mappings)",
+              "quality_standardization": "1ms (lookup_tables)",
+              "basic_scoring": "4ms (essential_dimensions_only)",
+              "immediate_output": "3ms (tier_1_bypass_complex_scoring)",
+              "buffer": "2ms"
+            },
+            "bypass_complex_processing": true,
+            "essential_scoring_only": true
+          }
+        },
         "operations": {
           "multi_dimensional_scoring": {
             "input": "enriched_metadata_signals",
@@ -208,12 +398,25 @@
               "risk_reward_ratio": {
                 "weight": 0.1,
                 "calculation": "expected_profit / expected_risk",
-                "description": "風險報酬比評估"
+                "description": "風險報酬比評估",
+                "high_ratio_boost": "if risk_reward > 3.0: apply 1.2x multiplier"
+              }
+            },
+            "dynamic_priority_adjustment": {
+              "rapid_market_movement": {
+                "volatility_threshold": "> 95th percentile",
+                "tier_2_promotion": "promote_to_execution_layer",
+                "description": "快速變動時 Tier 2 臨時提升"
+              },
+              "signal_scarcity_boost": {
+                "low_signal_frequency": "< 3 signals per 15min",
+                "individual_signal_weight_boost": 1.25,
+                "description": "低信號頻率時提高單一信號權重"
               }
             },
             "composite_score": "weighted_sum_of_dimensions",
             "output": "multi_dimensional_scored_signals",
-            "computation_time_ms": 7
+            "computation_time_ms": 5
           },
           "signal_ranking_algorithm": {
             "input": "multi_dimensional_scored_signals",
@@ -230,7 +433,7 @@
               "filtered_signals": "composite_score < 0.4"
             },
             "output": "ranked_signal_tiers",
-            "computation_time_ms": 4
+            "computation_time_ms": 2
           },
           "signal_filtering_rules": {
             "input": "ranked_signal_tiers",
@@ -241,20 +444,36 @@
               "signal_diversity_requirement": "different_signal_types_preferred",
               "temporal_filtering": "avoid_signals_within_5min"
             },
+            "reverse_signal_conflict_suppression": {
+              "enabled": true,
+              "conflict_detection_window": "1min",
+              "action": "reduce_both_scores by 20% or delay_transmission",
+              "example": "BUY signal followed by SELL signal within 1min"
+            },
+            "machine_learning_adaptive_thresholds": {
+              "enabled": true,
+              "threshold_adjustment": {
+                "trending_market": "lower minimum_quality_threshold to 0.55",
+                "sideways_market": "raise minimum_quality_threshold to 0.65",
+                "volatile_market": "dynamic threshold based on volatility percentile"
+              },
+              "historical_performance_learning": "adjust weights based on 7-day rolling accuracy"
+            },
             "filtering_logic": {
               "quality_filter": "remove_signals_below_threshold",
               "quantity_filter": "keep_top_n_per_category",
               "diversity_filter": "prefer_complementary_signals",
-              "temporal_filter": "remove_too_recent_duplicates"
+              "temporal_filter": "remove_too_recent_duplicates",
+              "conflict_filter": "apply_reverse_signal_suppression"
             },
             "output": "filtered_high_quality_signals",
-            "computation_time_ms": 3
+            "computation_time_ms": 2
           }
         }
       },
       "layer_4_output_generation": {
-        "description": "最終輸出生成與分發層",
-        "dependencies": ["layer_3_signal_prioritization"],
+        "description": "最終輸出生成與分發層 - 流式輸出",
+        "dependencies": ["layer_0_cross_module_sync", "layer_3_signal_prioritization"],
         "operations": {
           "standardized_output_formatting": {
             "input": "filtered_high_quality_signals",
@@ -276,10 +495,17 @@
               }
             },
             "output": "multi_format_signals",
-            "computation_time_ms": 5
+            "computation_time_ms": 3
           },
           "signal_distribution": {
             "input": "multi_format_signals",
+            "streaming_output": {
+              "enabled": true,
+              "tier_1_immediate_push": "< 2ms latency",
+              "tier_2_batch_push": "every 5s",
+              "tier_3_scheduled_push": "every 15s",
+              "description": "流式推送避免等待所有計算完成"
+            },
             "distribution_channels": {
               "primary_channel": {
                 "destination": "unified_signal_candidate_pool",
@@ -309,32 +535,60 @@
               "tier_3_signals": "monitoring_and_backup_channels"
             },
             "output": "distributed_signals",
-            "computation_time_ms": 3
+            "computation_time_ms": 2
           },
           "performance_metrics_logging": {
             "input": "distributed_signals",
+            "real_time_backtesting": {
+              "enabled": true,
+              "backtest_intervals": ["1min", "5min", "15min"],
+              "accuracy_tracking": "compare_signal_vs_actual_price_movement",
+              "feedback_loop": "adjust_quality_calculation_weights",
+              "description": "即時回測生成真實命中率數據"
+            },
+            "execution_feedback_integration": {
+              "enabled": true,
+              "feedback_metrics": [
+                "order_fill_success_rate",
+                "slippage_percentage",
+                "post_execution_pnl",
+                "time_to_market_move"
+              ],
+              "weight_adjustment": "auto_adjust_signal_strength_calculation",
+              "description": "交易執行引擎回饋迴路"
+            },
+            "latency_distribution_monitoring": {
+              "track_percentiles": ["P50", "P95", "P99"],
+              "sla_target": "< 50ms for P99",
+              "alert_threshold": "P95 > 40ms",
+              "description": "延遲分佈監測確保極端情況可控"
+            },
             "metrics": {
               "signal_generation_metrics": {
                 "total_signals_processed": "count",
                 "signals_by_tier": "tier_distribution",
                 "average_quality_score": "mean_quality",
-                "processing_time": "total_computation_time"
+                "processing_time": "total_computation_time",
+                "real_time_accuracy": "1min/5min/15min hit_rate"
               },
               "quality_metrics": {
                 "multi_confirmation_rate": "percentage_with_multiple_confirmations",
                 "average_confidence_score": "mean_confidence",
-                "signal_diversity_index": "shannon_entropy_of_signal_types"
+                "signal_diversity_index": "shannon_entropy_of_signal_types",
+                "cross_market_correlation": "btc_altcoin_signal_alignment"
               },
               "performance_metrics": {
                 "computation_time_by_layer": "layer_timing_breakdown",
                 "memory_usage": "peak_memory_consumption",
-                "cache_hit_rate": "signal_processing_cache_efficiency"
+                "cache_hit_rate": "signal_processing_cache_efficiency",
+                "streaming_latency": "tier_1_push_latency_p99"
               }
             },
             "logging_destinations": {
               "performance_database": "structured_metrics",
               "monitoring_dashboard": "real_time_kpis",
-              "log_files": "detailed_trace_logs"
+              "log_files": "detailed_trace_logs",
+              "ml_training_pipeline": "accuracy_and_feedback_data"
             },
             "output": "performance_logs",
             "computation_time_ms": 2
@@ -346,7 +600,7 @@
       "format_compatibility": {
         "naming_convention": "{symbol}_{timeframe}_{strategy}_{signal_type}",
         "inherits_from": "indicator_dependency_graph_v2",
-        "output_standardization": "unified_signal_format_v2"
+        "output_standardization": "unified_signal_format_v2.1"
       },
       "standardized_trading_signal": {
         "signal_id": "unique_identifier_uuid",
@@ -365,7 +619,10 @@
           "market_activity_level": "HIGH | NORMAL | LOW",
           "trading_session": "ASIAN | EUROPEAN | AMERICAN | OVERLAP",
           "volume_confirmation": "true | false",
-          "multi_timeframe_alignment": "true | false"
+          "multi_timeframe_alignment": "true | false",
+          "btc_correlation": "0.0-1.0 (for_altcoins)",
+          "market_regime": "trending | sideways | volatile",
+          "liquidity_score": "0.0-1.0"
         },
         "risk_metrics": {
           "signal_risk_level": "LOW | MEDIUM | HIGH",
@@ -385,30 +642,50 @@
           "technical_convergence": "true | false",
           "volume_alignment": "true | false",
           "sentiment_alignment": "true | false",
-          "historical_accuracy": "0.0-1.0 (based_on_historical_performance)"
+          "historical_accuracy": "0.0-1.0 (based_on_historical_performance)",
+          "cross_market_validation": "true | false",
+          "anomaly_flag": "NORMAL | ANOMALY_CANDIDATE"
         },
         "metadata": {
           "timestamp": "ISO_datetime",
-          "source": "phase1c_signal_standardization_v2",
-          "processing_version": "2.0.0",
+          "source": "phase1c_signal_standardization_v2.1",
+          "processing_version": "2.1.0",
           "data_sources": ["source_1", "source_2"],
-          "computation_time_ms": "total_processing_time"
+          "computation_time_ms": "total_processing_time",
+          "streaming_tier": "immediate | batch | scheduled"
         }
       }
     },
     "performance_targets": {
-      "total_computation_time_ms": 40,
-      "layered_processing_times": {
-        "layer_1_signal_collection": "12ms",
-        "layer_2_standardization": "19ms",
-        "layer_3_prioritization": "14ms",
-        "layer_4_output_generation": "10ms"
+      "total_computation_time_ms": 25,
+      "extreme_market_optimization": {
+        "tier_1_signals_fast_track": "< 15ms total processing",
+        "detection_threshold": "btc_move > 2% in 5min",
+        "bypass_complex_scoring": true,
+        "pre_computed_adapters": "startup_time_cached"
       },
-      "signal_processing_capacity": "1000+ signals per batch",
-      "quality_enhancement_effectiveness": "> 95%",
-      "signal_standardization_accuracy": "> 99%",
-      "multi_format_output_generation": "< 5ms",
-      "memory_efficiency": "< 100MB peak usage"
+      "streaming_latency": {
+        "tier_1_signals": "< 2ms immediate push",
+        "tier_2_signals": "< 5s batch push",
+        "tier_3_signals": "< 15s scheduled push"
+      },
+      "layered_processing_times": {
+        "layer_0_cross_module_sync": "1ms (shared_timestamp_reference)",
+        "layer_1_signal_collection": "8ms (format_adapter + quality_std + conflict_prevention)",
+        "layer_2_standardization": "13ms (cross-market validation optimized)",
+        "layer_3_prioritization": "9ms (dynamic adjustment optimized)", 
+        "layer_4_output_generation": "7ms (streaming output optimized)"
+      },
+      "signal_processing_capacity": "1500+ signals per batch (improved)",
+      "quality_enhancement_effectiveness": "> 97% (cross-market validation)",
+      "signal_standardization_accuracy": "> 99.5% (ML adaptive thresholds)",
+      "real_time_accuracy_tracking": "> 85% hit rate in 5min window",
+      "latency_sla": {
+        "p95_latency": "< 20ms",
+        "p99_latency": "< 25ms", 
+        "extreme_market_p99": "< 15ms for tier_1"
+      },
+      "memory_efficiency": "< 100MB peak usage (optimized cross-market data caching)"
     },
     "integration_points": {
       "feeds_to": [
@@ -429,22 +706,45 @@
       "data_sources": [
         "standardized_technical_indicators",
         "volatility_regime_signals",
-        "market_sentiment_data"
+        "market_sentiment_data",
+        "cross_market_correlation_data",
+        "liquidity_metrics"
       ]
     },
     "enhanced_optimization_strategies": {
-      "multi_dimensional_scoring": "綜合評分系統提升信號品質識別",
-      "vectorized_signal_processing": "批次處理提升 70% 處理速度",
-      "adaptive_quality_thresholds": "動態品質閾值適應市場條件",
-      "intelligent_signal_filtering": "智能過濾避免信號冗餘和衝突",
+      "cross_module_timestamp_sync": "統一時間戳同步層解決上游數據不一致問題",
+      "signal_format_adapter": "自動格式轉換確保信號識別和路由正確性",
+      "quality_score_standardization": "統一品質評分標準消除優先級排序偏差",
+      "extreme_market_fast_track": "Tier1信號15ms快速通道滿足極端市場要求",
+      "intelligent_conflict_prevention": "預防Phase1B與Indicator信號衝突機制",
+      "optimized_timing_allocation": "重新分配計算時間預算提升25ms→15ms響應",
+      "extreme_market_adaptive_sampling": "BTC急跌>2%觸發5秒級mini-batch處理",
+      "anomaly_isolation_preprocessing": "Z-score/MAD離群檢測避免異常數據誤導",
+      "cross_market_validation": "BTC相關性檢查提升山寨幣信號品質",
+      "trading_session_weight_adaptation": "亞洲/歐洲/美洲時段自適應權重調整",
+      "liquidity_weighted_scoring": "24h成交額/深度加權過濾低流動性假突破",
+      "dynamic_priority_adjustment": "極端波動時Tier2信號臨時提升執行層",
+      "reverse_signal_conflict_suppression": "1分鐘內反向信號自動降權或延遲",
+      "machine_learning_adaptive_thresholds": "基於7日滾動準確率自動調整閾值",
+      "streaming_output_optimization": "Tier1立即推送減少高價值信號延遲",
+      "real_time_backtesting_feedback": "1/5/15分鐘即時回測調整品質模型",
+      "execution_engine_feedback_loop": "成交回報自動調整信號強度計算",
+      "latency_distribution_monitoring": "P95/P99延遲監測確保極端情況SLA",
       "layered_caching_strategy": {
+        "format_adapter_cache_30s": ["phase1b_mappings", "indicator_mappings"],
+        "quality_conversion_cache_60s": ["confirmation_status_lookup", "numerical_quality_ranges"],
         "signal_cache_30s": ["standardized_signals", "quality_scores"],
-        "metadata_cache_60s": ["market_context", "risk_metrics"],
-        "performance_cache_120s": ["historical_accuracy", "tier_statistics"]
-      },
-      "parallel_output_generation": "多格式並行輸出減少延遲",
-      "real_time_performance_monitoring": "即時性能監控和自動優化",
-      "memory_optimized_processing": "記憶體使用優化和垃圾回收"
+        "metadata_cache_60s": [
+          "market_context",
+          "risk_metrics", 
+          "cross_market_data"
+        ],
+        "performance_cache_120s": [
+          "historical_accuracy",
+          "tier_statistics",
+          "ml_model_weights"
+        ]
+      }
     },
     "interface_compatibility": {
       "upstream_integration": {
@@ -456,7 +756,9 @@
           "{symbol}_{timeframe}_volatility_regime",
           "{symbol}_{timeframe}_{indicator_name}"
         ],
-        "requires_data_validation": "multi_source_signal_integrity"
+        "format_adapter_layer": "automatic_conversion_to_standard_format",
+        "requires_data_validation": "layer_0_cross_module_sync",
+        "cross_market_data_required": "btc_correlation_totalcap_liquidity"
       },
       "downstream_integration": {
         "provides_to": [
@@ -464,12 +766,14 @@
           "trading_execution_engine"
         ],
         "format_provided": "{symbol}_{timeframe}_{strategy}_{signal_type}",
-        "quality_assurance": "multi_dimensional_quality_scoring"
+        "quality_assurance": "multi_dimensional_quality_scoring",
+        "streaming_capability": "tier_based_immediate_delivery"
       },
       "cross_module_validation": {
         "validates_with": "phase3_market_analyzer",
         "performance_tracking": "signal_performance_monitor",
-        "real_time_monitoring": "standardization_accuracy_tracking"
+        "real_time_monitoring": "standardization_accuracy_tracking",
+        "ml_feedback_integration": "execution_results_learning_pipeline"
       }
     }
   }

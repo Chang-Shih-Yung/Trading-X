@@ -1,0 +1,179 @@
+{
+  "unified_signal_candidate_pool_v3_visual_flow": {
+    "版本": "3.0.0",
+    "標題": "統一信號候選池 v3.0 核心流程視覺化",
+    "描述": "完整EPL預處理 + Phase1A整合 + 事件驅動 + AI適應學習的下一代信號管理中樞",
+    "增強特色": "🧠 AI學習 + 🔄 EPL優化 + ⚡ 極端市場 + 📊 7維度評分 + 🎯 預測過濾",
+    
+    "🎨 視覺化流程圖": {
+      "流程總覽": "🌐 Phase1完整輸入 → 🧠 AI學習引擎 → 🔄 多源融合 → 📊 7維度評分 → 🎯 EPL預處理 → 🚀 Phase2輸出",
+      
+      "🏗️ 層級架構": {
+        "🧠 AI層": {
+          "名稱": "AI適應學習引擎",
+          "表情符號": "🧠🎯",
+          "狀態": "✅ 智能化",
+          "處理時間": "5ms",
+          "描述": "基於EPL決策反饋的自適應學習系統",
+          "核心功能": [
+            "📚 歷史決策學習 (7天滾動數據)",
+            "🎯 預測性過濾 (Random Forest + XGBoost)",
+            "🔄 實時適應 (偏差>20%觸發)",
+            "⚖️ 動態權重調整 (每4小時重計算)"
+          ],
+          "輸出": "ai_optimized_weights_and_filters",
+          "視覺流程": "📊 EPL反饋 → 🧠 學習分析 → ⚖️ 權重調整 → 🎯 預測過濾 → 📤 優化參數"
+        },
+        
+        "🔄 Layer 0": {
+          "名稱": "Phase1完整流程同步整合層",
+          "表情符號": "🔄⚡",
+          "狀態": "✅ 同步優化",
+          "處理時間": "3ms",
+          "描述": "Phase1A到1C完整流程同步整合",
+          "同步機制": {
+            "🕐 統一時間戳": "websocket_realtime_driver 主時間源",
+            "📊 數據流驗證": "WebSocket → Phase1A → Indicators → Phase1B → Phase1C → Pool",
+            "⚡ 極端市場通道": "BTC>3%變動 → <60ms總延遲"
+          },
+          "操作步驟": {
+            "時間戳同步": "100ms容忍度，主源統一",
+            "數據流完整性": "任意環節中斷檢測",
+            "極端市場檢測": "BTC_5min_change > 3% OR volume_surge > 8x"
+          },
+          "輸出": "synchronized_phase1_complete_data_flow",
+          "視覺流程": "🌐 WebSocket → 🔄 Phase1A → 📊 並行[Indicators+Phase1B] → 🎯 Phase1C → ✅ 同步驗證"
+        },
+        
+        "🎯 Layer 1": {
+          "名稱": "增強版多源信號融合與品質評估",
+          "表情符號": "🎯📊",
+          "狀態": "✅ AI增強",
+          "處理時間": "12ms",
+          "描述": "AI權重調整的智能信號收集與7維度評分",
+          "多源整合": {
+            "🎨 Phase1A基礎": "基礎權重 0.25 → AI調整 0.20-0.35",
+            "🔧 Indicator技術": "基礎權重 0.20 → AI調整 0.15-0.30",
+            "🌊 Phase1B波動": "基礎權重 0.25 → AI調整 0.20-0.35",
+            "⭐ Phase1C標準": "基礎權重 0.30 → AI調整 0.25-0.40"
+          },
+          "操作步驟": {
+            "🎯 智能信號收集": {
+              "輸入源動態權重": "AI學習調整基礎權重",
+              "市場制度適應": "趨勢/橫盤/波動市場自動調整",
+              "信號品質過濾": "多層品質檢驗機制",
+              "時間": "4ms"
+            },
+            "🏭 7維度綜合評分": {
+              "維度1_信號強度": "權重0.25 - weighted_avg(source_strength * AI_weight)",
+              "維度2_置信度": "權重0.20 - confidence_aggregation + AI調整",
+              "維度3_數據品質": "權重0.15 - timestamp_sync + completeness",
+              "維度4_市場一致性": "權重0.12 - btc_correlation + sentiment",
+              "維度5_時間效應": "權重0.10 - trading_session + time_bias",
+              "維度6_流動性因子": "權重0.10 - volume/depth ratio",
+              "維度7_歷史準確率": "權重0.08 - 30天EPL通過率",
+              "時間": "8ms"
+            }
+          },
+          "輸出": "7_dimensional_scored_signals",
+          "視覺流程": "🌐 多源輸入 → 🧠 AI權重 → 🎯 智能收集 → 📊 7維評分 → 📤 評分信號"
+        },
+        
+        "🚀 Layer 2": {
+          "名稱": "EPL預處理優化層",
+          "表情符號": "🚀🎯",
+          "狀態": "✅ EPL優化",
+          "處理時間": "8ms",
+          "描述": "為EPL系統優化的預處理與格式化",
+          "EPL導向設計": {
+            "🎯 成功預測": "XGBoost模型，>75%準確率",
+            "🔧 信號優化": "去重增強 + 互補性選擇",
+            "📊 格式化": "EPL標準輸入格式",
+            "⚡ 緊急通道": "極端信號<10ms直達EPL"
+          },
+          "操作步驟": {
+            "🎯 EPL導向過濾": {
+              "預測模型": "歷史EPL決策XGBoost",
+              "過濾策略": "predicted_epl_pass > 0.4",
+              "信號優化": "30s去重 + 互補選擇 + 數量控制",
+              "時間": "5ms"
+            },
+            "📊 EPL輸入格式化": {
+              "標準化輸出": "signal_id + source + strength + confidence + prediction",
+              "EPL優化欄位": "risk + priority + sizing + stop_loss + take_profit",
+              "時間": "2ms"
+            },
+            "⚡ 緊急信號通道": {
+              "檢測": "market_shock OR flash_crash OR massive_volume",
+              "處理": "跳過排隊，直接EPL",
+              "延遲": "<10ms to EPL",
+              "時間": "1ms"
+            }
+          },
+          "輸出": "epl_optimized_signal_candidates",
+          "視覺流程": "📊 評分信號 → 🎯 EPL預測 → 🔧 格式優化 → ⚡ 緊急通道 → 🚀 EPL就緒"
+        }
+      }
+    },
+
+    "⚡ 性能視覺化": {
+      "總處理時間": "28ms (3+12+8+5ms AI)",
+      "極端市場": "<60ms 端到端響應",
+      "分層時間分配": {
+        "🧠 AI學習層": "5ms (權重調整 + 預測過濾)",
+        "🔄 Phase1同步": "3ms (完整流程同步)",
+        "🎯 多源融合": "12ms (7維度評分 + AI權重)",
+        "🚀 EPL預處理": "8ms (優化 + 格式化)"
+      },
+      "延遲分佈": {
+        "P50": "<20ms",
+        "P95": "<25ms", 
+        "P99": "<30ms",
+        "極端市場P99": "<60ms"
+      }
+    },
+
+    "🎯 創新特色視覺化": {
+      "🧠 AI適應學習": {
+        "描述": "基於EPL反饋自動權重調整",
+        "效果": "準確率提升30%",
+        "視覺": "📊 EPL反饋 → 🧠 學習 → ⚖️ 調整 → 📈 提升"
+      },
+      "🔄 完整Phase1整合": {
+        "描述": "WebSocket到Phase1C完整流程",
+        "效果": "統一數據流，零衝突",
+        "視覺": "🌐 → 🎨 → 📊 → 🌊 → ⭐ → 🚀"
+      },
+      "🎯 EPL預處理優化": {
+        "描述": "專為EPL設計的預處理",
+        "效果": "EPL通過率提升15%",
+        "視覺": "📊 → 🎯 → 📋 → ⚡ → 🚀"
+      },
+      "⚡ 極端市場快速通道": {
+        "描述": "<60ms緊急處理能力",
+        "效果": "滿足高頻交易需求",
+        "視覺": "🚨 檢測 → ⚡ 快速通道 → 🚀 立即EPL"
+      }
+    },
+
+    "🔗 整合點視覺化": {
+      "輸入源": [
+        "🌐 websocket_realtime_driver",
+        "🎨 phase1a_basic_signal_generation", 
+        "📊 indicator_dependency_graph",
+        "🌊 phase1b_volatility_adaptation",
+        "⭐ phase1c_signal_standardization"
+      ],
+      "輸出目標": [
+        "🚀 phase2_epl_preprocessing_layer",
+        "📊 signal_performance_monitor",
+        "🔄 ai_learning_feedback_loop"
+      ],
+      "反饋迴路": [
+        "📈 phase2_epl_decision_results",
+        "⚡ phase3_execution_results",
+        "📊 phase4_output_performance"
+      ]
+    }
+  }
+}

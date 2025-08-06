@@ -1,0 +1,201 @@
+{
+  "phase1a_basic_signal_generation_dependency": {
+    "版本": "1.0.0",
+    "創建時間": "2024-12-19",
+    "描述": "Phase1A基礎信號生成技術配置與依賴關係",
+    "模組類型": "signal_generation_foundation",
+    
+    "strategy_dependency_graph": {
+      "核心依賴": {
+        "主要輸入源": {
+          "websocket_realtime_driver": {
+            "類型": "primary_time_source",
+            "數據類型": ["real_time_price", "volume", "market_depth"],
+            "更新頻率": "100ms",
+            "依賴等級": "critical",
+            "故障處理": "system_halt"
+          }
+        },
+        "輸出目標": {
+          "indicator_dependency_graph": {
+            "類型": "parallel_processing",
+            "數據格式": "standardized_basic_signals",
+            "傳輸協議": "async_queue",
+            "優先級": "high"
+          },
+          "phase1b_volatility_adaptation": {
+            "類型": "parallel_processing", 
+            "數據格式": "basic_signal_foundation",
+            "傳輸協議": "async_queue",
+            "優先級": "high"
+          },
+          "phase1c_signal_standardization": {
+            "類型": "downstream_processing",
+            "數據格式": "preprocessed_signals",
+            "傳輸協議": "direct_pipe",
+            "優先級": "medium"
+          }
+        }
+      },
+      
+      "技術依賴": {
+        "計算庫": {
+          "pandas": ">=1.5.0",
+          "numpy": ">=1.21.0", 
+          "asyncio": "內建",
+          "aioredis": ">=2.0.0"
+        },
+        "數據存儲": {
+          "redis_cache": {
+            "用途": "實時數據緩存",
+            "TTL": "300s",
+            "key_pattern": "phase1a:basic:{symbol}:{timestamp}"
+          },
+          "memory_buffer": {
+            "用途": "高速處理緩衝",
+            "大小": "100MB",
+            "類型": "ring_buffer"
+          }
+        }
+      }
+    },
+
+    "dependencies": {
+      "upstream_modules": [
+        {
+          "module": "websocket_realtime_driver",
+          "type": "data_source",
+          "critical": true,
+          "timeout": "1000ms",
+          "retry_strategy": "exponential_backoff"
+        }
+      ],
+      "downstream_modules": [
+        {
+          "module": "indicator_dependency_graph", 
+          "type": "parallel_consumer",
+          "delivery_guarantee": "at_least_once",
+          "max_queue_size": 1000
+        },
+        {
+          "module": "phase1b_volatility_adaptation",
+          "type": "parallel_consumer", 
+          "delivery_guarantee": "at_least_once",
+          "max_queue_size": 500
+        },
+        {
+          "module": "phase1c_signal_standardization",
+          "type": "sequential_consumer",
+          "delivery_guarantee": "exactly_once", 
+          "max_queue_size": 200
+        }
+      ]
+    },
+
+    "computation_flow": {
+      "processing_layers": {
+        "layer_0_websocket_reception": {
+          "輸入": "websocket_realtime_driver.distributed_phase1_real_time_feeds",
+          "處理": "websocket_data_reception_and_buffering",
+          "輸出": "buffered_real_time_market_data",
+          "預期處理時間": "5ms",
+          "錯誤處理": "circuit_breaker_pattern"
+        },
+        "layer_1_basic_preprocessing": {
+          "輸入": "buffered_real_time_market_data", 
+          "處理": "basic_data_cleaning_and_validation",
+          "輸出": "cleaned_market_data",
+          "預期處理時間": "8ms",
+          "錯誤處理": "retry_with_fallback"
+        },
+        "layer_2_signal_pregeneration": {
+          "輸入": "cleaned_market_data",
+          "處理": "basic_signal_pattern_detection",
+          "輸出": "basic_signal_candidates", 
+          "預期處理時間": "7ms",
+          "錯誤處理": "graceful_degradation"
+        },
+        "layer_3_output_standardization": {
+          "輸入": "basic_signal_candidates",
+          "處理": "signal_format_standardization_and_routing",
+          "輸出": "standardized_basic_signals",
+          "預期處理時間": "5ms",
+          "錯誤處理": "best_effort_delivery"
+        }
+      },
+      
+      "總預期處理時間": "25ms",
+      "極端市場處理時間": "<35ms",
+      "並行度": "single_threaded_async",
+      "記憶體使用": "<50MB"
+    },
+
+    "configuration": {
+      "signal_generation_params": {
+        "基礎模式": {
+          "price_change_threshold": 0.001,
+          "volume_change_threshold": 1.5,
+          "signal_strength_range": [0.0, 1.0],
+          "confidence_calculation": "basic_statistical_model"
+        },
+        "極端市場模式": {
+          "price_change_threshold": 0.005,
+          "volume_change_threshold": 3.0, 
+          "signal_strength_boost": 1.2,
+          "priority_escalation": true
+        }
+      },
+      
+      "performance_targets": {
+        "處理延遲P99": "<30ms",
+        "信號產生率": "10-50 signals/minute",
+        "準確率基線": ">60%",
+        "系統可用性": ">99.5%"
+      },
+      
+      "monitoring_config": {
+        "metrics_collection": [
+          "processing_latency",
+          "signal_generation_rate", 
+          "error_rate",
+          "queue_depth"
+        ],
+        "alerting_thresholds": {
+          "processing_latency": ">50ms",
+          "error_rate": ">5%",
+          "queue_depth": ">800"
+        }
+      }
+    },
+
+    "error_handling": {
+      "websocket_disconnection": {
+        "策略": "immediate_circuit_break",
+        "恢復": "wait_for_reconnection",
+        "超時": "30s"
+      },
+      "數據品質異常": {
+        "策略": "skip_invalid_data",
+        "記錄": "error_log_with_sample",
+        "閾值": "error_rate < 10%"
+      },
+      "處理延遲超標": {
+        "策略": "priority_queue_reorder",
+        "降級": "reduce_signal_complexity",
+        "告警": "immediate_notification"
+      }
+    },
+
+    "integration_points": {
+      "入口點": {
+        "websocket_data_feed": "async_message_handler",
+        "emergency_market_signal": "priority_interrupt_handler"
+      },
+      "出口點": {
+        "parallel_distribution": ["indicators", "phase1b"],
+        "sequential_pipeline": "phase1c",
+        "monitoring_feed": "signal_performance_tracker"
+      }
+    }
+  }
+}

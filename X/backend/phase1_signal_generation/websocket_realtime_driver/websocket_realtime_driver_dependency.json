@@ -1,0 +1,329 @@
+{
+  "WEBSOCKET_REALTIME_DRIVER_DEPENDENCY": {
+    "流程概述": "WebSocket實時數據驅動引擎 - Phase1信號生成的數據基礎層",
+    "版本": "1.0.0", 
+    "核心理念": "多交易所實時數據 + 連接管理 + 數據品質保證 + 統一分發",
+
+    "🌐 架構設計": {
+      "連接架構": {
+        "多交易所支援": ["binance_spot", "binance_futures", "okx_spot", "bybit_spot"],
+        "連接模式": "async_websocket_with_connection_pooling",
+        "負載均衡": "round_robin_with_latency_awareness",
+        "容錯機制": "auto_reconnect_with_exponential_backoff"
+      },
+      "數據管道": {
+        "接收緩衝": "ring_buffer_with_overflow_protection",
+        "處理隊列": "priority_queue_by_data_type",
+        "分發機制": "pub_sub_pattern_with_selective_routing",
+        "背壓處理": "adaptive_throttling_on_downstream_congestion"
+      }
+    },
+
+    "⚡ 實時數據流程": {
+      "Layer_0_連接管理": {
+        "層級": "layer_0_connection_management",
+        "描述": "多交易所WebSocket連接池管理",
+        "依賴": "無 (基礎服務層)",
+        "時間": "2ms",
+        "操作": {
+          "🔌 連接池初始化": {
+            "連接數量": "4個主要交易所 x 2個備用連接",
+            "連接配置": {
+              "binance": {
+                "spot_endpoint": "wss://stream.binance.com:9443/ws/btcusdt@kline_1m@kline_5m@depth20@ticker",
+                "futures_endpoint": "wss://fstream.binance.com/ws/btcusdt@kline_1m@markPrice@depth20",
+                "auth_required": "false",
+                "rate_limit": "5 requests/second",
+                "ping_interval": "30s"
+              },
+              "okx": {
+                "endpoint": "wss://ws.okx.com:8443/ws/v5/public",
+                "subscribe_topics": ["candle1m", "candle5m", "books5", "tickers"],
+                "compression": "gzip_enabled"
+              },
+              "bybit": {
+                "endpoint": "wss://stream.bybit.com/v5/public/spot",
+                "topics": ["kline.1.BTCUSDT", "orderbook.1.BTCUSDT", "tickers.BTCUSDT"]
+              }
+            },
+            "健康檢查": "每5秒ping檢測，10秒超時斷線重連",
+            "輸出": "🔌 active_connection_pool"
+          },
+          "🔄 自動重連機制": {
+            "輸入": "connection_health_status",
+            "重連策略": {
+              "第1次": "立即重連 (0s delay)",
+              "第2次": "1秒延遲重連",
+              "第3次": "2秒延遲重連", 
+              "第4次": "4秒延遲重連",
+              "第5次+": "8秒延遲重連 (最大)"
+            },
+            "失敗處理": {
+              "連續失敗閾值": "5次",
+              "降級策略": "切換到備用交易所",
+              "告警機制": "推送連接異常告警"
+            },
+            "輸出": "🔄 reconnection_status"
+          }
+        }
+      },
+
+      "Layer_1_數據接收": {
+        "層級": "layer_1_data_ingestion",
+        "描述": "實時數據接收與初步處理",
+        "依賴": "✅ layer_0_connection_management",
+        "時間": "3ms",
+        "操作": {
+          "📊 多類型數據接收": {
+            "輸入": "active_connection_pool",
+            "數據類型": {
+              "K線數據": {
+                "時間框架": ["1m", "5m", "15m"],
+                "字段": ["open", "high", "low", "close", "volume", "quote_volume", "timestamp"],
+                "頻率": "每分鐘/5分鐘更新",
+                "緩衝大小": "60個數據點 rolling window"
+              },
+              "訂單簿數據": {
+                "深度": "前20檔買賣價",
+                "更新模式": "增量更新 + 全量快照",
+                "頻率": "100-500ms級別更新",
+                "數據結構": "{bids: [[price, qty]], asks: [[price, qty]]}"
+              },
+              "即時成交": {
+                "字段": ["price", "quantity", "timestamp", "is_buyer_maker"],
+                "過濾": "僅大額成交 (>0.1 BTC equivalent)",
+                "聚合": "1秒內成交聚合統計"
+              },
+              "標記價格": {
+                "來源": "futures marking price",
+                "頻率": "1秒更新",
+                "用途": "現貨期貨套利檢測"
+              }
+            },
+            "輸出": "📊 raw_multitype_data_stream"
+          },
+          "🔍 數據驗證": {
+            "輸入": "raw_multitype_data_stream",
+            "驗證規則": {
+              "時間戳驗證": {
+                "時區統一": "所有時間戳轉換為UTC",
+                "時間合理性": "timestamp必須在當前時間±5分鐘內",
+                "順序檢查": "timestamp必須遞增"
+              },
+              "價格驗證": {
+                "合理性檢查": "價格變動 < 10% in 1min (正常市場)",
+                "跨交易所驗證": "同幣對價格偏差 < 1%",
+                "非零檢查": "價格和數量必須 > 0"
+              },
+              "數據完整性": {
+                "必要字段": "檢查所有必要字段存在",
+                "格式驗證": "數值類型和範圍檢查",
+                "JSON格式": "確保JSON結構正確"
+              }
+            },
+            "異常處理": {
+              "數據丟棄": "驗證失敗的數據直接丟棄",
+              "告警記錄": "記錄異常數據統計",
+              "降級策略": "使用最後有效數據"
+            },
+            "輸出": "🔍 validated_data_stream"
+          }
+        }
+      },
+
+      "Layer_2_數據處理": {
+        "層級": "layer_2_data_processing", 
+        "描述": "數據清理、標準化和基礎計算",
+        "依賴": "✅ layer_1_data_ingestion",
+        "時間": "4ms",
+        "操作": {
+          "🧹 數據清理": {
+            "輸入": "validated_data_stream",
+            "清理操作": {
+              "異常值檢測": {
+                "Z-score檢測": "閾值±3標準差",
+                "IQR檢測": "四分位間距離群值檢測",
+                "處理方式": "標記異常但不丟棄"
+              },
+              "缺失值處理": {
+                "K線缺失": "使用前一根K線的收盤價填充",
+                "訂單簿缺失": "使用最後快照數據",
+                "成交數據缺失": "標記為無成交"
+              },
+              "重複數據": {
+                "去重邏輯": "相同timestamp + symbol的數據去重",
+                "保留策略": "保留最新接收的數據"
+              }
+            },
+            "輸出": "🧹 cleaned_data_stream"
+          },
+          "📏 標準化處理": {
+            "輸入": "cleaned_data_stream",
+            "標準化方法": {
+              "價格標準化": {
+                "相對變化": "price_change_pct = (current - previous) / previous",
+                "歸一化": "min_max_scaling to [0, 1] based on 24h range",
+                "對數變換": "log_return for large price movements"
+              },
+              "成交量標準化": {
+                "相對成交量": "volume_ratio = current_volume / 24h_avg_volume",
+                "成交量百分位": "volume_percentile based on historical data",
+                "成交額標準化": "turnover normalized by market cap"
+              },
+              "時間標準化": {
+                "統一時間戳": "all timestamps in UTC milliseconds",
+                "時間對齊": "align to standard intervals (1m, 5m)",
+                "時區標記": "preserve original timezone information"
+              }
+            },
+            "輸出": "📏 standardized_data_stream"
+          },
+          "🔢 基礎計算": {
+            "輸入": "standardized_data_stream",
+            "計算指標": {
+              "價格指標": {
+                "價格動量": "price_momentum = (close - close_5_periods_ago) / close_5_periods_ago",
+                "波動率": "rolling_volatility = std(returns, window=20)",
+                "價格區間": "price_range_pct = (high - low) / close"
+              },
+              "成交量指標": {
+                "成交量趨勢": "volume_trend = EMA(volume, 5) vs EMA(volume, 20)",
+                "成交量異常": "volume_anomaly = current_volume > 3 * rolling_mean(volume, 20)",
+                "資金流": "money_flow = price_change * volume"
+              },
+              "流動性指標": {
+                "買賣價差": "spread_pct = (ask - bid) / mid_price * 100",
+                "訂單簿深度": "book_depth = sum(bid_volume + ask_volume)",
+                "流動性比率": "liquidity_ratio = total_volume / book_depth"
+              }
+            },
+            "輸出": "🔢 calculated_metrics_stream"
+          }
+        }
+      },
+
+      "Layer_3_信號分發": {
+        "層級": "layer_3_signal_distribution",
+        "描述": "處理後數據的智能分發與路由",
+        "依賴": "✅ layer_2_data_processing",
+        "時間": "3ms",
+        "操作": {
+          "🎯 智能路由": {
+            "輸入": "calculated_metrics_stream",
+            "路由規則": {
+              "phase1a_basic_signal_generation": {
+                "數據類型": "all_processed_data",
+                "優先級": "HIGH",
+                "延遲要求": "< 5ms",
+                "格式": "standardized_realtime_format"
+              },
+              "indicator_dependency_graph": {
+                "數據類型": "price_volume_data + basic_indicators",
+                "批次大小": "5 data points",
+                "延遲要求": "< 10ms"
+              },
+              "phase1b_volatility_adaptation": {
+                "數據類型": "volatility_metrics + price_momentum",
+                "觸發條件": "volatility_spike > 95th_percentile",
+                "緊急模式": "immediate_routing"
+              },
+              "unified_signal_candidate_pool": {
+                "數據類型": "extreme_events + anomaly_detections",
+                "觸發條件": "critical_market_events",
+                "延遲要求": "< 3ms"
+              }
+            },
+            "輸出": "🎯 routed_data_streams"
+          },
+          "📡 發布訂閱": {
+            "輸入": "routed_data_streams",
+            "發布機制": {
+              "主題分類": {
+                "realtime_price": "實時價格更新",
+                "volume_alerts": "成交量異常告警",
+                "volatility_spikes": "波動率突增事件",
+                "liquidity_changes": "流動性變化事件"
+              },
+              "訂閱管理": {
+                "動態訂閱": "模組可動態訂閱/取消訂閱主題",
+                "優先級隊列": "CRITICAL > HIGH > MEDIUM > LOW",
+                "背壓控制": "auto_throttling when subscribers lag"
+              }
+            },
+            "輸出": "📡 published_data_streams"
+          },
+          "📊 監控統計": {
+            "輸入": "published_data_streams",
+            "監控指標": {
+              "數據流量": "messages_per_second by topic",
+              "延遲分佈": "p50, p95, p99 latency metrics",
+              "連接狀態": "active_connections by exchange",
+              "錯誤率": "error_rate by data_type",
+              "數據品質": "data_quality_score by source"
+            },
+            "告警規則": {
+              "高延遲": "p95_latency > 50ms",
+              "連接異常": "connection_failure_rate > 5%",
+              "數據品質": "data_quality_score < 0.9",
+              "流量異常": "message_rate deviation > 50%"
+            },
+            "輸出": "📊 monitoring_metrics"
+          }
+        }
+      }
+    },
+
+    "🎯 性能要求與優化": {
+      "延遲目標": {
+        "數據接收": "< 100ms from exchange",
+        "內部處理": "< 12ms (2+3+4+3)",
+        "總延遲": "< 112ms end-to-end"
+      },
+      "吞吐量目標": {
+        "消息處理": "> 10,000 messages/second",
+        "並發連接": "> 20 websocket connections",
+        "數據點": "> 1,000 data points/second"
+      },
+      "可靠性目標": {
+        "連接穩定性": "> 99.9% uptime",
+        "數據完整性": "> 99.8% valid data",
+        "延遲一致性": "p99 < 150ms"
+      }
+    },
+
+    "🔧 技術架構": {
+      "技術棧": {
+        "WebSocket客戶端": "websockets library (Python asyncio)",
+        "數據處理": "pandas + numpy for numerical computation",
+        "消息隊列": "asyncio.Queue with priority support",
+        "監控": "prometheus metrics + custom dashboards"
+      },
+      "部署架構": {
+        "容器化": "Docker容器部署",
+        "擴展性": "水平擴展支援多實例",
+        "負載均衡": "通過exchange分配負載",
+        "監控": "健康檢查 + metrics收集"
+      }
+    },
+
+    "🔗 整合接口": {
+      "提供服務": [
+        "realtime_data_feed_service",
+        "market_event_notification_service", 
+        "data_quality_monitoring_service",
+        "connection_health_status_service"
+      ],
+      "依賴服務": [
+        "exchange_api_credentials_service",
+        "system_configuration_service",
+        "logging_monitoring_service"
+      ],
+      "數據輸出": [
+        "phase1a_basic_signal_generation",
+        "indicator_dependency_graph",
+        "phase1b_volatility_adaptation", 
+        "unified_signal_candidate_pool"
+      ]
+    }
+  }
+}

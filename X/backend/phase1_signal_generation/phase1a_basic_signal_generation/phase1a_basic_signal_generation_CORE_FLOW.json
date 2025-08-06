@@ -1,0 +1,312 @@
+{
+  "PHASE1A_BASIC_SIGNAL_GENERATION_CORE_FLOW": {
+    "流程概述": "Phase1A 基礎信號生成引擎 - WebSocket驅動的實時數據處理層",
+    "版本": "1.0.0",
+    "核心理念": "實時數據接收 + 品質驗證 + 基礎預處理 + 標準化輸出",
+
+    "🔄 數據流程視覺化": {
+      "📡 輸入源": {
+        "WebSocket實時數據": "🌐 多交易所實時數據流 (Binance, OKX, Bybit)",
+        "數據類型": "📊 K線數據 + 📈 技術指標原始值 + 💰 成交量 + 📋 訂單簿",
+        "更新頻率": "⚡ 100ms-1s 級別實時更新",
+        "數據驗證": "🔍 數據完整性 + 時間戳對齊 + 異常檢測"
+      },
+
+      "Layer_0_WebSocket數據接收": {
+        "層級": "layer_0_websocket_data_ingestion",
+        "名稱": "🌐 WebSocket實時數據接收層",
+        "依賴": "無 (基礎數據層)",
+        "時間": "5ms",
+        "視覺標記": "🔵 藍色 → 數據接收",
+        "實時要求": {
+          "延遲目標": "< 100ms from exchange",
+          "數據新鮮度": "< 500ms tolerance",
+          "連接穩定性": "> 99.9% uptime"
+        },
+        "操作": {
+          "🌐 多交易所連接管理": {
+            "交易所列表": ["binance_spot", "binance_futures", "okx", "bybit"],
+            "連接池管理": "async connection pooling",
+            "斷線重連": "exponential backoff (1s, 2s, 4s, 8s)",
+            "心跳檢測": "30s heartbeat with 5s timeout",
+            "連接負載均衡": "round-robin with latency awareness"
+          },
+          "📊 實時數據接收": {
+            "K線數據": {
+              "時間框架": ["1m", "5m", "15m", "1h"],
+              "數據字段": ["open", "high", "low", "close", "volume", "timestamp"],
+              "緩衝機制": "ring buffer (60個數據點)",
+              "驗證": "price range + volume validation"
+            },
+            "訂單簿數據": {
+              "深度等級": "20檔買賣",
+              "更新頻率": "100ms level2 updates",
+              "數據驗證": "spread validation + book integrity",
+              "壓縮存儲": "delta compression"
+            },
+            "成交量指標": {
+              "實時成交": "trade tick data",
+              "成交量趨勢": "rolling volume calculation",
+              "大單檢測": "> 10 BTC equivalents"
+            }
+          },
+          "🔍 數據品質檢驗": {
+            "時間戳驗證": {
+              "同步檢查": "cross-exchange timestamp alignment",
+              "漂移容忍": "< 200ms acceptable drift",
+              "NTP同步": "server time synchronization"
+            },
+            "價格合理性": {
+              "異常檢測": "price spike > 5% in 1min",
+              "跨交易所驗證": "price deviation < 0.5%",
+              "歷史比較": "vs 24h price range"
+            },
+            "數據完整性": {
+              "缺失檢測": "gap detection in time series",
+              "重複檢測": "duplicate timestamp filtering",
+              "格式驗證": "JSON schema validation"
+            }
+          }
+        },
+        "輸出": "🔵 raw_validated_realtime_data",
+        "效果": "99.9% 數據可靠性"
+      },
+
+      "Layer_1_基礎預處理": {
+        "層級": "layer_1_basic_preprocessing",
+        "名稱": "⚙️ 基礎數據預處理層",
+        "依賴": "✅ layer_0_websocket_data_ingestion",
+        "時間": "8ms",
+        "視覺標記": "🟢 綠色 → 數據清理",
+        "操作": {
+          "🧹 數據清理": {
+            "輸入": "raw_validated_realtime_data",
+            "異常值處理": {
+              "Z-score過濾": "閾值 3.0",
+              "IQR過濾": "四分位距離檢測",
+              "移動平均平滑": "3點移動平均減少噪音"
+            },
+            "缺失值處理": {
+              "前向填充": "forward fill for < 3 missing points",
+              "線性插值": "linear interpolation for gaps",
+              "標記處理": "mark processed data points"
+            },
+            "輸出": "🧹 cleaned_data",
+            "時間": "3ms"
+          },
+          "📏 基礎標準化": {
+            "輸入": "cleaned_data",
+            "價格標準化": {
+              "相對變化": "price_change_percentage",
+              "歸一化": "min-max scaling to [0,1]",
+              "波動率調整": "volatility-adjusted scaling"
+            },
+            "成交量標準化": {
+              "相對成交量": "volume / 24h_avg_volume",
+              "成交量百分位": "volume percentile ranking",
+              "異常成交量標記": "volume > 3x average"
+            },
+            "時間標準化": {
+              "UTC統一": "convert all timestamps to UTC",
+              "對齊": "align to exchange-specific intervals",
+              "時區標記": "mark original timezone"
+            },
+            "輸出": "📏 standardized_basic_data",
+            "時間": "2ms"
+          },
+          "🔢 基礎計算": {
+            "輸入": "standardized_basic_data",
+            "基礎指標": {
+              "價格動量": "price momentum calculation",
+              "成交量比率": "volume ratio vs baseline",
+              "價差分析": "bid-ask spread analysis",
+              "流動性指標": "basic liquidity metrics"
+            },
+            "波動性計算": {
+              "實時波動率": "rolling standard deviation",
+              "價格波幅": "high-low range percentage",
+              "波動率百分位": "volatility percentile ranking"
+            },
+            "趨勢檢測": {
+              "短期趨勢": "5-period price direction",
+              "成交量趨勢": "volume trend direction",
+              "動量指標": "basic momentum calculation"
+            },
+            "輸出": "🔢 basic_calculated_metrics",
+            "時間": "3ms"
+          }
+        }
+      },
+
+      "Layer_2_信號預生成": {
+        "層級": "layer_2_signal_pregeneration", 
+        "名稱": "🎯 基礎信號預生成層",
+        "依賴": "✅ layer_1_basic_preprocessing",
+        "時間": "7ms",
+        "視覺標記": "🟡 黃色 → 信號生成",
+        "操作": {
+          "📊 基礎技術信號": {
+            "輸入": "basic_calculated_metrics",
+            "價格信號": {
+              "突破檢測": "price breakout detection",
+              "支撐阻力": "basic support/resistance levels",
+              "趨勢確認": "trend confirmation signals"
+            },
+            "成交量信號": {
+              "成交量突破": "volume breakout detection",
+              "成交量背離": "price-volume divergence",
+              "異常成交量": "unusual volume alerts"
+            },
+            "動量信號": {
+              "動量轉折": "momentum reversal detection",
+              "加速檢測": "acceleration/deceleration",
+              "動量背離": "momentum divergence signals"
+            },
+            "輸出": "📊 basic_technical_signals",
+            "時間": "4ms"
+          },
+          "⚡ 極端事件檢測": {
+            "輸入": "basic_calculated_metrics",
+            "市場衝擊": {
+              "價格急變": "price shock > 2% in 5min",
+              "成交量爆發": "volume surge > 5x average",
+              "流動性枯竭": "order book depth drop"
+            },
+            "異常模式": {
+              "閃崩檢測": "flash crash pattern",
+              "操縱檢測": "potential manipulation signals",
+              "異常交易": "unusual trading pattern"
+            },
+            "緊急標記": {
+              "緊急程度": "CRITICAL | HIGH | MEDIUM",
+              "響應時間": "immediate alert flagging",
+              "傳播優先級": "priority signal routing"
+            },
+            "輸出": "⚡ extreme_event_signals",
+            "時間": "2ms"
+          },
+          "🔄 信號品質評估": {
+            "輸入": ["basic_technical_signals", "extreme_event_signals"],
+            "信號強度": {
+              "原始強度": "raw signal strength [0,1]",
+              "置信度": "confidence score [0,1]", 
+              "數據品質": "data quality score [0,1]"
+            },
+            "信號驗證": {
+              "交叉驗證": "cross-validation with multiple sources",
+              "歷史驗證": "historical pattern matching",
+              "一致性檢查": "internal consistency validation"
+            },
+            "品質標記": {
+              "品質等級": "A (>0.8) | B (>0.6) | C (>0.4)",
+              "可靠性": "reliability score based on validation",
+              "不確定性": "uncertainty quantification"
+            },
+            "輸出": "🔄 quality_assessed_signals",
+            "時間": "1ms"
+          }
+        }
+      },
+
+      "Layer_3_輸出標準化": {
+        "層級": "layer_3_output_standardization",
+        "名稱": "🚀 標準化輸出層",
+        "依賴": "✅ layer_2_signal_pregeneration",
+        "時間": "5ms",
+        "視覺標記": "🔴 紅色 → 標準輸出",
+        "操作": {
+          "📤 格式標準化": {
+            "輸入": "quality_assessed_signals",
+            "統一格式": {
+              "信號ID": "phase1a_{timestamp}_{type}_{sequence}",
+              "信號類型": "PRICE_BREAKOUT | VOLUME_SURGE | MOMENTUM_SHIFT | EXTREME_EVENT",
+              "信號強度": "0.0-1.0 統一範圍",
+              "置信度": "0.0-1.0 標準化置信度",
+              "時間戳": "ISO_8601_UTC 格式",
+              "數據源": "WebSocket_source_identifier"
+            },
+            "元數據": {
+              "市場狀態": "market_condition_tag",
+              "數據品質": "data_quality_metrics",
+              "處理延遲": "processing_latency_ms",
+              "驗證狀態": "validation_results"
+            },
+            "輸出": "📤 standardized_phase1a_signals",
+            "時間": "2ms"
+          },
+          "🔗 下游接口": {
+            "輸入": "standardized_phase1a_signals",
+            "路由規則": {
+              "indicator_dependency_graph": "向下游傳遞：所有基礎信號作為indicator計算的輸入",
+              "phase1b_volatility_adaptation": "向下游傳遞：價格和成交量信號作為波動性分析輸入",
+              "phase1c_signal_standardization": "向下游傳遞：高品質信號 (>0.6) 進行標準化處理",
+              "unified_signal_candidate_pool": "緊急路由：極端事件信號直接進入候選池",
+              "數據流方向": "Phase1A → 下游模組 (非循環依賴)"
+            },
+            "優先級路由": {
+              "CRITICAL信號": "所有下游模組立即接收",
+              "HIGH信號": "優先級路由到相關模組",
+              "MEDIUM/LOW信號": "正常批次處理"
+            },
+            "格式適配": {
+              "為每個下游模組": "生成適配格式",
+              "保持相容性": "backward compatibility",
+              "版本控制": "API version management"
+            },
+            "輸出": "🔗 routed_signals_to_downstream",
+            "時間": "3ms"
+          }
+        }
+      }
+    },
+
+    "🎯 性能目標與優化": {
+      "總計算時間": "25ms (WebSocket to Phase1B/1C ready)",
+      "實時要求": {
+        "數據接收延遲": "< 100ms from exchange",
+        "處理延遲": "< 25ms internal processing", 
+        "總延遲": "< 125ms end-to-end"
+      },
+      "分層處理時間": {
+        "layer_0_websocket": "5ms (連接管理+數據接收)",
+        "layer_1_preprocessing": "8ms (清理+標準化+計算)",
+        "layer_2_pregeneration": "7ms (信號生成+品質評估)",
+        "layer_3_output": "5ms (格式化+路由)"
+      },
+      "可靠性目標": {
+        "連接穩定性": "> 99.9%",
+        "數據完整性": "> 99.8%", 
+        "信號品質": "> 95% Grade B+"
+      }
+    },
+
+    "🔧 核心創新特色": {
+      "實時數據驅動": "WebSocket多交易所實時數據，100ms級響應",
+      "智能品質檢驗": "多層數據驗證，確保信號可靠性",
+      "統一標準化": "為下游模組提供標準化接口",
+      "極端事件檢測": "實時檢測市場異常，觸發緊急處理",
+      "自適應路由": "根據信號類型和品質智能路由",
+      "向後相容": "與現有Phase1B/1C完美整合"
+    },
+
+    "🔗 整合點": {
+      "輸入來源": [
+        "WebSocket_Binance_Spot",
+        "WebSocket_Binance_Futures", 
+        "WebSocket_OKX",
+        "WebSocket_Bybit"
+      ],
+      "輸出目標": [
+        "indicator_dependency_graph", 
+        "phase1b_volatility_adaptation",
+        "phase1c_signal_standardization",
+        "unified_signal_candidate_pool"
+      ],
+      "系統整合": [
+        "時間戳統一系統",
+        "錯誤監控系統",
+        "性能監控系統"
+      ]
+    }
+  }
+}

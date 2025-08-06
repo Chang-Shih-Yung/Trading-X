@@ -1,0 +1,329 @@
+{
+  "phase3_market_analyzer_visual_flow": {
+    "version": "2.2.0",
+    "title": "Phase3 市場分析器核心流程視覺化",
+    "description": "Order Book 深度分析、資金費率情緒指標與高階市場微結構分析系統",
+    "enhancement_features": "🔄 事件驅動 + 🌊 串流化處理 + ⚖️ 動態權重 + 🛡️ 故障恢復",
+    
+    "visual_flow_diagram": {
+      "flow_overview": "📊 外部數據源 → 🔄 同步整合 → 🚀 高頻/低頻數據分離 → 📈 並行分析 → 🎯 微結構信號 → 🧠 高階預測",
+      
+      "layer_structure": {
+        "🔄 Layer 0": {
+          "name": "Phase1C 時間戳同步整合層",
+          "emoji": "🔄⏰",
+          "status": "✅ OPTIMIZED",
+          "process_time": "1ms",
+          "description": "統一時間戳同步，避免數據流衝突",
+          "key_features": [
+            "🎯 繼承 phase1c_layer_0_cross_module_sync",
+            "⏱️ 200ms 同步容錯",
+            "🔧 system_utc_with_exchange_offset 時間源",
+            "🛡️ use_latest_valid_timestamp 備援策略"
+          ],
+          "output": "synchronized_phase3_timestamp_reference",
+          "visual_flow": "🌐 市場數據 → 🔄 時間戳統一 → ✅ 同步驗證 → 📤 標準時間基準"
+        },
+        
+        "🚀 Layer 1A": {
+          "name": "高頻數據流處理層",
+          "emoji": "🚀📊",
+          "status": "✅ EVENT-DRIVEN",
+          "process_time": "9ms (3+4+2)",
+          "description": "< 100ms 高頻數據，事件驅動優化",
+          "adaptive_sampling": {
+            "🔥 高活躍模式": "波動 > 95% → 50ms 頻率 → 高 CPU 優先級",
+            "😴 平靜模式": "波動 < 50% → 200ms 頻率 → 節省 30-50% CPU"
+          },
+          "operations": {
+            "📋 OrderBook 流處理": {
+              "input": "real_time_orderbook_websocket",
+              "frequency": "adaptive_50ms_to_200ms",
+              "optimization": "🎯 事件觸發：大單 > 5x平均 | 價差 > 2x正常 | 波動變化 > 10%",
+              "buffer": "🔄 雙緩衝：O(1) 原子切換",
+              "time": "3ms"
+            },
+            "📈 Tick 交易流": {
+              "input": "tick_by_tick_trade_data",
+              "method": "incremental_volume_profile",
+              "storage": "🔁 環狀緩衝：300s 固定大小",
+              "time": "4ms"
+            },
+            "🐋 大單檢測": {
+              "trigger": "僅在異常交易量時觸發",
+              "threshold": "size > 10x_average_order_size",
+              "classification": "🐋 鯨魚 | 🏛️ 機構 | 👥 散戶群",
+              "time": "2ms"
+            }
+          },
+          "failover": "🛡️ Binance → OKX/Bybit (< 5s 切換)",
+          "visual_flow": "🌊 高頻數據流 → 🎯 事件觸發檢測 → 🔄 雙緩衝處理 → 📤 實時快照"
+        },
+        
+        "🕐 Layer 1B": {
+          "name": "低頻數據收集層",
+          "emoji": "🕐📅",
+          "status": "✅ ASYNC-INDEPENDENT",
+          "process_time": "6ms (2+3+1)",
+          "description": "30s - 8h 低頻數據，異步獨立處理",
+          "async_processing": "獨立於高頻數據流，避免同步等待",
+          "operations": {
+            "💰 資金費率收集": {
+              "frequency": "8_hours",
+              "storage": "🔁 7天歷史環狀緩衝",
+              "health": "< 8.5h 新鮮度檢查",
+              "time": "2ms"
+            },
+            "📊 持倉量監控": {
+              "frequency": "30_seconds",
+              "analysis": "動態計算 24h 變化率",
+              "health": "< 45s 更新檢查",
+              "time": "3ms"
+            },
+            "🌍 市場制度指標": {
+              "frequency": "daily",
+              "cache": "24h 快取有效期",
+              "indicators": "波動制度 | 趨勢強度 | 市場階段",
+              "time": "1ms"
+            }
+          },
+          "health_monitoring": "✅ 95% 數據完整性 | 🟡 降級模式支援",
+          "visual_flow": "📅 低頻數據 → 🔄 異步收集 → 🏥 健康監控 → 📊 制度分析"
+        },
+        
+        "📊 Layer 2": {
+          "name": "OrderBook 深度分析層",
+          "emoji": "📊⚖️",
+          "status": "✅ STREAMING",
+          "process_time": "9ms (2+3+4)",
+          "description": "串流化處理，與 Layer 3 並行執行",
+          "pipeline_processing": "無需等待，增量更新",
+          "operations": {
+            "⚖️ 買賣不平衡": {
+              "formula": "(bid_volume - ask_volume) / (bid_volume + ask_volume)",
+              "levels": "5, 10, 20 檔深度",
+              "optimization": "僅重算變化的深度層級",
+              "time": "2ms"
+            },
+            "🌊 訂單流強度": {
+              "window": "60s 滑動窗口",
+              "metrics": "新增/取消/成交 訂單數/秒",
+              "method": "sliding_window_analysis",
+              "time": "3ms"
+            },
+            "🏗️ 市場深度分析": {
+              "analysis": "價差分析 | 深度韌性 | 價格衝擊估算",
+              "cache": "30s 深度指標快取",
+              "time": "4ms"
+            }
+          },
+          "visual_flow": "📋 OrderBook 快照 → ⚖️ 不平衡計算 → 🌊 流強度分析 → 🏗️ 深度品質"
+        },
+        
+        "🎭 Layer 3": {
+          "name": "市場情緒與資金流向分析層",
+          "emoji": "🎭💰",
+          "status": "✅ PARALLEL",
+          "process_time": "6ms (1+2+3)",
+          "description": "並行處理優化，使用 asyncio.gather",
+          "parallel_execution": "與 Layer 2 同時執行",
+          "operations": {
+            "😄 資金費率情緒": {
+              "mapping": "< -0.01% 極度看空 → > 0.01% 極度看多",
+              "cache": "1h 情緒分數快取",
+              "time": "1ms"
+            },
+            "📈 持倉量動量": {
+              "calculation": "oi_change_percentage_24h",
+              "interpretation": "上升 OI + 上升價格 = 看多動量",
+              "smoothing": "指數移動平均",
+              "time": "2ms"
+            },
+            "📊 成交量情緒": {
+              "methods": "增量 VWAP 偏差 | 實時累積分配 | 機構 vs 散戶流比率",
+              "computation": "增量計算避免重複處理",
+              "time": "3ms"
+            }
+          },
+          "visual_flow": "💰 資金費率 → 😄 情緒映射 → 📈 動量分析 → 📊 成交量情緒"
+        },
+        
+        "🎯 Layer 4": {
+          "name": "市場微結構信號生成層",
+          "emoji": "🎯🔧",
+          "status": "✅ DYNAMIC-WEIGHTS",
+          "process_time": "22ms (4+6+5+7)",
+          "description": "動態權重適應，並行融合信號",
+          "dynamic_weight_adaptation": {
+            "🔥 高波動模式": "市場壓力 > 0.7 → 微結構權重 1.3x → 流動性衝擊優先級 +2",
+            "😴 低波動模式": "市場壓力 < 0.3 → 技術權重 1.2x → 制度變化優先級 +1",
+            "⚖️ 正常模式": "0.3 ≤ 壓力 ≤ 0.7 → 基準權重 1.0x"
+          },
+          "signal_operations": {
+            "🚨 流動性衝擊": {
+              "criteria": "深度突減 > 50% | 價差擴大 > 3x | 流強度激增 > 5x",
+              "strength": "0.8-1.0 (Phase1C 統一標準)",
+              "tier": "tier_1_critical",
+              "time": "4ms"
+            },
+            "🏛️ 機構資金流": {
+              "patterns": "協調大單 | 冰山訂單 | 暗池溢出",
+              "strength": "0.7-0.9 (Phase1C 統一標準)",
+              "tier": "tier_1_critical (鯨魚) | tier_2_important (一般)",
+              "time": "6ms"
+            },
+            "🎭 情緒分歧": {
+              "detection": "資金費率看多 + OI 看空 = 逆向信號",
+              "strength": "0.6-0.85 → 0.72-1.0 (*1.2 提升)",
+              "tier": "tier_2_important",
+              "time": "5ms"
+            },
+            "🌊 流動性制度": {
+              "classification": "高流動性穩定 | 低流動性波動 | 突破準備 | 分配階段",
+              "strength": "0.5-0.8 → 0.75-1.0 (*1.5 提升)",
+              "tier": "tier_3_monitoring",
+              "note": "與 phase1b 波動性制度互補",
+              "time": "7ms"
+            }
+          },
+          "visual_flow": "📊📈 Layer 2+3 輸入 → 🎯 並行融合 → ⚖️ 動態權重 → 🚨🏛️🎭🌊 四類信號輸出"
+        },
+        
+        "🧠 Layer 5": {
+          "name": "高階分析與預測信號層",
+          "emoji": "🧠🔮",
+          "status": "✅ ML-FEEDBACK",
+          "process_time": "17ms (8+6+3)",
+          "description": "即時校正機制，模型回饋迴路",
+          "model_feedback_loop": {
+            "validation": "5min 驗證間隔",
+            "tracking": "預測偏差統計 | 準確率追蹤 | 命中率監控",
+            "adjustment": "基於準確率的指數加權調整",
+            "emergency": "Z-score > 3.0 → 30s 快速重校正"
+          },
+          "operations": {
+            "🔮 價格衝擊預測": {
+              "model": "adaptive_ml_price_impact_model",
+              "horizon": "1-5 分鐘",
+              "feedback": "每 5 分鐘根據實際結果調整權重",
+              "time": "8ms"
+            },
+            "📊 流動性預測": {
+              "method": "ensemble_time_series + market_hours_adjustment",
+              "horizon": "15-60 分鐘",
+              "confidence": "95% 信心區間估計",
+              "time": "6ms"
+            },
+            "🌡️ 市場壓力指標": {
+              "components": "OrderBook 穩定性 | 資金費率壓力 | OI 波動 | 成交量異常",
+              "calibration": "動態調整壓力閾值",
+              "time": "3ms"
+            }
+          },
+          "visual_flow": "🎯 Layer 4 信號 → 🧠 ML 模型分析 → 🔮 預測生成 → 🔄 回饋校正"
+        }
+      },
+      
+      "performance_visualization": {
+        "⏱️ 總處理時間": "35ms (v2.1: 50ms → v2.2: 35ms)",
+        "🚀 v2.2 效能提升": {
+          "💾 CPU 使用": "平靜市場降低 40%",
+          "🔒 記憶體效率": "減少 60% 鎖競爭",
+          "⚡ 延遲優化": "50ms → 35ms 總延遲"
+        },
+        "📊 適應性效能": {
+          "🔥 高波動": "Tier1 < 30ms | 50ms 間隔 | 高 CPU 優先級",
+          "⚖️ 正常": "Tier1 < 50ms | Tier2 < 200ms | Tier3 < 500ms",
+          "😴 低波動": "Tier1 < 100ms | 200-300ms 間隔 | 節省 30-50% CPU"
+        }
+      },
+      
+      "integration_flow": {
+        "🔄 Phase1C 整合": {
+          "📤 輸出到": "phase1c_signal_standardization_layer_1_collection",
+          "🔧 格式適配": "自動適配到 Phase1C 標準格式",
+          "⏰ 時間同步": "繼承 Phase1C layer_0_cross_module_sync",
+          "🛡️ 衝突預防": "智能衝突檢測與解決機制"
+        },
+        "📊 衝突解決矩陣": {
+          "🔥 高波動場景": "流動性信號權重 1.5x | 雙重確認加成 1.5x",
+          "⚖️ 正常場景": "流動性信號權重 1.2x | 複雜信號延遲 3s 驗證",
+          "😴 低波動場景": "技術信號優先 | 微結構降權 0.8x"
+        }
+      },
+      
+      "monitoring_dashboard": {
+        "📊 即時指標": {
+          "⏱️ 處理延遲": "P50, P95, P99 分佈",
+          "🏥 API 健康": "per_source_availability_tracking",
+          "🎯 信號準確率": "5min rolling accuracy rate",
+          "💾 快取命中率": "buffer_efficiency_monitoring"
+        },
+        "🚨 警報系統": {
+          "⏱️ 延遲警報": "P95 > 40ms",
+          "🎯 準確率警報": "5min rolling accuracy < 70%",
+          "🔄 故障切換": "API source switch events",
+          "💻 資源警報": "CPU usage > 80% for 1min"
+        }
+      }
+    },
+    
+    "data_flow_summary": {
+      "input_sources": [
+        "🌐 binance_websocket_orderbook",
+        "💰 binance_funding_rate_api", 
+        "📊 binance_open_interest_api",
+        "🛡️ okx/bybit 備援源"
+      ],
+      "processing_layers": "🔄→🚀→🕐→📊→🎭→🎯→🧠 (7層處理)",
+      "output_destinations": [
+        "📤 phase1c_signal_standardization",
+        "🎯 unified_signal_candidate_pool",
+        "🛡️ risk_management_system",
+        "⚡ execution_engine"
+      ],
+      "optimization_features": [
+        "🎯 事件驅動分析",
+        "🔄 雙緩衝快取",
+        "🔁 環狀緩衝儲存",
+        "🌊 管道處理",
+        "🛡️ 多源故障恢復"
+      ]
+    },
+    
+    "signal_types_visual": {
+      "🚨 LIQUIDITY_SHOCK": {
+        "strength": "0.8-1.0",
+        "tier": "tier_1_critical",
+        "emoji_flow": "📊→🚨→⚡",
+        "description": "流動性衝擊檢測"
+      },
+      "🏛️ INSTITUTIONAL_FLOW": {
+        "strength": "0.7-0.9", 
+        "tier": "tier_1_critical (鯨魚) | tier_2_important (一般)",
+        "emoji_flow": "🐋→🏛️→💼",
+        "description": "機構資金流檢測"
+      },
+      "🎭 SENTIMENT_DIVERGENCE": {
+        "strength": "0.72-1.0 (*1.2提升)",
+        "tier": "tier_2_important",
+        "emoji_flow": "😄→🎭→📊",
+        "description": "市場情緒分歧"
+      },
+      "🌊 LIQUIDITY_REGIME_CHANGE": {
+        "strength": "0.75-1.0 (*1.5提升)",
+        "tier": "tier_3_monitoring", 
+        "emoji_flow": "🌊→🔄→📈",
+        "description": "流動性制度變化"
+      }
+    },
+    
+    "phase1c_compatibility": {
+      "✅ 時間戳對齊": "< 200ms 容錯",
+      "✅ 信號格式": "100% Phase1C 標準合規",
+      "✅ 層級分配": "自動 tier_1/tier_2/tier_3 分類",
+      "✅ 衝突解決": "< 10ms 動態調整",
+      "✅ 效能目標": "Tier1 < 30ms (高波動時)"
+    }
+  }
+}

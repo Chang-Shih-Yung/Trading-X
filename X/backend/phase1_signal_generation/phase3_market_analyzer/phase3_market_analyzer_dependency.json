@@ -2,7 +2,9 @@
   "strategy_dependency_graph": {
     "strategy_name": "Phase3 市場分析器",
     "description": "Order Book 深度分析、資金費率情緒指標與高階市場微結構分析系統",
-    "version": "1.0.0",
+    "version": "2.2.0",
+    "phase1c_integration_optimized": "針對 Phase1C 信號標準化引擎優化整合",
+    "v2_2_enhancements": "事件驅動 + 串流化處理 + 動態權重 + 故障恢復",
     "dependencies": {
       "core_dependencies": ["binance_data_connector"],
       "external_libraries": ["aiohttp", "asyncio", "numpy", "pandas"],
@@ -10,24 +12,121 @@
         "binance_websocket_orderbook",
         "binance_funding_rate_api",
         "binance_open_interest_api"
+      ],
+      "backup_api_dependencies": [
+        "okx_websocket_orderbook",
+        "bybit_funding_rate_api", 
+        "okx_open_interest_api"
+      ],
+      "cross_module_dependencies": [
+        "phase1c_signal_standardization_layer_0_sync",
+        "unified_signal_candidate_pool",
+        "shared_market_data_cache",
+        "double_buffer_cache_manager",
+        "ring_buffer_storage"
       ]
     },
     "computation_flow": {
-      "layer_1_market_data_collection": {
-        "description": "高頻市場數據收集層",
+      "layer_0_phase1c_sync_integration": {
+        "description": "Phase1C 時間戳同步整合層",
         "dependencies": [],
+        "sync_mechanism": {
+          "inherits_from": "phase1c_layer_0_cross_module_sync",
+          "timestamp_source": "system_utc_with_exchange_offset",
+          "sync_tolerance_ms": 200,
+          "fallback_strategy": "use_latest_valid_timestamp",
+          "validation": "verify_phase1c_timestamp_alignment"
+        },
+        "computation_time_ms": 1,
+        "output": "synchronized_phase3_timestamp_reference"
+      },
+      "layer_1a_high_freq_stream": {
+        "description": "高頻數據流處理層 (< 100ms) - 事件驅動優化",
+        "dependencies": ["layer_0_phase1c_sync_integration"],
+        "adaptive_sampling": {
+          "market_active_mode": {
+            "volatility_threshold": "> 95th percentile",
+            "orderbook_frequency": "50ms",
+            "analysis_frequency": "100ms",
+            "cpu_allocation": "high_priority"
+          },
+          "market_calm_mode": {
+            "volatility_threshold": "< 50th percentile",
+            "orderbook_frequency": "200ms", 
+            "analysis_frequency": "300ms",
+            "cpu_savings": "30-50%"
+          }
+        },
+        "failover_mechanism": {
+          "primary_sources": ["binance_websocket"],
+          "backup_sources": ["okx_websocket", "bybit_websocket"],
+          "switch_criteria": {
+            "latency_threshold": "> 500ms",
+            "error_rate_threshold": "> 5%",
+            "data_stale_threshold": "> 1s"
+          },
+          "switch_time": "< 5s"
+        },
         "operations": {
           "orderbook_stream_processing": {
             "input": "real_time_orderbook_websocket",
             "data_points": ["bids", "asks", "depth_levels_20"],
-            "update_frequency": "100ms",
+            "update_frequency": "adaptive_50ms_to_200ms",
+            "event_driven_optimization": {
+              "large_order_trigger": "volume > 5x_average",
+              "liquidity_shock_trigger": "spread > 2x_normal",
+              "market_regime_trigger": "volatility_percentile_change > 10%"
+            },
+            "double_buffer": {
+              "active_buffer": "reading_by_analysis_modules", 
+              "update_buffer": "writing_by_data_stream",
+              "switch_operation": "O(1)_atomic_pointer_swap"
+            },
             "output": "processed_orderbook_snapshots",
-            "computation_time_ms": 5
+            "computation_time_ms": 3
           },
+          "tick_trade_stream": {
+            "input": "tick_by_tick_trade_data",
+            "analysis_method": "incremental_volume_profile",
+            "ring_buffer": {
+              "trade_history_window": "300s",
+              "memory_efficiency": "fixed_size_O(1)_insertion"
+            },
+            "output": "streaming_volume_profile",
+            "computation_time_ms": 4
+          },
+          "large_order_detection": {
+            "input": "orderbook_updates",
+            "detection_mode": "event_triggered_only",
+            "detection_threshold": "size > 10x_average_order_size",
+            "classification": "whale_orders | institutional_orders | retail_clusters",
+            "optimization": "僅在異常交易量出現時觸發計算",
+            "output": "large_order_alerts",
+            "computation_time_ms": 2
+          }
+        }
+      },
+      "layer_1b_low_freq_data": {
+        "description": "低頻數據收集層 (30s - 8h) - 異步獨立處理",
+        "dependencies": ["layer_0_phase1c_sync_integration"],
+        "async_processing": "獨立於高頻數據流，避免同步等待",
+        "health_monitoring": {
+          "per_metric_check": {
+            "funding_rate_freshness": "< 8.5h",
+            "open_interest_update": "< 45s",
+            "data_completeness": "> 95%"
+          },
+          "degraded_mode": {
+            "missing_funding": "使用歷史平均值 + 警告標記",
+            "stale_open_interest": "降低權重50% + 時間戳標記"
+          }
+        },
+        "operations": {
           "funding_rate_collection": {
             "input": "binance_funding_rate_api",
             "data_points": ["current_rate", "predicted_rate", "rate_history"],
             "update_frequency": "8_hours",
+            "ring_buffer": "7天歷史數據",
             "output": "funding_rate_data",
             "computation_time_ms": 2
           },
@@ -35,38 +134,45 @@
             "input": "binance_open_interest_api",
             "data_points": ["current_oi", "oi_change", "oi_weighted_price"],
             "update_frequency": "30_seconds",
+            "trend_analysis": "動態計算24h變化率",
             "output": "open_interest_metrics",
             "computation_time_ms": 3
           },
-          "volume_profile_analysis": {
-            "input": "tick_by_tick_trade_data",
-            "analysis_method": "price_volume_distribution",
-            "output": "volume_profile_data",
-            "computation_time_ms": 8
+          "market_regime_indicators": {
+            "input": "daily_ohlcv_data",
+            "indicators": ["volatility_regime", "trend_strength", "market_phase"],
+            "update_frequency": "daily",
+            "caching": "24h快取有效期",
+            "output": "market_regime_context",
+            "computation_time_ms": 1
           }
         }
       },
       "layer_2_orderbook_analysis": {
-        "description": "Order Book 深度分析層",
-        "dependencies": ["layer_1_market_data_collection"],
+        "description": "Order Book 深度分析層 - 串流化處理",
+        "dependencies": ["layer_1a_high_freq_stream"],
+        "pipeline_processing": "與 Layer 3 並行處理，無需等待",
+        "incremental_computation": "增量更新而非全量重算",
         "operations": {
           "bid_ask_imbalance": {
             "input": "orderbook_snapshots",
             "formula": "(total_bid_volume - total_ask_volume) / (total_bid_volume + total_ask_volume)",
             "depth_levels": "5, 10, 20",
+            "incremental_update": "僅重算變化的深度層級",
             "output": "imbalance_ratios",
-            "computation_time_ms": 3
+            "computation_time_ms": 2
           },
           "order_flow_intensity": {
             "input": "orderbook_updates_stream",
-            "method": "order_arrival_rate_analysis",
+            "method": "sliding_window_analysis",
             "metrics": [
               "new_orders_per_second",
-              "cancelled_orders_per_second",
+              "cancelled_orders_per_second", 
               "filled_orders_per_second"
             ],
+            "window_size": "60s_sliding_window",
             "output": "order_flow_metrics",
-            "computation_time_ms": 5
+            "computation_time_ms": 3
           },
           "market_depth_analysis": {
             "input": "orderbook_snapshots",
@@ -75,21 +181,16 @@
               "depth_resilience",
               "price_impact_estimation"
             ],
+            "caching": "depth_metrics_30s_cache",
             "output": "depth_quality_metrics",
-            "computation_time_ms": 7
-          },
-          "large_order_detection": {
-            "input": "orderbook_updates",
-            "detection_threshold": "size > 10x_average_order_size",
-            "classification": "whale_orders | institutional_orders | retail_clusters",
-            "output": "large_order_alerts",
             "computation_time_ms": 4
           }
         }
       },
       "layer_3_sentiment_analysis": {
-        "description": "市場情緒與資金流向分析層",
-        "dependencies": ["layer_1_market_data_collection"],
+        "description": "市場情緒與資金流向分析層 - 並行處理優化",
+        "dependencies": ["layer_1b_low_freq_data"],
+        "parallel_execution": "與 Layer 2 同時執行，使用 asyncio.gather",
         "operations": {
           "funding_rate_sentiment": {
             "input": "funding_rate_data",
@@ -100,8 +201,9 @@
               "-0.01% <= rate < -0.005%": "bearish",
               "rate < -0.01%": "extreme_bearish"
             },
+            "caching": "sentiment_score_1h_cache",
             "output": "funding_sentiment_score",
-            "computation_time_ms": 2
+            "computation_time_ms": 1
           },
           "open_interest_momentum": {
             "input": "open_interest_metrics",
@@ -112,27 +214,65 @@
               "falling_oi + rising_price = bullish_weakening",
               "falling_oi + falling_price = bearish_weakening"
             ],
+            "trend_smoothing": "exponential_moving_average",
             "output": "oi_momentum_signal",
-            "computation_time_ms": 3
+            "computation_time_ms": 2
           },
           "volume_sentiment_analysis": {
-            "input": "volume_profile_data",
+            "input": "streaming_volume_profile",
             "analysis_methods": [
-              "volume_weighted_average_price_deviation",
-              "volume_accumulation_distribution",
-              "institutional_vs_retail_volume_ratio"
+              "incremental_vwap_deviation",
+              "real_time_accumulation_distribution",
+              "institutional_vs_retail_flow_ratio"
             ],
+            "streaming_computation": "增量計算避免重複處理",
             "output": "volume_sentiment_indicators",
-            "computation_time_ms": 6
+            "computation_time_ms": 3
           }
         }
       },
       "layer_4_microstructure_signals": {
-        "description": "市場微結構信號生成層",
+        "description": "市場微結構信號生成層 - 動態權重適應",
         "dependencies": [
           "layer_2_orderbook_analysis",
           "layer_3_sentiment_analysis"
         ],
+        "parallel_fusion": "使用 asyncio.gather 並行融合信號",
+        "dynamic_weight_adaptation": {
+          "market_state_aware_adjustment": {
+            "high_volatility_mode": {
+              "condition": "market_stress > 0.7",
+              "microstructure_weight": "1.3x (提升即時性)",
+              "technical_weight": "0.8x (降低滯後性)",
+              "liquidity_priority": "LIQUIDITY_SHOCK 優先級 +2"
+            },
+            "low_volatility_mode": {
+              "condition": "market_stress < 0.3", 
+              "microstructure_weight": "0.7x (減少噪音)",
+              "technical_weight": "1.2x (提升穩定性)",
+              "regime_priority": "LIQUIDITY_REGIME 優先級 +1"
+            },
+            "normal_mode": {
+              "condition": "0.3 <= market_stress <= 0.7",
+              "microstructure_weight": "1.0x (基準權重)",
+              "technical_weight": "1.0x (基準權重)"
+            }
+          }
+        },
+        "phase1c_signal_adaptation": {
+          "signal_strength_normalization": {
+            "liquidity_shock": "原值 * dynamic_weight * 1.0 (已在高範圍 0.8-1.0)",
+            "institutional_flow": "原值 * dynamic_weight * 1.0 (已符合 0.7-0.9)",
+            "sentiment_divergence": "原值 * dynamic_weight * 1.2 (從 0.6-0.85 提升到 0.72-1.0)",
+            "liquidity_regime": "原值 * dynamic_weight * 1.5 (從 0.5-0.8 提升到 0.75-1.0)"
+          },
+          "adaptive_tier_classification": {
+            "tier_1_critical": ["LIQUIDITY_SHOCK", "institutional_flow with whale_orders"],
+            "tier_2_important": ["INSTITUTIONAL_FLOW", "SENTIMENT_DIVERGENCE"],
+            "tier_3_monitoring": ["LIQUIDITY_REGIME_CHANGE"],
+            "dynamic_promotion": "根據市場狀態動態提升信號層級"
+          }
+        },
         "operations": {
           "liquidity_shock_detection": {
             "input": "depth_quality_metrics, order_flow_metrics",
@@ -141,7 +281,9 @@
               "spread_widening > 3x_normal",
               "order_flow_intensity_spike > 5x_average"
             ],
-            "signal_strength": "0.8-1.0 (統一標準)",
+            "signal_strength": "0.8-1.0 → 0.8-1.0 (Phase1C 統一標準)",
+            "signal_confidence": "0.0-1.0 (基礎信心分數，由 phase1c 進一步處理)",
+            "phase1c_tier_assignment": "tier_1_critical",
             "output": "liquidity_shock_signals",
             "computation_time_ms": 4
           },
@@ -152,7 +294,9 @@
               "iceberg_order_detection",
               "dark_pool_spillover_effects"
             ],
-            "signal_strength": "0.7-0.9 (統一標準)",
+            "signal_strength": "0.7-0.9 → 0.7-0.9 (Phase1C 統一標準)",
+            "signal_confidence": "0.0-1.0 (基礎信心分數，由 phase1c 進一步處理)",
+            "phase1c_tier_assignment": "tier_1_critical (whale_orders) | tier_2_important (regular)",
             "output": "institutional_flow_signals",
             "computation_time_ms": 6
           },
@@ -162,7 +306,9 @@
               "funding_bullish + oi_bearish = contrarian_signal",
               "volume_accumulation + funding_neutral = stealth_accumulation"
             ],
-            "signal_strength": "0.6-0.85 (統一標準)",
+            "signal_strength": "0.6-0.85 → 0.72-1.0 (Phase1C 標準化提升 *1.2)",
+            "signal_confidence": "0.0-1.0 (基礎信心分數，由 phase1c 進一步處理)",
+            "phase1c_tier_assignment": "tier_2_important",
             "output": "sentiment_divergence_signals",
             "computation_time_ms": 5
           },
@@ -174,7 +320,9 @@
               "liquidity_breakout_preparation",
               "liquidity_distribution_phase"
             ],
-            "signal_strength": "0.5-0.8 (統一標準)",
+            "signal_strength": "0.5-0.8 → 0.75-1.0 (Phase1C 標準化提升 *1.5)",
+            "signal_confidence": "0.0-1.0 (基礎信心分數，由 phase1c 進一步處理)",
+            "phase1c_tier_assignment": "tier_3_monitoring",
             "note": "專注於流動性制度分析，與 phase1b 的波動性制度分析互補",
             "output": "liquidity_regime_classification_signals",
             "computation_time_ms": 7
@@ -182,33 +330,50 @@
         }
       },
       "layer_5_advanced_analytics": {
-        "description": "高階分析與預測信號層",
+        "description": "高階分析與預測信號層 - 即時校正機制",
         "dependencies": ["layer_4_microstructure_signals"],
+        "model_feedback_loop": {
+          "validation_interval": "5min",
+          "accuracy_tracking": {
+            "price_impact_prediction": "實際vs預測偏差統計",
+            "liquidity_forecast": "預測準確率rolling統計",
+            "regime_classification": "制度切換命中率追蹤"
+          },
+          "adaptive_weight_adjustment": "基於準確率的指數加權調整",
+          "emergency_mode": {
+            "anomaly_detection": "Z-score > 3.0 觸發緊急模式",
+            "fast_recalibration": "30s內完成模型參數調整",
+            "fallback_mechanism": "模型失效時回退到基礎規則"
+          }
+        },
         "operations": {
           "price_impact_prediction": {
             "input": "current_orderbook, historical_impact_data",
-            "model": "machine_learning_price_impact_model",
+            "model": "adaptive_ml_price_impact_model",
             "prediction_horizon": "1-5_minutes",
+            "feedback_integration": "每5分鐘根據實際結果調整權重",
             "output": "predicted_price_impact",
-            "computation_time_ms": 10
+            "computation_time_ms": 8
           },
           "liquidity_forecast": {
             "input": "orderbook_trends, historical_liquidity_patterns",
-            "forecast_method": "time_series_analysis + market_hours_adjustment",
-            "forecast_horizon": "15-60_minutes",
+            "forecast_method": "ensemble_time_series + market_hours_adjustment",
+            "forecast_horizon": "15-60_minutes", 
+            "confidence_interval": "95% 信心區間估計",
             "output": "liquidity_availability_forecast",
-            "computation_time_ms": 8
+            "computation_time_ms": 6
           },
           "market_stress_indicator": {
             "input": "all_layer_outputs",
             "stress_components": [
               "orderbook_stability",
-              "funding_rate_pressure",
+              "funding_rate_pressure", 
               "open_interest_volatility",
               "volume_distribution_anomalies"
             ],
+            "real_time_calibration": "動態調整壓力閾值",
             "output": "market_stress_score",
-            "computation_time_ms": 5
+            "computation_time_ms": 3
           }
         }
       }
@@ -217,8 +382,16 @@
       "market_microstructure_signal": {
         "signal_id": "uuid",
         "signal_type": "LIQUIDITY_SHOCK | INSTITUTIONAL_FLOW | SENTIMENT_DIVERGENCE | LIQUIDITY_REGIME_CHANGE",
-        "signal_strength": "0.0-1.0 (統一標準)",
+        "signal_strength": "0.0-1.0 (Phase1C 統一標準，已標準化)",
         "signal_confidence": "0.0-1.0 (基礎信心分數，由 phase1c 進一步處理)",
+        "phase1c_integration": {
+          "tier_assignment": "tier_1_critical | tier_2_important | tier_3_monitoring",
+          "processing_priority": "immediate | batch_5s | scheduled_15s",
+          "conflict_resolution": {
+            "vs_technical_signals": "microstructure_priority (更即時)",
+            "vs_volatility_signals": "weighted_combination_preferred"
+          }
+        },
         "orderbook_context": {
           "bid_ask_imbalance": "-1.0 to 1.0",
           "market_depth_score": "0.0-1.0",
@@ -250,31 +423,173 @@
       }
     },
     "performance_targets": {
-      "total_computation_time_ms": 60,
+      "total_computation_time_ms": 35,
+      "v2_2_performance_improvements": {
+        "cpu_usage_reduction": "平靜市場下降低 40%",
+        "memory_efficiency": "減少 60% 鎖競爭",
+        "latency_optimization": "總延遲 50ms → 35ms"
+      },
+      "adaptive_performance": {
+        "high_volatility_mode": {
+          "tier_1_microstructure_latency": "< 30ms (critical signals)",
+          "processing_frequency": "50ms intervals",
+          "cpu_priority": "high"
+        },
+        "normal_mode": {
+          "tier_1_microstructure_latency": "< 50ms (critical signals)", 
+          "tier_2_sentiment_latency": "< 200ms (batch processing)",
+          "tier_3_regime_latency": "< 500ms (scheduled processing)"
+        },
+        "low_volatility_mode": {
+          "tier_1_microstructure_latency": "< 100ms (relaxed)",
+          "processing_frequency": "200-300ms intervals",
+          "cpu_savings": "30-50%"
+        }
+      },
       "data_latency": "< 200ms from_market",
-      "signal_accuracy": "> 70%",
-      "orderbook_analysis_frequency": "every_100ms",
+      "signal_accuracy": "> 80%",
+      "orderbook_analysis_frequency": "adaptive_50ms_to_300ms",
       "sentiment_analysis_frequency": "every_30_seconds"
     },
     "integration_points": {
       "feeds_to": [
+        "phase1c_signal_standardization_layer_1_collection",
         "unified_signal_candidate_pool",
         "risk_management_system",
         "execution_engine"
       ],
-      "receives_from": ["binance_websocket_feeds", "binance_rest_apis"]
+      "receives_from": ["binance_websocket_feeds", "binance_rest_apis"],
+      "phase1c_specific_integration": {
+        "signal_format_adapter": "自動適配到 Phase1C 標準格式",
+        "timestamp_sync": "繼承 Phase1C layer_0_cross_module_sync",
+        "conflict_prevention": "智能衝突檢測與解決機制"
+      }
     },
     "optimization_strategies": {
       "streaming_data_processing": "使用 asyncio 流式處理，減少延遲",
       "incremental_orderbook_updates": "增量更新而非全量重算",
       "smart_sampling": "根據市場活躍度動態調整採樣頻率",
-      "parallel_analysis": "並行處理不同分析模組"
+      "parallel_analysis": "Layer 2+3 並行處理，Layer 4 並行融合",
+      "v2_2_advanced_optimizations": {
+        "event_driven_analysis": {
+          "large_order_detection": "僅在異常交易量時觸發",
+          "liquidity_shock_detection": "僅在spread異常時計算",
+          "regime_change_detection": "僅在統計顯著變化時更新"
+        },
+        "double_buffer_cache": {
+          "active_buffer": "正在被分析模組讀取",
+          "update_buffer": "正在被數據流更新", 
+          "switch_operation": "O(1) 原子操作",
+          "lock_free_design": "避免讀寫鎖競爭"
+        },
+        "ring_buffer_storage": {
+          "orderbook_history": "60秒orderbook快照環狀緩衝",
+          "trade_history": "300秒交易數據環狀緩衝",
+          "funding_history": "7天funding rate歷史環狀緩衝",
+          "memory_efficiency": "固定大小，O(1)插入"
+        },
+        "pipeline_processing": {
+          "non_blocking_layers": "Layer完成即推送，不等待批次",
+          "progressive_fusion": "Layer 4接收到任意信號即開始處理",
+          "streaming_output": "每層完成即流式輸出"
+        }
+      },
+      "phase1c_integration_optimization": {
+        "shared_cache_strategy": "與 Phase1C 共享市場數據快取",
+        "async_processing": "Phase3 與 Phase1C 非同步處理",
+        "memory_pooling": "統一記憶體池管理",
+        "cpu_affinity": "分配不同 CPU 核心避免資源競爭"
+      }
     },
     "real_time_requirements": {
       "orderbook_update_latency": "< 50ms",
       "signal_generation_latency": "< 100ms",
       "data_freshness_threshold": "< 500ms",
-      "system_availability": "> 99.5%"
+      "system_availability": "> 99.8%",
+      "v2_2_reliability_enhancements": {
+        "failover_capabilities": {
+          "multi_source_backup": ["binance", "okx", "bybit"],
+          "automatic_switching": "< 5s 故障切換時間",
+          "health_monitoring": "每個API源獨立監控",
+          "degraded_mode_support": "單源失效時降級運行"
+        },
+        "fault_tolerance": {
+          "per_metric_health_check": {
+            "orderbook_freshness": "< 200ms", 
+            "funding_rate_validity": "< 8.5h",
+            "open_interest_update": "< 45s"
+          },
+          "graceful_degradation": {
+            "missing_funding": "使用歷史平均值",
+            "stale_orderbook": "降低權重50%",
+            "api_failure": "切換備援源"
+          }
+        }
+      },
+      "phase1c_compatibility_requirements": {
+        "tier_1_signal_delivery": "< 30ms to Phase1C (高波動時)",
+        "timestamp_alignment_tolerance": "< 200ms",
+        "signal_format_compliance": "100% Phase1C 標準",
+        "conflict_resolution_time": "< 10ms"
+      }
+    },
+    "phase1c_conflict_resolution_matrix": {
+      "dynamic_weight_microstructure_vs_technical": {
+        "high_volatility_scenarios": {
+          "liquidity_shock + RSI_oversold": "提升流動性信號權重 1.5x (原1.2x)",
+          "institutional_flow + volume_breakout": "雙重確認加成 1.5x (原1.3x)", 
+          "sentiment_divergence + trend_following": "微結構優先，技術信號降權 0.7x"
+        },
+        "normal_volatility_scenarios": {
+          "liquidity_shock + RSI_oversold": "提升流動性信號權重 1.2x", 
+          "institutional_flow + volume_breakout": "雙重確認加成 1.3x",
+          "sentiment_divergence + trend_following": "標記為複雜信號，延遲 3s 驗證"
+        },
+        "low_volatility_scenarios": {
+          "liquidity_shock + RSI_oversold": "技術信號優先，微結構降權 0.8x",
+          "institutional_flow + volume_breakout": "技術信號優先 1.2x",
+          "sentiment_divergence + trend_following": "技術信號主導，微結構輔助"
+        }
+      },
+      "adaptive_timing_conflict_handling": {
+        "market_stress_based_priority": {
+          "high_stress": "Phase3 微結構絕對優先（更即時準確）",
+          "normal_stress": "權重平衡，時間戳優先",
+          "low_stress": "Phase1C 技術分析優先（更穩定可靠）"
+        },
+        "衝突窗口": "30s 檢測窗口",
+        "dynamic_resolution_time": "根據市場狀態 5-15ms 動態調整"
+      },
+      "adaptive_signal_strength_adjustment": {
+        "market_state_aware": {
+          "high_confidence_microstructure": "Phase3 信號強度 * (1.1 + market_stress * 0.2)",
+          "low_confidence_microstructure": "Phase3 信號強度 * (0.9 - market_stress * 0.1)",
+          "technical_signal_dominance": "當技術信號 > 0.8 時，微結構信號權重 * (0.8 - volatility_factor)"
+        },
+        "feedback_loop_adjustment": {
+          "accuracy_based_weighting": "根據過去5分鐘準確率動態調整權重",
+          "model_confidence_integration": "整合模型預測信心度到權重計算"
+        }
+      }
+    },
+    "v2_2_monitoring_and_observability": {
+      "real_time_metrics": {
+        "processing_latency_distribution": ["P50", "P95", "P99"],
+        "api_health_scores": "per_source_availability_tracking",
+        "signal_accuracy_rolling": "5min_rolling_accuracy_rate",
+        "cache_hit_rates": "buffer_efficiency_monitoring"
+      },
+      "alerting_system": {
+        "latency_alerts": "P95 > 40ms",
+        "accuracy_alerts": "5min rolling accuracy < 70%",
+        "failover_alerts": "API source switch events",
+        "resource_alerts": "CPU usage > 80% for 1min"
+      },
+      "performance_dashboard": {
+        "adaptive_sampling_effectiveness": "CPU savings in calm markets",
+        "pipeline_efficiency": "layer_parallel_execution_gains", 
+        "model_calibration_stats": "prediction_accuracy_improvements"
+      }
     }
   }
 }
