@@ -1,0 +1,572 @@
+{
+  "computation_dependency_graph": {
+    "description": "技術指標計算依賴圖 - 優化計算順序，減少重複計算",
+    "version": "2.0.0",
+    "configurable_parameters": {
+      "timeframes": ["1m", "5m", "15m", "1h"],
+      "data_sync": {
+        "max_delay_tolerance_seconds": 5,
+        "timestamp_validation": true,
+        "fallback_strategy": "use_cached_data"
+      },
+      "indicator_periods": {
+        "SMA_periods": [10, 20, 50],
+        "EMA_periods": [12, 26, 50],
+        "STD_periods": [20],
+        "rolling_periods": [14, 20],
+        "RSI_period": 14,
+        "MACD_signal_period": 9
+      },
+      "performance_targets": {
+        "scalping_max_ms": 15,
+        "swing_trading_max_ms": 25,
+        "trend_following_max_ms": 30,
+        "emergency_fallback_max_ms": 50
+      }
+    },
+    "computation_layers": {
+      "layer_-1_data_sync": {
+        "description": "數據同步檢查層 - 驗證時間戳和數據完整性",
+        "dependencies": [],
+        "validations": {
+          "timestamp_check": "驗證數據時間戳與本地時間差 < 5秒",
+          "data_completeness": "檢查 OHLCV 數據完整性",
+          "sequence_validation": "驗證數據序列連續性"
+        },
+        "outputs": [
+          "synced_open",
+          "synced_high",
+          "synced_low",
+          "synced_close",
+          "synced_volume",
+          "data_quality_score"
+        ],
+        "fallback_actions": {
+          "data_too_old": "使用快取數據並標記為歷史",
+          "missing_data": "插值補齊或跳過計算",
+          "invalid_sequence": "重新請求數據"
+        },
+        "computation_time_ms": 2
+      },
+      "layer_0_raw_data": {
+        "description": "原始價格數據 - 基礎層（已同步驗證）",
+        "dependencies": ["layer_-1_data_sync"],
+        "outputs": [
+          "{symbol}_{timeframe}_open",
+          "{symbol}_{timeframe}_high",
+          "{symbol}_{timeframe}_low",
+          "{symbol}_{timeframe}_close",
+          "{symbol}_{timeframe}_volume"
+        ],
+        "output_format": "standardized with symbol and timeframe",
+        "computation_time_ms": 1
+      },
+      "layer_1_basic_calculations": {
+        "description": "基礎計算 - 常用基礎值",
+        "dependencies": ["layer_0_raw_data"],
+        "calculations": {
+          "price_changes": {
+            "formula": "close.diff()",
+            "used_by": ["RSI", "momentum", "volatility"]
+          },
+          "typical_price": {
+            "formula": "(high + low + close) / 3",
+            "used_by": ["CCI", "volume_weighted_indicators"]
+          },
+          "true_range_components": {
+            "tr1": "high - low",
+            "tr2": "abs(high - close.shift(1))",
+            "tr3": "abs(low - close.shift(1))",
+            "used_by": ["ATR", "volatility_indicators"]
+          }
+        },
+        "computation_time_ms": 5
+      },
+      "layer_2_moving_averages": {
+        "description": "移動平均線 - 最常用基礎指標（參數化配置）",
+        "dependencies": ["layer_0_raw_data"],
+        "calculations": {
+          "sma_batch": {
+            "periods": "configurable_parameters.indicator_periods.SMA_periods",
+            "formula": "close.rolling(window=period).mean()",
+            "outputs": [
+              "{symbol}_{timeframe}_SMA_10",
+              "{symbol}_{timeframe}_SMA_20",
+              "{symbol}_{timeframe}_SMA_50"
+            ],
+            "used_by": [
+              "trend_indicators",
+              "bollinger_bands",
+              "volume_analysis"
+            ]
+          },
+          "ema_batch": {
+            "periods": "configurable_parameters.indicator_periods.EMA_periods",
+            "formula": "close.ewm(span=period).mean()",
+            "outputs": [
+              "{symbol}_{timeframe}_EMA_12",
+              "{symbol}_{timeframe}_EMA_26",
+              "{symbol}_{timeframe}_EMA_50"
+            ],
+            "used_by": ["MACD", "trend_strength", "signal_lines"]
+          },
+          "volume_sma_batch": {
+            "periods": "configurable_parameters.indicator_periods.SMA_periods",
+            "formula": "volume.rolling(window=period).mean()",
+            "outputs": [
+              "{symbol}_{timeframe}_volume_SMA_10",
+              "{symbol}_{timeframe}_volume_SMA_20",
+              "{symbol}_{timeframe}_volume_SMA_50"
+            ],
+            "used_by": ["volume_indicators", "volume_ratios"]
+          }
+        },
+        "computation_time_ms": 15
+      },
+      "layer_3_standard_deviations": {
+        "description": "標準差計算 - 波動性基礎（參數化）",
+        "dependencies": ["layer_0_raw_data", "layer_2_moving_averages"],
+        "calculations": {
+          "price_std_batch": {
+            "periods": "configurable_parameters.indicator_periods.STD_periods",
+            "formula": "close.rolling(window=period).std()",
+            "outputs": ["{symbol}_{timeframe}_price_std_20"],
+            "used_by": ["bollinger_bands", "volatility_indicators"]
+          },
+          "return_std_batch": {
+            "periods": "configurable_parameters.indicator_periods.STD_periods",
+            "formula": "close.pct_change().rolling(window=period).std()",
+            "outputs": ["{symbol}_{timeframe}_return_std_20"],
+            "used_by": ["volatility", "risk_metrics"]
+          }
+        },
+        "computation_time_ms": 10
+      },
+      "layer_4_rolling_extremes": {
+        "description": "滾動最高/最低值 - 震盪指標基礎（參數化）",
+        "dependencies": ["layer_0_raw_data"],
+        "calculations": {
+          "rolling_highs": {
+            "periods": "configurable_parameters.indicator_periods.rolling_periods",
+            "formula": "high.rolling(window=period).max()",
+            "outputs": [
+              "{symbol}_{timeframe}_highest_high_14",
+              "{symbol}_{timeframe}_highest_high_20"
+            ],
+            "used_by": ["stochastic", "williams_r", "support_resistance"]
+          },
+          "rolling_lows": {
+            "periods": "configurable_parameters.indicator_periods.rolling_periods",
+            "formula": "low.rolling(window=period).min()",
+            "outputs": [
+              "{symbol}_{timeframe}_lowest_low_14",
+              "{symbol}_{timeframe}_lowest_low_20"
+            ],
+            "used_by": ["stochastic", "williams_r", "support_resistance"]
+          }
+        },
+        "computation_time_ms": 8
+      },
+      "layer_5_intermediate_calculations": {
+        "description": "中間計算 - 復合指標的基礎",
+        "dependencies": [
+          "layer_1_basic_calculations",
+          "layer_2_moving_averages"
+        ],
+        "calculations": {
+          "rsi_components": {
+            "gain": "price_changes.where(price_changes > 0, 0).rolling(14).mean()",
+            "loss": "(-price_changes.where(price_changes < 0, 0)).rolling(14).mean()",
+            "used_by": ["RSI"]
+          },
+          "macd_line": {
+            "formula": "EMA_12 - EMA_26",
+            "used_by": ["MACD_signal", "MACD_histogram"]
+          },
+          "true_range": {
+            "formula": "max(tr1, max(tr2, tr3))",
+            "used_by": ["ATR"]
+          },
+          "typical_price_sma": {
+            "formula": "typical_price.rolling(20).mean()",
+            "used_by": ["CCI"]
+          }
+        },
+        "computation_time_ms": 12
+      },
+      "layer_6_final_indicators": {
+        "description": "最終指標 - 基於前面所有層的計算",
+        "dependencies": [
+          "layer_2_moving_averages",
+          "layer_3_standard_deviations",
+          "layer_4_rolling_extremes",
+          "layer_5_intermediate_calculations"
+        ],
+        "calculations": {
+          "trend_indicators": {
+            "SMA_20": "from layer_2",
+            "SMA_50": "from layer_2",
+            "EMA_12": "from layer_2",
+            "EMA_26": "from layer_2",
+            "MACD": "macd_line from layer_5",
+            "MACD_signal": "MACD.ewm(span=9).mean()",
+            "MACD_histogram": "MACD - MACD_signal",
+            "trend_strength": "(current_price - SMA_20) / SMA_20 + (current_price - SMA_50) / SMA_50) / 2"
+          },
+          "momentum_indicators": {
+            "RSI": "100 - (100 / (1 + gain/loss))",
+            "STOCH_K": "100 * ((close - lowest_low_14) / (highest_high_14 - lowest_low_14))",
+            "STOCH_D": "STOCH_K.rolling(3).mean()",
+            "WILLR": "-100 * ((highest_high_14 - close) / (highest_high_14 - lowest_low_14))",
+            "MOM": "close.diff(periods=10)",
+            "CCI": "(typical_price - typical_price_sma) / (0.015 * mad)"
+          },
+          "volatility_indicators": {
+            "BB_upper": "SMA_20 + (price_std_20 * 2)",
+            "BB_lower": "SMA_20 - (price_std_20 * 2)",
+            "BB_middle": "SMA_20 from layer_2",
+            "BB_position": "(current_price - BB_lower) / (BB_upper - BB_lower)",
+            "ATR": "true_range.rolling(14).mean()",
+            "volatility": "return_std_20 * sqrt(252)"
+          },
+          "volume_indicators": {
+            "OBV": "cumsum(sign(price_changes) * volume)",
+            "volume_SMA": "volume_SMA_20 from layer_2",
+            "volume_ratio": "current_volume / volume_SMA_20",
+            "volume_trend": "(volume_SMA_10 - volume_SMA_50) / volume_SMA_50"
+          },
+          "support_resistance_indicators": {
+            "pivot_point": "(highest_high_20 + lowest_low_20 + previous_close) / 3",
+            "resistance_1": "2 * pivot_point - lowest_low_20",
+            "support_1": "2 * pivot_point - highest_high_20",
+            "distance_to_resistance": "(resistance_1 - current_price) / current_price",
+            "distance_to_support": "(current_price - support_1) / current_price"
+          }
+        },
+        "computation_time_ms": 20
+      }
+    },
+    "optimization_strategies": {
+      "batch_calculations": {
+        "moving_averages": "計算多個週期的 SMA/EMA 一次完成",
+        "rolling_operations": "統一計算所有 rolling max/min/std",
+        "vectorization": "使用 numpy 向量化操作",
+        "parallel_periods": "不同週期並行計算",
+        "memory_pooling": "重用記憶體池減少分配開銷"
+      },
+      "vectorization_enhancements": {
+        "numpy_optimization": "使用 numpy.convolve 和 numpy.lib.stride_tricks",
+        "batch_rolling": "批次滾動視窗計算",
+        "simd_acceleration": "利用 SIMD 指令集加速",
+        "expected_gain": "35-40% 性能提升"
+      },
+      "dependency_resolution": {
+        "execution_order": [
+          "layer_-1_data_sync",
+          "layer_0_raw_data",
+          [
+            "layer_1_basic_calculations",
+            "layer_2_moving_averages",
+            "layer_4_rolling_extremes"
+          ],
+          "layer_3_standard_deviations",
+          "layer_5_intermediate_calculations",
+          "layer_6_final_indicators"
+        ],
+        "parallel_execution_groups": {
+          "group_1": [
+            "layer_1_basic_calculations",
+            "layer_2_moving_averages",
+            "layer_4_rolling_extremes"
+          ],
+          "description": "這些層只依賴 layer_0，可並行執行"
+        },
+        "parallel_within_layer": true,
+        "cache_intermediate_results": true,
+        "multi_timeframe_parallel": true
+      },
+      "performance_estimates": {
+        "current_sequential_time_ms": 150,
+        "optimized_dependency_time_ms": 45,
+        "performance_improvement": "70.0%",
+        "parallel_execution_gain": "25% 額外提升",
+        "memory_overhead": "~25% 用於快取中間結果（優化後）",
+        "expected_throughput_increase": "200%+"
+      }
+    },
+    "conditional_execution": {
+      "description": "根據策略需求動態啟用指標計算",
+      "market_adaptive_profiles": {
+        "high_volatility_mode": {
+          "required_layers": [
+            "layer_0_raw_data",
+            "layer_1_basic_calculations",
+            "layer_2_moving_averages"
+          ],
+          "focus_indicators": ["RSI", "MACD", "ATR", "volatility"],
+          "computation_frequency": "increased",
+          "performance_target": "< 20ms"
+        },
+        "trend_analysis_mode": {
+          "required_layers": [
+            "layer_0_raw_data",
+            "layer_2_moving_averages",
+            "layer_5_intermediate_calculations"
+          ],
+          "focus_indicators": ["EMA_12", "EMA_26", "MACD", "trend_strength"],
+          "computation_frequency": "standard"
+        }
+      },
+      "strategy_profiles": {
+        "scalping": {
+          "required_layers": [
+            "layer_0_raw_data",
+            "layer_2_moving_averages",
+            "layer_5_intermediate_calculations"
+          ],
+          "required_indicators": ["RSI", "MACD", "BB_position", "volume_ratio"],
+          "skip_indicators": [
+            "pivot_point",
+            "support_resistance",
+            "long_term_trends"
+          ],
+          "performance_target": "< 15ms"
+        },
+        "swing_trading": {
+          "required_layers": [
+            "layer_0_raw_data",
+            "layer_2_moving_averages",
+            "layer_3_standard_deviations",
+            "layer_6_final_indicators"
+          ],
+          "required_indicators": [
+            "SMA_20",
+            "SMA_50",
+            "RSI",
+            "MACD",
+            "BB_bands",
+            "ATR"
+          ],
+          "skip_indicators": ["short_term_momentum"],
+          "performance_target": "< 25ms"
+        },
+        "trend_following": {
+          "required_layers": [
+            "layer_0_raw_data",
+            "layer_2_moving_averages",
+            "layer_5_intermediate_calculations",
+            "layer_6_final_indicators"
+          ],
+          "required_indicators": [
+            "EMA_12",
+            "EMA_26",
+            "MACD",
+            "trend_strength",
+            "volume_trend"
+          ],
+          "skip_indicators": ["oscillators", "short_term_volatility"],
+          "performance_target": "< 30ms"
+        }
+      }
+    },
+    "quality_scoring": {
+      "description": "每個指標計算時同步生成品質分數（數值化 0-1）",
+      "scoring_method": "continuous_numerical",
+      "confidence_weighting": {
+        "enabled": true,
+        "formula": "base_score * confidence_multiplier * market_session_weight"
+      },
+      "dynamic_thresholds": {
+        "volatility_adjustment": "根據市場波動性調整品質閾值",
+        "market_session_weight": "不同交易時段權重調整",
+        "adaptive_ranges": "基於歷史分布動態調整範圍"
+      },
+      "numerical_scoring_criteria": {
+        "RSI": {
+          "formula": "abs(RSI - 50) / 50",
+          "extreme_bonus": "if RSI < 20 or RSI > 80: score *= 1.2",
+          "confidence_score": "min(1.0, abs(RSI - 50) / 30)",
+          "dynamic_range": "根據波動性調整極值範圍"
+        },
+        "MACD": {
+          "formula": "min(1.0, abs(MACD_histogram) / historical_std)",
+          "momentum_factor": "考慮 MACD 線斜率",
+          "confidence_score": "min(1.0, abs(MACD_histogram) / adaptive_threshold)",
+          "adaptive_threshold": "基於歷史 MACD 分布動態調整"
+        },
+        "BB_position": {
+          "formula": "max(abs(BB_position - 0.5) * 2, squeeze_factor)",
+          "squeeze_factor": "if BB_width < historical_percentile_20: 0.9",
+          "confidence_score": "min(1.0, abs(BB_position - 0.5) * 2)",
+          "squeeze_detection": "檢測 Bollinger Bands 擠壓狀態提升評分"
+        },
+        "volume_confirmation": {
+          "formula": "min(1.0, volume_ratio / 2.0)",
+          "spike_detection": "if volume_ratio > 3.0: score = 1.0",
+          "confidence_score": "min(1.0, volume_ratio / 1.5)"
+        }
+      },
+      "aggregated_quality_score": {
+        "calculation": "weighted_average of all indicator scores",
+        "weights": {
+          "RSI": 0.25,
+          "MACD": 0.25,
+          "BB_position": 0.25,
+          "volume_confirmation": 0.25
+        },
+        "minimum_indicators": 3,
+        "confidence_threshold": 0.6
+      },
+      "parallel_scoring": {
+        "enabled": true,
+        "description": "指標計算完成後立即並行計算品質分數",
+        "batch_processing": "批次處理多個時間框架的品質評分"
+      }
+    },
+    "caching_strategy": {
+      "multi_timeframe_caching": {
+        "enabled": true,
+        "cache_key_format": "{layer_name}_{symbol}_{timeframe}_{hash}",
+        "cross_timeframe_validation": "驗證不同時間框架數據一致性"
+      },
+      "adaptive_caching": {
+        "dynamic_ttl": {
+          "high_volatility": "cache_ttl: 10s",
+          "normal_volatility": "cache_ttl: 30s",
+          "low_volatility": "cache_ttl: 60s"
+        },
+        "cache_warming": {
+          "enabled": true,
+          "targets": "預先計算熱門交易對指標",
+          "priority_symbols": ["BTCUSDT", "ETHUSDT", "BNBUSDT"],
+          "warm_timeframes": ["1m", "5m", "15m"]
+        },
+        "lru_strategy": "最近最少使用快取策略",
+        "memory_management": {
+          "max_cache_size_mb": 256,
+          "cleanup_threshold": 0.8,
+          "emergency_cleanup": true
+        }
+      },
+      "event_driven_invalidation": {
+        "enabled": true,
+        "kline_events": {
+          "new_kline_close": "新K線收盤立即失效相關快取",
+          "significant_price_move": "價格變動 > 1% 時失效",
+          "volume_spike": "成交量 > 2倍平均時失效"
+        },
+        "parameter_events": {
+          "period_change": "指標週期參數變更",
+          "strategy_switch": "交易策略模式切換",
+          "emergency_mode": "緊急模式觸發"
+        },
+        "quality_events": {
+          "quality_score_spike": "品質分數變化 > 0.3",
+          "signal_strength_change": "信號強度劇變",
+          "market_regime_shift": "市場制度轉換"
+        }
+      },
+      "intermediate_cache": {
+        "layer_-1_data_sync": "adaptive_ttl",
+        "layer_2_moving_averages": "adaptive_ttl",
+        "layer_3_standard_deviations": "adaptive_ttl",
+        "layer_4_rolling_extremes": "adaptive_ttl"
+      },
+      "final_indicators_cache": {
+        "cache_ttl": "adaptive_ttl",
+        "invalidation_triggers": [
+          "new_kline_data",
+          "parameter_change",
+          "volatility_regime_change",
+          "quality_score_spike",
+          "signal_strength_change"
+        ],
+        "cache_hit_target": "95%+",
+        "performance_monitoring": {
+          "hit_rate_tracking": true,
+          "latency_monitoring": true,
+          "memory_usage_alerts": true
+        }
+      }
+    }
+  },
+  "dynamic_performance_monitoring": {
+    "enabled": true,
+    "real_time_profiling": {
+      "layer_timing": "記錄每層實際執行時間",
+      "bottleneck_detection": "自動識別性能瓶頸",
+      "memory_usage_tracking": "監控記憶體使用情況",
+      "cache_performance": "快取命中率和延遲監控"
+    },
+    "adaptive_optimization": {
+      "auto_fallback": {
+        "enabled": true,
+        "trigger_threshold_ms": 100,
+        "fallback_strategy": "跳過低優先級指標",
+        "emergency_mode_ms": 200
+      },
+      "load_balancing": {
+        "cpu_threshold": 80,
+        "memory_threshold": 85,
+        "dynamic_parallelism": "根據系統負載調整並行度"
+      },
+      "self_tuning": {
+        "cache_size_adjustment": "根據命中率動態調整快取大小",
+        "ttl_optimization": "基於實際使用模式優化 TTL",
+        "parameter_recommendation": "基於性能數據推薦最佳參數"
+      }
+    },
+    "performance_alerts": {
+      "slow_computation_alert": "計算時間超過目標 50%",
+      "cache_miss_alert": "快取命中率低於 85%",
+      "memory_usage_alert": "記憶體使用超過閾值",
+      "data_quality_alert": "數據品質分數低於 0.5"
+    }
+  },
+  "implementation_notes": {
+    "optimization_phases": {
+      "phase1_immediate": [
+        "實現數據同步層（layer_-1_data_sync）",
+        "部署參數化配置系統",
+        "實現並行層執行（layer_1, layer_2, layer_4）",
+        "啟用事件驅動快取策略"
+      ],
+      "phase2_short_term": [
+        "實現多時間框架並行計算",
+        "部署數值化品質評分系統",
+        "啟用動態性能監控",
+        "實現自動降級機制"
+      ],
+      "phase3_advanced": [
+        "完整市場適應性計算模式",
+        "智能負載平衡系統",
+        "自動調優和參數推薦",
+        "完整監控和告警系統"
+      ]
+    },
+    "phase1_priority": [
+      "實現 layer_-1_data_sync 數據驗證",
+      "建立參數化配置系統",
+      "實現 layer_2_moving_averages 的批次計算",
+      "添加事件驅動快取機制",
+      "部署標準化輸出格式"
+    ],
+    "expected_benefits": {
+      "computation_speed": "提升 70%+ 計算速度（從 150ms → 45ms）",
+      "memory_efficiency": "記憶體使用優化 30%，快取命中率 95%+",
+      "data_reliability": "數據同步檢查提升系統可靠性",
+      "maintainability": "參數化配置大幅提升運維靈活性",
+      "flexibility": "多時間框架支援，動態策略適應",
+      "scalability": "支援更多交易對和時間框架同時分析",
+      "market_adaptivity": "根據市場條件和性能實時自動調整",
+      "operational_excellence": "完整監控、告警和自動優化系統"
+    },
+    "production_readiness": {
+      "data_validation": "生產級數據驗證和同步",
+      "fault_tolerance": "自動降級和容錯機制",
+      "monitoring": "完整的性能監控和告警",
+      "scalability": "支援高並發和大量交易對",
+      "maintainability": "參數化配置和動態調整"
+    }
+  }
+}

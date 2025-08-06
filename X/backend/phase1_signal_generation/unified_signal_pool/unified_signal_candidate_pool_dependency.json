@@ -1,0 +1,285 @@
+{
+  "strategy_dependency_graph": {
+    "strategy_name": "統一信號候選池管理器",
+    "description": "多策略信號統一收集、評分、排序與分發的核心樞紐系統",
+    "version": "1.0.0",
+    "dependencies": {
+      "core_dependencies": [
+        "phase1b_volatility_adaptation",
+        "phase1c_signal_standardization",
+        "pandas_ta_indicators",
+        "phase3_market_analyzer",
+        "binance_data_connector"
+      ],
+      "external_libraries": ["numpy", "pandas", "asyncio"]
+    },
+    "computation_flow": {
+      "layer_1_signal_ingestion": {
+        "description": "多源信號接收與初步驗證層",
+        "dependencies": [],
+        "operations": {
+          "multi_strategy_signal_collection": {
+            "input_sources": [
+              "phase1b_volatility_signals",
+              "phase1c_standardized_signals",
+              "technical_indicator_signals",
+              "market_analyzer_signals"
+            ],
+            "collection_method": "async_concurrent_gathering",
+            "output": "raw_signal_pool",
+            "computation_time_ms": 8
+          },
+          "signal_validation": {
+            "input": "raw_signal_pool",
+            "validation_rules": [
+              "signal_strength_range: 0.0-1.0 (統一標準)",
+              "timestamp_freshness: < 60_seconds",
+              "required_fields_present: true",
+              "signal_type_valid: enum_check"
+            ],
+            "scope": "業務邏輯驗證 (重複檢測、關聯分析)",
+            "output": "validated_signals",
+            "computation_time_ms": 3
+          },
+          "duplicate_detection": {
+            "input": "validated_signals",
+            "method": "signal_fingerprint_matching",
+            "deduplication_logic": "same_symbol + same_type + timestamp_window_30s",
+            "output": "deduplicated_signals",
+            "computation_time_ms": 4
+          }
+        }
+      },
+      "layer_2_signal_enrichment": {
+        "description": "信號豐富化與上下文增強層",
+        "dependencies": ["layer_1_signal_ingestion"],
+        "operations": {
+          "market_context_enrichment": {
+            "input": "deduplicated_signals, real_time_market_data",
+            "enrichment_data": [
+              "current_price",
+              "volume_profile",
+              "order_book_snapshot",
+              "funding_rate",
+              "open_interest"
+            ],
+            "output": "context_enriched_signals",
+            "computation_time_ms": 6
+          },
+          "historical_performance_lookup": {
+            "input": "signals, historical_performance_database",
+            "lookup_method": "signal_pattern_matching",
+            "performance_metrics": [
+              "win_rate",
+              "avg_return",
+              "max_drawdown",
+              "sharpe_ratio"
+            ],
+            "output": "performance_enriched_signals",
+            "computation_time_ms": 5
+          },
+          "cross_timeframe_analysis": {
+            "input": "signals, multi_timeframe_data",
+            "timeframes": ["1m", "5m", "15m", "1h"],
+            "analysis_method": "trend_alignment_scoring",
+            "output": "timeframe_analyzed_signals",
+            "computation_time_ms": 10
+          }
+        }
+      },
+      "layer_3_signal_scoring": {
+        "description": "綜合信號評分與排序層",
+        "dependencies": ["layer_2_signal_enrichment"],
+        "operations": {
+          "composite_score_calculation": {
+            "input": "enriched_signals",
+            "scope": "綜合評分 (不重複計算信心分數)",
+            "scoring_components": {
+              "final_confidence_score_from_phase1c": "weight: 0.35",
+              "market_context_alignment": "weight: 0.20",
+              "historical_performance": "weight: 0.20",
+              "cross_timeframe_consistency": "weight: 0.15",
+              "urgency_factor": "weight: 0.10"
+            },
+            "formula": "weighted_sum_without_confidence_recalculation",
+            "output": "composite_scores",
+            "note": "使用 phase1c 已計算的 final_confidence_score，不重複計算",
+            "computation_time_ms": 7
+          },
+          "risk_adjusted_scoring": {
+            "input": "composite_scores, risk_metrics",
+            "risk_adjustment": "score * (1 - risk_penalty_factor)",
+            "risk_factors": [
+              "market_volatility",
+              "position_correlation",
+              "drawdown_risk",
+              "liquidity_risk"
+            ],
+            "output": "risk_adjusted_scores",
+            "computation_time_ms": 4
+          },
+          "signal_ranking": {
+            "input": "risk_adjusted_scores",
+            "ranking_method": "descending_score_with_priority_boost",
+            "priority_boost": {
+              "CRITICAL": "+0.1",
+              "HIGH": "+0.05",
+              "MEDIUM": "0.0",
+              "LOW": "-0.05"
+            },
+            "output": "ranked_signal_pool",
+            "computation_time_ms": 2
+          }
+        }
+      },
+      "layer_4_signal_filtering": {
+        "description": "智能信號過濾與質量控制層",
+        "dependencies": ["layer_3_signal_scoring"],
+        "operations": {
+          "quality_threshold_filtering": {
+            "input": "ranked_signal_pool",
+            "filtering_rules": {
+              "minimum_score": "0.6",
+              "minimum_confidence": "0.5",
+              "maximum_risk_score": "0.8"
+            },
+            "output": "quality_filtered_signals",
+            "computation_time_ms": 2
+          },
+          "correlation_filtering": {
+            "input": "quality_filtered_signals",
+            "method": "signal_correlation_analysis",
+            "correlation_threshold": "0.8",
+            "deduplication_strategy": "keep_highest_score",
+            "output": "correlation_filtered_signals",
+            "computation_time_ms": 5
+          },
+          "position_limit_filtering": {
+            "input": "correlation_filtered_signals, current_positions",
+            "position_limits": {
+              "max_positions_per_symbol": "3",
+              "max_total_positions": "20",
+              "max_exposure_per_sector": "0.3"
+            },
+            "output": "position_aware_signals",
+            "computation_time_ms": 3
+          }
+        }
+      },
+      "layer_5_signal_distribution": {
+        "description": "信號分發與路由層",
+        "dependencies": ["layer_4_signal_filtering"],
+        "operations": {
+          "priority_queue_management": {
+            "input": "position_aware_signals",
+            "queue_structure": {
+              "CRITICAL": "immediate_execution_queue",
+              "HIGH": "priority_queue_5s_delay",
+              "MEDIUM": "standard_queue_30s_delay",
+              "LOW": "batch_queue_60s_delay"
+            },
+            "output": "queued_signals",
+            "computation_time_ms": 2
+          },
+          "signal_broadcasting": {
+            "input": "queued_signals",
+            "broadcast_channels": [
+              "websocket_real_time_feed",
+              "rest_api_polling_endpoint",
+              "internal_strategy_bus",
+              "alert_notification_system"
+            ],
+            "output": "distributed_signals",
+            "computation_time_ms": 5
+          },
+          "performance_tracking": {
+            "input": "distributed_signals",
+            "tracking_metrics": [
+              "signal_execution_latency",
+              "signal_accuracy_rate",
+              "false_positive_rate",
+              "profit_attribution"
+            ],
+            "output": "tracked_performance_data",
+            "computation_time_ms": 3
+          }
+        }
+      }
+    },
+    "signal_pool_output_format": {
+      "candidate_signal": {
+        "signal_id": "uuid",
+        "symbol": "trading_pair",
+        "signal_type": "BUY | SELL | HOLD",
+        "original_strength": "raw_signal_value",
+        "composite_score": "0.0-1.0 (統一標準)",
+        "risk_adjusted_score": "0.0-1.0 (統一標準)",
+        "final_confidence_score": "0.0-1.0 (來自 phase1c，不重複計算)",
+        "priority": "CRITICAL | HIGH | MEDIUM | LOW",
+        "grade": "A+ | A | B | C | D",
+        "source_strategy": "strategy_identifier",
+        "market_context": {
+          "current_price": "real_time_price",
+          "volume": "current_volume",
+          "volatility_regime": "HIGH | MEDIUM | LOW",
+          "trend_direction": "UP | DOWN | SIDEWAYS"
+        },
+        "timeframe_analysis": {
+          "primary_timeframe": "signal_origin_timeframe",
+          "supporting_timeframes": "array_of_confirming_timeframes",
+          "alignment_score": "0.0-1.0"
+        },
+        "risk_metrics": {
+          "risk_score": "0.0-1.0",
+          "max_position_size": "percentage_of_portfolio",
+          "stop_loss_level": "price_level",
+          "take_profit_level": "price_level"
+        },
+        "performance_context": {
+          "historical_win_rate": "percentage",
+          "avg_return": "percentage",
+          "max_drawdown": "percentage"
+        },
+        "timestamps": {
+          "signal_generated": "ISO_datetime",
+          "signal_received": "ISO_datetime",
+          "signal_processed": "ISO_datetime",
+          "signal_expires": "ISO_datetime"
+        }
+      }
+    },
+    "performance_targets": {
+      "total_processing_time_ms": 50,
+      "signal_throughput": "1000_signals_per_minute",
+      "signal_latency": "< 100ms end_to_end",
+      "signal_accuracy": "> 75%",
+      "false_positive_rate": "< 10%"
+    },
+    "integration_points": {
+      "feeds_to": [
+        "execution_engine",
+        "portfolio_management_system",
+        "risk_management_system",
+        "alert_notification_system"
+      ],
+      "receives_from": [
+        "phase1b_volatility_adaptation",
+        "phase1c_signal_standardization",
+        "pandas_ta_indicators",
+        "phase3_market_analyzer"
+      ]
+    },
+    "optimization_strategies": {
+      "async_concurrent_processing": "並行處理多個信號源，提升 60% 處理速度",
+      "signal_pooling": "批次處理信號群組，減少單一信號處理開銷",
+      "smart_caching": "快取歷史性能數據和市場上下文",
+      "early_filtering": "在早期階段過濾低質量信號，節省後續計算資源"
+    },
+    "quality_assurance": {
+      "signal_validation": "嚴格的信號格式和內容驗證",
+      "performance_monitoring": "實時監控信號質量和系統性能",
+      "feedback_loop": "根據執行結果調整信號評分權重",
+      "anomaly_detection": "識別異常信號模式和系統故障"
+    }
+  }
+}

@@ -1,0 +1,280 @@
+{
+  "strategy_dependency_graph": {
+    "strategy_name": "Phase3 市場分析器",
+    "description": "Order Book 深度分析、資金費率情緒指標與高階市場微結構分析系統",
+    "version": "1.0.0",
+    "dependencies": {
+      "core_dependencies": ["binance_data_connector"],
+      "external_libraries": ["aiohttp", "asyncio", "numpy", "pandas"],
+      "api_dependencies": [
+        "binance_websocket_orderbook",
+        "binance_funding_rate_api",
+        "binance_open_interest_api"
+      ]
+    },
+    "computation_flow": {
+      "layer_1_market_data_collection": {
+        "description": "高頻市場數據收集層",
+        "dependencies": [],
+        "operations": {
+          "orderbook_stream_processing": {
+            "input": "real_time_orderbook_websocket",
+            "data_points": ["bids", "asks", "depth_levels_20"],
+            "update_frequency": "100ms",
+            "output": "processed_orderbook_snapshots",
+            "computation_time_ms": 5
+          },
+          "funding_rate_collection": {
+            "input": "binance_funding_rate_api",
+            "data_points": ["current_rate", "predicted_rate", "rate_history"],
+            "update_frequency": "8_hours",
+            "output": "funding_rate_data",
+            "computation_time_ms": 2
+          },
+          "open_interest_monitoring": {
+            "input": "binance_open_interest_api",
+            "data_points": ["current_oi", "oi_change", "oi_weighted_price"],
+            "update_frequency": "30_seconds",
+            "output": "open_interest_metrics",
+            "computation_time_ms": 3
+          },
+          "volume_profile_analysis": {
+            "input": "tick_by_tick_trade_data",
+            "analysis_method": "price_volume_distribution",
+            "output": "volume_profile_data",
+            "computation_time_ms": 8
+          }
+        }
+      },
+      "layer_2_orderbook_analysis": {
+        "description": "Order Book 深度分析層",
+        "dependencies": ["layer_1_market_data_collection"],
+        "operations": {
+          "bid_ask_imbalance": {
+            "input": "orderbook_snapshots",
+            "formula": "(total_bid_volume - total_ask_volume) / (total_bid_volume + total_ask_volume)",
+            "depth_levels": "5, 10, 20",
+            "output": "imbalance_ratios",
+            "computation_time_ms": 3
+          },
+          "order_flow_intensity": {
+            "input": "orderbook_updates_stream",
+            "method": "order_arrival_rate_analysis",
+            "metrics": [
+              "new_orders_per_second",
+              "cancelled_orders_per_second",
+              "filled_orders_per_second"
+            ],
+            "output": "order_flow_metrics",
+            "computation_time_ms": 5
+          },
+          "market_depth_analysis": {
+            "input": "orderbook_snapshots",
+            "analysis": [
+              "spread_analysis",
+              "depth_resilience",
+              "price_impact_estimation"
+            ],
+            "output": "depth_quality_metrics",
+            "computation_time_ms": 7
+          },
+          "large_order_detection": {
+            "input": "orderbook_updates",
+            "detection_threshold": "size > 10x_average_order_size",
+            "classification": "whale_orders | institutional_orders | retail_clusters",
+            "output": "large_order_alerts",
+            "computation_time_ms": 4
+          }
+        }
+      },
+      "layer_3_sentiment_analysis": {
+        "description": "市場情緒與資金流向分析層",
+        "dependencies": ["layer_1_market_data_collection"],
+        "operations": {
+          "funding_rate_sentiment": {
+            "input": "funding_rate_data",
+            "sentiment_mapping": {
+              "rate > 0.01%": "extreme_bullish",
+              "0.005% < rate <= 0.01%": "bullish",
+              "-0.005% <= rate <= 0.005%": "neutral",
+              "-0.01% <= rate < -0.005%": "bearish",
+              "rate < -0.01%": "extreme_bearish"
+            },
+            "output": "funding_sentiment_score",
+            "computation_time_ms": 2
+          },
+          "open_interest_momentum": {
+            "input": "open_interest_metrics",
+            "calculation": "oi_change_percentage_24h",
+            "interpretation": [
+              "rising_oi + rising_price = bullish_momentum",
+              "rising_oi + falling_price = bearish_momentum",
+              "falling_oi + rising_price = bullish_weakening",
+              "falling_oi + falling_price = bearish_weakening"
+            ],
+            "output": "oi_momentum_signal",
+            "computation_time_ms": 3
+          },
+          "volume_sentiment_analysis": {
+            "input": "volume_profile_data",
+            "analysis_methods": [
+              "volume_weighted_average_price_deviation",
+              "volume_accumulation_distribution",
+              "institutional_vs_retail_volume_ratio"
+            ],
+            "output": "volume_sentiment_indicators",
+            "computation_time_ms": 6
+          }
+        }
+      },
+      "layer_4_microstructure_signals": {
+        "description": "市場微結構信號生成層",
+        "dependencies": [
+          "layer_2_orderbook_analysis",
+          "layer_3_sentiment_analysis"
+        ],
+        "operations": {
+          "liquidity_shock_detection": {
+            "input": "depth_quality_metrics, order_flow_metrics",
+            "detection_criteria": [
+              "sudden_depth_decrease > 50%",
+              "spread_widening > 3x_normal",
+              "order_flow_intensity_spike > 5x_average"
+            ],
+            "signal_strength": "0.8-1.0 (統一標準)",
+            "output": "liquidity_shock_signals",
+            "computation_time_ms": 4
+          },
+          "institutional_flow_signal": {
+            "input": "large_order_alerts, volume_sentiment",
+            "pattern_recognition": [
+              "coordinated_large_orders",
+              "iceberg_order_detection",
+              "dark_pool_spillover_effects"
+            ],
+            "signal_strength": "0.7-0.9 (統一標準)",
+            "output": "institutional_flow_signals",
+            "computation_time_ms": 6
+          },
+          "sentiment_divergence_signal": {
+            "input": "funding_sentiment, oi_momentum, volume_sentiment",
+            "divergence_detection": [
+              "funding_bullish + oi_bearish = contrarian_signal",
+              "volume_accumulation + funding_neutral = stealth_accumulation"
+            ],
+            "signal_strength": "0.6-0.85 (統一標準)",
+            "output": "sentiment_divergence_signals",
+            "computation_time_ms": 5
+          },
+          "liquidity_regime_signal": {
+            "input": "all_microstructure_metrics",
+            "regime_classification": [
+              "high_liquidity_stable",
+              "low_liquidity_volatile",
+              "liquidity_breakout_preparation",
+              "liquidity_distribution_phase"
+            ],
+            "signal_strength": "0.5-0.8 (統一標準)",
+            "note": "專注於流動性制度分析，與 phase1b 的波動性制度分析互補",
+            "output": "liquidity_regime_classification_signals",
+            "computation_time_ms": 7
+          }
+        }
+      },
+      "layer_5_advanced_analytics": {
+        "description": "高階分析與預測信號層",
+        "dependencies": ["layer_4_microstructure_signals"],
+        "operations": {
+          "price_impact_prediction": {
+            "input": "current_orderbook, historical_impact_data",
+            "model": "machine_learning_price_impact_model",
+            "prediction_horizon": "1-5_minutes",
+            "output": "predicted_price_impact",
+            "computation_time_ms": 10
+          },
+          "liquidity_forecast": {
+            "input": "orderbook_trends, historical_liquidity_patterns",
+            "forecast_method": "time_series_analysis + market_hours_adjustment",
+            "forecast_horizon": "15-60_minutes",
+            "output": "liquidity_availability_forecast",
+            "computation_time_ms": 8
+          },
+          "market_stress_indicator": {
+            "input": "all_layer_outputs",
+            "stress_components": [
+              "orderbook_stability",
+              "funding_rate_pressure",
+              "open_interest_volatility",
+              "volume_distribution_anomalies"
+            ],
+            "output": "market_stress_score",
+            "computation_time_ms": 5
+          }
+        }
+      }
+    },
+    "signal_output_format": {
+      "market_microstructure_signal": {
+        "signal_id": "uuid",
+        "signal_type": "LIQUIDITY_SHOCK | INSTITUTIONAL_FLOW | SENTIMENT_DIVERGENCE | LIQUIDITY_REGIME_CHANGE",
+        "signal_strength": "0.0-1.0 (統一標準)",
+        "signal_confidence": "0.0-1.0 (基礎信心分數，由 phase1c 進一步處理)",
+        "orderbook_context": {
+          "bid_ask_imbalance": "-1.0 to 1.0",
+          "market_depth_score": "0.0-1.0",
+          "order_flow_intensity": "relative_to_baseline",
+          "spread_condition": "tight | normal | wide | very_wide"
+        },
+        "sentiment_context": {
+          "funding_sentiment": "extreme_bearish to extreme_bullish",
+          "oi_momentum": "strong_growth | growth | stable | decline | strong_decline",
+          "volume_sentiment": "accumulation | distribution | neutral"
+        },
+        "microstructure_metrics": {
+          "liquidity_score": "0.0-1.0",
+          "market_stress_score": "0.0-1.0",
+          "institutional_activity": "high | medium | low",
+          "retail_activity": "high | medium | low"
+        },
+        "predictive_analytics": {
+          "predicted_price_impact": "percentage",
+          "liquidity_forecast": "improving | stable | deteriorating",
+          "regime_probability": "breakdown | ranging | trending | breakout"
+        },
+        "timestamps": {
+          "data_timestamp": "ISO_datetime",
+          "analysis_timestamp": "ISO_datetime",
+          "signal_generated": "ISO_datetime",
+          "signal_expires": "ISO_datetime"
+        }
+      }
+    },
+    "performance_targets": {
+      "total_computation_time_ms": 60,
+      "data_latency": "< 200ms from_market",
+      "signal_accuracy": "> 70%",
+      "orderbook_analysis_frequency": "every_100ms",
+      "sentiment_analysis_frequency": "every_30_seconds"
+    },
+    "integration_points": {
+      "feeds_to": [
+        "unified_signal_candidate_pool",
+        "risk_management_system",
+        "execution_engine"
+      ],
+      "receives_from": ["binance_websocket_feeds", "binance_rest_apis"]
+    },
+    "optimization_strategies": {
+      "streaming_data_processing": "使用 asyncio 流式處理，減少延遲",
+      "incremental_orderbook_updates": "增量更新而非全量重算",
+      "smart_sampling": "根據市場活躍度動態調整採樣頻率",
+      "parallel_analysis": "並行處理不同分析模組"
+    },
+    "real_time_requirements": {
+      "orderbook_update_latency": "< 50ms",
+      "signal_generation_latency": "< 100ms",
+      "data_freshness_threshold": "< 500ms",
+      "system_availability": "> 99.5%"
+    }
+  }
+}
