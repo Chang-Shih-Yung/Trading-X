@@ -1,0 +1,272 @@
+{
+  "REAL_DATA_SIGNAL_QUALITY_ENGINE_CORE_FLOW": {
+    "流程概述": "實時數據信號品質引擎 - 並行監控架構視覺化流程",
+    "版本": "2.1.0",
+    "核心理念": "並行監控 → 品質驗證 → 異常檢測 → 系統負載管理 → 零延遲反饋",
+
+    "🔄 數據流程視覺化": {
+      "Step_-1": {
+        "層級": "layer_-1_parallel_intake",
+        "名稱": "🔍 並行數據接收層",
+        "輸入": "EPL處理中的信號流 + 系統性能指標",
+        "處理": "⏰ 非阻塞數據攔截 + 📊 實時品質指標採集 + 🔗 系統狀態監控",
+        "輸出": "✅ parallel_signal_stream + system_metrics + quality_snapshots",
+        "時間": "0ms (非阻塞並行)",
+        "並行度": "多線程並行監控",
+        "視覺標記": "🟢 綠燈 → 並行監控啟動",
+        "非阻塞特性": "🚫 不影響主EPL流程性能"
+      },
+
+      "Step_0": {
+        "層級": "layer_0_signal_intake",
+        "名稱": "📈 信號品質快照層",
+        "輸入": "✅ unified_signal_pool.signal_candidates (並行複製)",
+        "處理": "🏷️ 信號元數據提取 + 📊 品質指標快照 + ⏰ 時間戳同步",
+        "輸出": "📊 signal_quality_snapshots + metadata_records + timing_info",
+        "時間": "2ms",
+        "並行度": "與EPL主流程並行",
+        "視覺標記": "🔵 藍色 → 品質快照採集",
+        "監控範圍": [
+          "🟢 Express lane信號品質",
+          "🔵 Standard lane處理狀態",
+          "🟣 Deep lane複雜度指標"
+        ]
+      },
+
+      "Step_1_2_3_PARALLEL": {
+        "層級": "並行執行組 (品質驗證 + 異常檢測 + 負載監控)",
+        "名稱": "⚡ 三重並行監控層",
+        "並行處理": {
+          "🧮 Layer_1_Quality_Validation": {
+            "處理_1": "📊 Phase1品質指標驗證",
+            "處理_2": "🔍 EPL處理一致性檢查",
+            "處理_3": "⚖️ 信號強度與信心度交叉驗證",
+            "輸出": "✅ quality_validation_results + consistency_scores",
+            "時間": "8ms",
+            "監控重點": "🎯 Phase1→Phase2數據一致性"
+          },
+          "📊 Layer_2_Anomaly_Detection": {
+            "處理_1": "🔍 微異常模式識別",
+            "處理_2": "📈 信號變異趨勢分析",
+            "處理_3": "⚠️ 異常信號標記與分類",
+            "輸出": "🚨 anomaly_alerts + pattern_analysis + signal_classifications",
+            "時間": "12ms",
+            "監控重點": "🕵️ Express lane微異常檢測"
+          },
+          "📏 Layer_3_System_Load_Monitoring": {
+            "處理_1": "⚡ CPU使用率實時追蹤",
+            "處理_2": "📋 隊列長度動態監控",
+            "處理_3": "💾 記憶體使用情況分析",
+            "輸出": "📊 system_performance_metrics + load_alerts + capacity_predictions",
+            "時間": "5ms",
+            "監控重點": "🖥️ 系統資源使用最佳化"
+          }
+        },
+        "總時間": "12ms (並行執行最慢層)",
+        "視覺標記": "🟡 黃色並行區塊",
+        "協調機制": "🔄 結果匯聚與優先級排序"
+      },
+
+      "Step_4": {
+        "層級": "layer_4_enhanced_monitoring",
+        "名稱": "🔬 增強監控分析層",
+        "輸入": "✅ Layer_1-3 並行輸出",
+        "處理_1": "📊 延遲觀察信號追蹤分析",
+        "處理_2": "🎯 動態閾值調整建議",
+        "處理_3": "🔄 來源多樣性評估",
+        "輸出": {
+          "delayed_observation_tracking": "📅 5分鐘性能改善追蹤",
+          "dynamic_threshold_recommendations": "🎯 市場壓力響應式閾值建議",
+          "source_diversity_analysis": "🌟 模型多樣性評估報告"
+        },
+        "時間": "8ms",
+        "依賴": "🔗 需要前三層並行結果",
+        "視覺標記": "🟠 橙色 → 增強分析"
+      },
+
+      "Step_5": {
+        "層級": "layer_5_priority_classification",
+        "名稱": "🎯 優先級分類層",
+        "輸入": "✅ Layer_4 增強分析輸出",
+        "處理": {
+          "緊急警報": "🚨 系統負載 >85% 或 異常檢測觸發",
+          "品質警告": "⚠️ 信號品質下降或一致性問題",
+          "性能建議": "💡 最佳化建議與閾值調整",
+          "正常監控": "✅ 常規品質指標與狀態報告"
+        },
+        "輸出": "🎯 classified_alerts_by_priority + actionable_recommendations",
+        "時間": "5ms",
+        "視覺標記": "🟣 紫色 → 優先級決策"
+      },
+
+      "Step_6_FINAL": {
+        "層級": "layer_6_output_distribution",
+        "名稱": "📡 輸出分發層",
+        "輸入": "✅ 所有前置層輸出",
+        "處理": {
+          "📊 監控儀表板": {
+            "real_time_metrics": "✅ 即時品質指標",
+            "performance_trends": "📈 性能趨勢圖表",
+            "system_health": "💚 系統健康狀態",
+            "quality_scores": "🎯 綜合品質評分"
+          },
+          "🚨 警報通知系統": {
+            "critical_alerts": "🔴 緊急系統警報",
+            "quality_warnings": "🟡 品質警告通知",
+            "performance_notifications": "📊 性能異常通知"
+          },
+          "⚖️ 系統負載平衡器": {
+            "load_management": "📊 負載管理指令",
+            "resource_allocation": "💾 資源分配建議",
+            "degradation_triggers": "⬇️ 降階觸發信號"
+          }
+        },
+        "輸出格式": "🏷️ {destination}_{alert_type}_{priority_level}",
+        "例如": "dashboard_quality_metrics_normal, alerts_system_overload_critical",
+        "時間": "5ms",
+        "視覺標記": "🔴 紅色 → 最終輸出分發"
+      }
+    },
+
+    "⚡ 性能優化策略視覺化": {
+      "🚀 並行非阻塞": {
+        "主流程影響": "🚫 零延遲影響EPL主流程",
+        "並行效率": "⬆️ 三重監控同時執行",
+        "資源隔離": "🔒 獨立線程池避免資源競爭"
+      },
+      "🧮 智能採樣": {
+        "高頻採樣": "⚡ Express lane: 100%監控",
+        "選擇採樣": "📊 Standard lane: 50%採樣",
+        "重點採樣": "🔍 Deep lane: 80%重點監控",
+        "效率提升": "⬆️ +40% 監控效率提升"
+      },
+      "💾 記憶體最佳化": {
+        "滑動窗口": "🔄 15分鐘滑動窗口緩存",
+        "壓縮存儲": "📦 歷史數據壓縮存儲",
+        "智能清理": "🧹 過期數據自動清理",
+        "記憶體節省": "⬇️ -60% 記憶體使用"
+      }
+    },
+
+    "🎯 品質監控系統": {
+      "數值化監控": {
+        "信號一致性": "🎯 Phase1 vs EPL輸出一致性 >= 95%",
+        "處理效率": "⚡ 各通道處理時間監控",
+        "品質退化": "📉 品質指標下降趨勢檢測",
+        "異常比例": "🚨 異常信號比例 <= 5%"
+      },
+      "系統健康": "🏆 weighted_average([一致性:0.3, 效率:0.25, 品質:0.25, 異常:0.2])",
+      "警報閾值": {
+        "緊急": "🔴 健康評分 < 0.7 或 系統負載 > 85%",
+        "警告": "🟡 健康評分 < 0.8 或 品質下降 > 10%",
+        "正常": "✅ 健康評分 >= 0.8 且 各項指標正常"
+      }
+    },
+
+    "🔄 動態監控調整": {
+      "實時調整": {
+        "⏱️ 採樣頻率": "根據系統負載動態調整",
+        "🔍 監控深度": "根據異常檢測結果調整",
+        "💾 緩存策略": "根據記憶體使用情況調整",
+        "📊 報告頻率": "根據警報優先級調整"
+      },
+      "自適應機制": {
+        "高負載模式": "⚡ 降低採樣頻率, 重點監控關鍵指標",
+        "異常模式": "🔍 提高監控精度, 增加檢測頻率",
+        "正常模式": "✅ 標準監控配置, 平衡效率與精度"
+      }
+    },
+
+    "📊 總體流程時間線": {
+      "並行監控": "40ms (layer_-1:0ms → layer_0:2ms → [layer_1+2+3]:12ms → layer_4:8ms → layer_5:5ms → layer_6:5ms)",
+      "非阻塞特性": "⚡ 主EPL流程: 12ms 不受影響",
+      "監控完整度": "📊 40ms 完整監控週期",
+      "並行效益": {
+        "🟢 Express監控": "2ms + 8ms = 10ms",
+        "🔵 Standard監控": "2ms + 12ms = 14ms",
+        "🟣 Deep監控": "2ms + 12ms + 8ms = 22ms"
+      },
+      "總體效率": "⬆️ 零延遲主流程 + 40ms完整監控"
+    },
+
+    "🎯 輸出標準化": {
+      "監控報告": "📊 {timestamp}_{component}_{metric_type}_{severity}",
+      "警報格式": {
+        "alert_id": "🆔 唯一警報識別碼",
+        "severity": "🚦 critical/warning/info",
+        "component": "🔧 affected_component", 
+        "message": "📝 詳細描述",
+        "timestamp": "⏰ ISO datetime",
+        "metrics": "📊 相關數值指標"
+      },
+      "儀表板數據": "📈 實時圖表數據 + 歷史趨勢",
+      "系統指令": "⚖️ 負載平衡與資源調整指令"
+    },
+
+    "🔗 下游整合點": {
+      "監控儀表板": [
+        "📊 real_time_quality_metrics",
+        "📈 performance_trend_charts",
+        "🎯 system_health_indicators"
+      ],
+      "警報通知系統": [
+        "🚨 critical_system_alerts",
+        "⚠️ quality_degradation_warnings",
+        "📊 performance_anomaly_notifications"
+      ],
+      "系統負載平衡器": [
+        "⚖️ load_management_commands",
+        "💾 resource_allocation_recommendations", 
+        "⬇️ graceful_degradation_triggers"
+      ]
+    },
+
+    "🔬 增強監控能力": {
+      "微異常檢測": {
+        "描述": "Express lane信號變異監控",
+        "檢測項目": [
+          "📊 signal_volatility_jump > 0.3",
+          "📉 confidence_drop_rate > 0.1",
+          "🎯 quality_consistency_deviation > 0.15"
+        ],
+        "回應動作": ["🚨 即時警報", "📊 詳細分析報告"]
+      },
+      "延遲觀察追蹤": {
+        "描述": "5分鐘性能改善追蹤",
+        "追蹤指標": [
+          "📈 price_movement_accuracy",
+          "🎯 signal_effectiveness",
+          "⏰ timing_precision"
+        ],
+        "升級觸發": "💪 性能改善 > 15% → reinforced_candidate"
+      },
+      "動態閾值監控": {
+        "描述": "市場壓力響應式閾值",
+        "調整參數": [
+          "🎯 confidence_thresholds",
+          "📊 quality_gates",
+          "⚡ processing_priorities"
+        ],
+        "調整頻率": "📅 每5分鐘或異常觸發時"
+      }
+    },
+
+    "🚨 系統彈性設計": {
+      "監控降階": {
+        "觸發條件": "⚠️ 監控系統CPU > 90% 或 記憶體 > 80%",
+        "降階策略": "🔄 降低採樣頻率 → 重點監控關鍵指標",
+        "最小監控": "🚨 只保留系統負載和緊急警報監控"
+      },
+      "容錯處理": {
+        "監控失效": "🔌 單一監控模組失效不影響其他模組",
+        "數據遺失": "📦 緩存機制確保關鍵數據不遺失",
+        "通信中斷": "🔄 自動重連與數據同步機制"
+      },
+      "自我修復": {
+        "異常檢測": "🔍 監控系統自身健康檢查",
+        "自動重啟": "🔄 模組異常時自動重啟",
+        "狀態恢復": "💾 從最後已知良好狀態恢復"
+      }
+    }
+  }
+}

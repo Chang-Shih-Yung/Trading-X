@@ -1,0 +1,326 @@
+{
+  "SIGNAL_SCORING_ENGINE_CORE_FLOW": {
+    "流程概述": "信號評分引擎 - 內嵌式五維度評分架構視覺化流程",
+    "版本": "2.1.0",
+    "核心理念": "內嵌整合 → 五維評分 → 微異常調整 → 來源共識 → 零延遲輸出",
+
+    "🔄 數據流程視覺化": {
+      "Step_-1": {
+        "層級": "layer_-1_embedded_integration",
+        "名稱": "🔗 內嵌整合接收層",
+        "輸入": "EPL Step3 correlation_analyzed_candidates",
+        "處理": "⚡ 零延遲內嵌接收 + 📊 SignalCandidate結構解析 + 🔗 EPL質量控制同步",
+        "輸出": "✅ parsed_signal_data + embedded_context + quality_metadata",
+        "時間": "0ms (內嵌處理)",
+        "並行度": "與EPL Step3同步執行",
+        "視覺標記": "🟢 綠燈 → 無縫內嵌整合",
+        "整合特性": "🔗 embedded_in_step3_quality_control"
+      },
+
+      "Step_0": {
+        "層級": "layer_0_signal_data_extraction", 
+        "名稱": "📊 信號數據提取層",
+        "輸入": "✅ 內嵌接收的 SignalCandidate objects",
+        "處理": {
+          "基礎指標提取": "💪 signal_strength + 🎯 confidence + ⭐ data_completeness",
+          "技術快照解析": "📈 technical_snapshot (RSI, MACD, BB, Volume)",
+          "市場環境解析": "🌍 market_environment (volatility, liquidity, momentum)",
+          "動態參數解析": "🔄 dynamic_params + adaptation_metrics"
+        },
+        "輸出": "📊 structured_signal_metrics + technical_indicators + market_context",
+        "時間": "0.5ms",
+        "並行度": "批次處理多信號",
+        "視覺標記": "🔵 藍色 → 數據結構化"
+      },
+
+      "Step_1_2_3_PARALLEL": {
+        "層級": "並行執行組 (五維度評分並行計算)",
+        "名稱": "⚡ 五維度並行評分層",
+        "並行處理": {
+          "💪 Dimension_1_Strength": {
+            "處理_1": "📊 signal_strength線性評分 (0.0-1.0)",
+            "處理_2": "🔄 微異常調整 (volatility_jump_penalty)",
+            "處理_3": "📈 強度趨勢分析",
+            "權重": "30%",
+            "輸出": "💪 strength_score + volatility_adjusted_score",
+            "時間": "0.8ms"
+          },
+          "🎯 Dimension_2_Confidence": {
+            "處理_1": "📊 confidence直接映射評分",
+            "處理_2": "📉 confidence_drop_rate監控",
+            "處理_3": "⚖️ 歷史信心度比較",
+            "權重": "25%",
+            "輸出": "🎯 confidence_score + drop_rate_adjustment",
+            "時間": "0.6ms"
+          },
+          "⭐ Dimension_3_Quality": {
+            "處理_1": "🔄 strength與confidence平均值計算",
+            "處理_2": "📊 data_completeness因子調整",
+            "處理_3": "🔍 signal_clarity一致性檢查",
+            "權重": "20%",
+            "輸出": "⭐ quality_score + consistency_factor",
+            "時間": "0.5ms"
+          },
+          "⚠️ Dimension_4_Risk": {
+            "處理_1": "🔄 反向風險評估 (1 - risk_score)",
+            "處理_2": "📊 市場壓力風險調整",
+            "處理_3": "⚖️ 流動性風險因子",
+            "權重": "15%",
+            "輸出": "⚠️ risk_adjusted_score + market_risk_factor",
+            "時間": "0.7ms"
+          },
+          "⏰ Dimension_5_Timing": {
+            "處理_1": "🎯 市場壓力自適應時機評分",
+            "處理_2": "📅 時間窗口最佳化分析",
+            "處理_3": "🔄 動態時機評估",
+            "權重": "10%",
+            "輸出": "⏰ timing_score + market_stress_adjustment",
+            "時間": "0.4ms"
+          }
+        },
+        "總時間": "0.8ms (並行執行最慢維度)",
+        "視覺標記": "🟡 黃色並行區塊",
+        "協調機制": "🔄 加權平均與維度平衡"
+      },
+
+      "Step_4": {
+        "層級": "layer_4_source_consensus_validation",
+        "名稱": "🌟 來源共識驗證層",
+        "輸入": "✅ 五維度並行評分結果",
+        "處理詳情": {
+          "來源重疊評分": {
+            "algorithm": "📊 jaccard_similarity_coefficient",
+            "threshold": "0.72",
+            "處理": "🔍 信號來源重疊度分析"
+          },
+          "模型多樣性評分": {
+            "algorithm": "🌟 entropy_based_diversity_measure", 
+            "threshold": "0.8",
+            "處理": "🎯 多模型信號多樣性評估",
+            "保留規則": "preserve_if_diversity_score > 0.8"
+          },
+          "行動偏差評分": {
+            "algorithm": "⚖️ directional_consensus_measure",
+            "threshold": "0.85", 
+            "處理": "🔄 方向性共識度測量"
+          }
+        },
+        "輸出": "🌟 source_consensus_matrix + diversity_preservation_flags",
+        "時間": "1.2ms",
+        "視覺標記": "🟠 橙色 → 共識驗證"
+      },
+
+      "Step_5": {
+        "層級": "layer_5_micro_anomaly_detection",
+        "名稱": "🔍 微異常檢測層",
+        "輸入": "✅ 評分結果 + 共識驗證",
+        "處理詳情": {
+          "信號波動監控": {
+            "algorithm": "📊 rolling_standard_deviation_analysis",
+            "window_size": "15_minutes",
+            "threshold": "jump_threshold: 0.3"
+          },
+          "信心度下降檢測": {
+            "algorithm": "📉 rate_of_change_analysis", 
+            "baseline": "historical_confidence_average",
+            "threshold": "drop_threshold: 0.1"
+          }
+        },
+        "異常調整": {
+          "volatility_jump_penalty": "📊 -0.1 to -0.3 score adjustment",
+          "confidence_drop_penalty": "📉 -0.05 to -0.2 score adjustment"
+        },
+        "輸出": "🔍 anomaly_detection_results + score_adjustments",
+        "時間": "0.8ms",
+        "視覺標記": "🟣 紫色 → 異常檢測"
+      },
+
+      "Step_6_FINAL": {
+        "層級": "layer_6_final_score_calculation",
+        "名稱": "🎯 最終評分計算層",
+        "輸入": "✅ 所有前置層輸出",
+        "處理": {
+          "加權評分計算": {
+            "strength": "💪 30% * strength_score",
+            "confidence": "🎯 25% * confidence_score", 
+            "quality": "⭐ 20% * quality_score",
+            "risk": "⚠️ 15% * risk_score",
+            "timing": "⏰ 10% * timing_score"
+          },
+          "異常調整應用": {
+            "micro_anomaly_adjustment": "🔍 anomaly_penalties應用",
+            "source_consensus_bonus": "🌟 diversity_preservation_bonus",
+            "market_stress_factor": "📊 dynamic_market_adjustment"
+          },
+          "最終標準化": {
+            "score_normalization": "📊 0.0-1.0範圍標準化",
+            "quality_confidence_mapping": "🎯 score → confidence級別映射"
+          }
+        },
+        "輸出格式": {
+          "final_score": "🎯 0.0-1.0 最終評分",
+          "component_scores": "📊 五維度明細評分",
+          "adjustment_factors": "🔄 各項調整因子",
+          "quality_confidence": "⭐ 評分可信度 (0.0-1.0)"
+        },
+        "時間": "0.5ms",
+        "視覺標記": "🔴 紅色 → 最終評分輸出"
+      }
+    },
+
+    "⚡ 性能優化策略視覺化": {
+      "🚀 內嵌整合": {
+        "零延遲整合": "🔗 直接嵌入EPL Step3, 無獨立調用開銷",
+        "記憶體共享": "💾 與EPL共享SignalCandidate對象",
+        "處理節省": "⬆️ 消除3ms獨立處理時間"
+      },
+      "🧮 並行計算": {
+        "五維度並行": "⚡ strength/confidence/quality/risk/timing同時計算",
+        "向量化操作": "📊 批次信號同時評分",
+        "效率提升": "⬆️ +80% 評分計算速度"
+      },
+      "💾 智能快取": {
+        "評分快取": "📦 相似信號評分結果快取",
+        "模型快取": "🧠 評分模型參數快取",
+        "命中率": "🎯 >90% 快取命中率"
+      }
+    },
+
+    "🎯 評分系統詳情": {
+      "五維度權重": {
+        "💪 信號強度": "30% - 核心信號品質指標",
+        "🎯 信心度": "25% - Phase1預處理可信度",
+        "⭐ 品質評分": "20% - 數據完整性與清晰度",
+        "⚠️ 風險評分": "15% - 反向風險評估",
+        "⏰ 時機評分": "10% - 市場時機適應性"
+      },
+      "評分範圍": {
+        "原始評分": "📊 0.0-1.0 標準化範圍",
+        "調整範圍": "🔄 ±0.3 異常調整範圍",
+        "最終輸出": "🎯 0.0-1.0 標準化最終評分"
+      },
+      "品質信心映射": {
+        "高信心": "✅ score >= 0.8",
+        "中等信心": "🟡 0.6 <= score < 0.8", 
+        "低信心": "⚠️ 0.4 <= score < 0.6",
+        "不可信": "❌ score < 0.4"
+      }
+    },
+
+    "🔄 動態調整機制": {
+      "市場壓力響應": {
+        "⏱️ 時機評分調整": "根據市場壓力指數動態調整",
+        "⚠️ 風險權重調整": "高壓力時提高風險權重",
+        "🎯 閾值動態調整": "極端市況下降低通過閾值"
+      },
+      "自適應學習": {
+        "評分模型調整": "🧠 根據歷史準確性調整權重",
+        "異常檢測優化": "🔍 異常模式學習與調整",
+        "共識驗證改進": "🌟 來源可信度動態更新"
+      }
+    },
+
+    "📊 總體流程時間線": {
+      "內嵌處理": "3.8ms (layer_-1:0ms → layer_0:0.5ms → [五維度並行]:0.8ms → layer_4:1.2ms → layer_5:0.8ms → layer_6:0.5ms)",
+      "獨立處理對比": "❌ 原獨立模式: 3ms + 調用開銷",
+      "內嵌優勢": "✅ 內嵌模式: 0ms額外開銷 (嵌入EPL)",
+      "並行效益": {
+        "🔵 五維度計算": "0.8ms (並行執行)",
+        "🟠 共識驗證": "1.2ms",
+        "🟣 異常檢測": "0.8ms"
+      },
+      "總體效率": "⬆️ 零延遲整合 + 3.8ms完整評分"
+    },
+
+    "🎯 輸出標準化": {
+      "評分報告": "📊 {signal_id}_{timestamp}_{final_score}_{confidence_level}",
+      "明細格式": {
+        "signal_id": "🆔 信號唯一識別碼",
+        "final_score": "🎯 0.0-1.0 最終評分",
+        "component_scores": {
+          "strength": "💪 強度維度評分",
+          "confidence": "🎯 信心度維度評分",
+          "quality": "⭐ 品質維度評分", 
+          "risk": "⚠️ 風險維度評分",
+          "timing": "⏰ 時機維度評分"
+        },
+        "adjustments": {
+          "micro_anomaly": "🔍 微異常調整值",
+          "source_consensus": "🌟 來源共識調整值",
+          "market_stress": "📊 市場壓力調整值"
+        },
+        "metadata": {
+          "processing_time": "⏰ 評分處理時間",
+          "confidence_level": "⭐ 評分可信度等級",
+          "timestamp": "📅 評分時間戳"
+        }
+      }
+    },
+
+    "🔗 整合點與依賴": {
+      "上游整合": [
+        "🔗 EPL Step3 quality_control_gate",
+        "📊 correlation_analyzed_candidates",
+        "🎯 Phase1 quality indicators"
+      ],
+      "下游輸出": [
+        "🎯 embedded_quality_scores",
+        "📊 EPL final_epl_ready_candidates (enhanced)",
+        "⭐ quality_confidence_metadata"
+      ],
+      "並行監控": [
+        "👀 real_data_signal_quality_engine",
+        "📊 monitoring_dashboard",
+        "🚨 alert_notification_system"
+      ]
+    },
+
+    "🔬 增強評分能力": {
+      "微異常適應": {
+        "描述": "實時信號變異響應評分調整",
+        "調整項目": [
+          "📊 signal_volatility_jump → strength_penalty",
+          "📉 confidence_drop_rate → confidence_penalty",
+          "🎯 quality_consistency → quality_bonus"
+        ],
+        "自動調整": "🔄 即時異常檢測與評分修正"
+      },
+      "來源多樣性評估": {
+        "描述": "多模型信號來源共識驗證",
+        "評估維度": [
+          "📊 source_overlap_score (重疊度)",
+          "🌟 model_diversity_score (多樣性)",
+          "⚖️ action_bias_score (方向共識)"
+        ],
+        "保留機制": "🛡️ diversity_score > 0.8 → 獨立信號保留"
+      },
+      "市場適應評分": {
+        "描述": "市場壓力響應式評分調整",
+        "適應參數": [
+          "⏰ timing_score市場壓力調整",
+          "⚠️ risk_weight動態權重",
+          "🎯 threshold自適應調整"
+        ],
+        "調整頻率": "📅 即時市場狀態響應"
+      }
+    },
+
+    "🚨 系統彈性設計": {
+      "評分降階": {
+        "觸發條件": "⚠️ EPL系統負載 > 85% 或 評分延遲 > 2ms",
+        "降階策略": "🔄 跳過複雜調整 → 使用基礎五維度評分",
+        "最小評分": "🚨 只保留strength + confidence核心評分"
+      },
+      "容錯處理": {
+        "評分失效": "🔌 單一維度失效使用默認權重",
+        "數據缺失": "📦 使用Phase1備用指標",
+        "異常處理": "🔄 異常檢測失效仍保證基礎評分"
+      },
+      "品質保證": {
+        "評分一致性": "🔍 同一信號重複評分一致性檢查",
+        "範圍驗證": "📊 評分結果0.0-1.0範圍驗證",
+        "邏輯檢查": "⚖️ 評分邏輯合理性驗證"
+      }
+    }
+  }
+}

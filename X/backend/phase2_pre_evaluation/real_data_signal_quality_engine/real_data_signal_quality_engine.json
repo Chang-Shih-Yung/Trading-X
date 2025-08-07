@@ -1,0 +1,130 @@
+{
+  "real_data_signal_quality_engine_dependency": {
+    "strategy_name": "Enhanced Real Data Signal Quality Monitoring Engine",
+    "version": "2.1.0",
+    "description": "Enhanced parallel quality monitoring with system load monitoring and micro-anomaly detection",
+    "module_type": "enhanced_quality_monitoring_engine",
+    "role": "parallel_monitoring_not_blocking_main_flow",
+    
+    "strategy_dependency_graph": {
+      "core_dependencies": {
+        "enhanced_monitoring_systems": {
+          "phase1b_volatility_adaptation": {
+            "type": "volatility_analysis",
+            "data_type": "volatility_metrics",
+            "update_frequency": "real_time",
+            "dependency_level": "critical"
+          },
+          "phase1c_signal_standardization": {
+            "type": "signal_standardization", 
+            "data_type": "standardized_signals",
+            "update_frequency": "real_time",
+            "dependency_level": "critical"
+          },
+          "system_load_monitor": {
+            "type": "system_performance_monitoring",
+            "data_type": "cpu_usage_queue_length_metrics",
+            "update_frequency": "real_time",
+            "dependency_level": "critical",
+            "thresholds": {
+              "cpu_usage_threshold": "85%",
+              "queue_length_threshold": "1000_signals"
+            }
+          },
+          "phase3_market_analyzer": {
+            "type": "market_analysis",
+            "data_type": "order_book_funding_data",
+            "update_frequency": "5min",
+            "dependency_level": "high"
+          },
+          "pandas_ta_indicators": {
+            "type": "technical_indicators",
+            "data_type": "ta_matrix",
+            "update_frequency": "real_time", 
+            "dependency_level": "high"
+          }
+        },
+        "enhanced_monitoring_capabilities": {
+          "micro_anomaly_detection": {
+            "type": "signal_variation_monitoring",
+            "data_type": "anomaly_detection_metrics",
+            "monitoring_scope": "express_lane_signals",
+            "dependency_level": "medium"
+          },
+          "delayed_observation_tracking": {
+            "type": "signal_performance_tracking",
+            "data_type": "performance_improvement_metrics",
+            "tracking_duration": "5_minutes",
+            "dependency_level": "medium"
+          },
+          "dynamic_threshold_monitoring": {
+            "type": "adaptive_threshold_tracking",
+            "data_type": "market_stress_adjusted_thresholds",
+            "update_frequency": "real_time",
+            "dependency_level": "medium"
+          }
+        }
+        }
+      }
+    },
+
+    "dependencies": {
+      "upstream_modules": [
+        {
+          "module": "unified_signal_candidate_pool",
+          "type": "signal_source",
+          "critical": true,
+          "timeout": "2000ms"
+        }
+      ],
+      "downstream_modules": [
+        {
+          "module": "monitoring_dashboard",
+          "type": "quality_metrics_consumer",
+          "delivery_guarantee": "best_effort"
+        },
+        {
+          "module": "alert_notification_system",
+          "type": "alert_consumer", 
+          "delivery_guarantee": "exactly_once"
+        },
+        {
+          "module": "system_load_balancer",
+          "type": "load_management_consumer",
+          "delivery_guarantee": "exactly_once"
+        }
+      ]
+    },
+
+    "computation_flow": {
+      "processing_layers": {
+        "layer_0_signal_intake": {
+          "input": "unified_signal_pool.signal_candidates",
+          "processing": "real_data_quality_validation",
+          "output": "validated_signal_candidates",
+          "expected_processing_time": "15ms"
+        },
+        "layer_1_priority_classification": {
+          "input": "validated_signal_candidates",
+          "processing": "signal_priority_scoring",
+          "output": "classified_signals_by_priority", 
+          "expected_processing_time": "10ms"
+        },
+        "layer_2_quality_control": {
+          "input": "classified_signals_by_priority",
+          "processing": "comprehensive_quality_assessment",
+          "output": "quality_controlled_signals",
+          "expected_processing_time": "12ms"
+        }
+      },
+      "total_expected_processing_time": "40ms (enhanced monitoring)",
+      "concurrency_level": "multi_threaded_async",
+      "enhanced_monitoring_capabilities": {
+        "system_load_monitoring": "real_time_cpu_and_queue_tracking",
+        "micro_anomaly_detection": "signal_variation_and_confidence_drop_monitoring", 
+        "delayed_observation_reinforcement": "continuous_signal_performance_tracking",
+        "dynamic_threshold_adaptation": "market_stress_responsive_thresholds"
+      }
+    }
+  }
+

@@ -1,0 +1,394 @@
+{
+  "phase3_execution_policy": {
+    "system_metadata": {
+      "version": "2.1.0",
+      "last_updated": "2025-08-07",
+      "description": "Phase3 Execution Policy Layer - Intelligent Decision Engine with Four-Scenario Processing",
+      "conflict_resolution_status": "resolved_with_phase1_phase2_integration"
+    },
+
+    "integration_standards": {
+      "data_format_consistency": {
+        "signal_strength_range": "0.0-1.0",
+        "confidence_range": "0.0-1.0", 
+        "quality_score_range": "0.0-1.0",
+        "timestamp_format": "ISO_8601_UTC",
+        "sync_tolerance": "100ms"
+      },
+      "upstream_integration": {
+        "phase1_unified_pool": {
+          "input_source": "unified_signal_candidate_pool_v3",
+          "time_source": "websocket_realtime_driver",
+          "data_validation": "0.0-1.0_range_enforcement"
+        },
+        "phase2_pre_evaluation": {
+          "epl_preprocessing_result": "final_epl_ready_candidates",
+          "embedded_scoring_result": "embedded_quality_scores_in_candidates",
+          "quality_monitoring_data": "parallel_monitoring_metrics"
+        }
+      },
+      "format_validation": {
+        "mandatory_fields": [
+          "signal_strength (0.0-1.0)",
+          "confidence (0.0-1.0)",
+          "timestamp (ISO_8601_UTC)",
+          "technical_snapshot",
+          "market_environment",
+          "final_epl_ready_status",
+          "embedded_quality_scores",
+          "correlation_analysis_result"
+        ],
+        "validation_checkpoints": [
+          "input_format_verification",
+          "range_boundary_check", 
+          "timestamp_sync_validation",
+          "data_completeness_check"
+        ]
+      }
+    },
+
+    "decision_engines": {
+      "replacement_decision_engine": {
+        "scenario": "A - Replace Position",
+        "trigger_conditions": {
+          "confidence_improvement_threshold": 0.15,
+          "direction_opposition_required": true,
+          "minimum_position_age": "5_minutes",
+          "correlation_analysis_result": "REPLACE_CANDIDATE_from_epl_step2"
+        },
+        "evaluation_criteria": {
+          "confidence_delta_weight": 0.4,
+          "market_timing_weight": 0.25,
+          "position_performance_weight": 0.20,
+          "risk_assessment_weight": 0.15
+        },
+        "execution_thresholds": {
+          "minimum_replacement_score": 0.75,
+          "max_position_loss_tolerance": -0.05,
+          "market_volatility_limit": 0.08
+        },
+        "risk_management": {
+          "transition_risk_assessment": true,
+          "market_impact_estimation": true,
+          "position_replacement_slippage": 0.001
+        }
+      },
+
+      "strengthening_decision_engine": {
+        "scenario": "B - Strengthen Position", 
+        "trigger_conditions": {
+          "confidence_improvement_threshold": 0.08,
+          "direction_alignment_required": true,
+          "correlation_analysis_result": "STRENGTHEN_CANDIDATE_from_epl_step2",
+          "position_performance_positive": true
+        },
+        "evaluation_criteria": {
+          "confidence_improvement_weight": 0.35,
+          "position_performance_weight": 0.25,
+          "risk_concentration_weight": 0.25,
+          "market_timing_weight": 0.15
+        },
+        "execution_thresholds": {
+          "minimum_strengthening_score": 0.70,
+          "max_position_concentration": 0.30,
+          "volatility_risk_limit": 0.06
+        },
+        "position_sizing": {
+          "max_additional_ratio": 0.5,
+          "base_size_calculation": "confidence_weighted",
+          "volatility_adjustment": true,
+          "portfolio_balance_consideration": true
+        }
+      },
+
+      "new_position_engine": {
+        "scenario": "C - New Position Creation",
+        "trigger_conditions": {
+          "no_existing_position": true,
+          "quality_score_threshold": 0.8,
+          "correlation_analysis_result": "NEW_CANDIDATE_from_epl_step2",
+          "portfolio_capacity_available": true
+        },
+        "evaluation_criteria": {
+          "signal_quality_weight": 0.4,
+          "market_suitability_weight": 0.25,
+          "portfolio_correlation_weight": 0.20,
+          "timing_optimization_weight": 0.15
+        },
+        "execution_thresholds": {
+          "minimum_creation_score": 0.70,
+          "max_portfolio_correlation": 0.7,
+          "min_market_liquidity": 0.6
+        },
+        "position_management": {
+          "initial_position_calculation": "kelly_criterion_modified",
+          "risk_per_trade_limit": 0.02,
+          "stop_loss_atr_multiplier": 2.0,
+          "take_profit_atr_multiplier": 4.0
+        }
+      },
+
+      "ignore_decision_engine": {
+        "scenario": "D - Signal Ignore",
+        "trigger_conditions": {
+          "quality_below_threshold": 0.4,
+          "high_redundancy_detected": true,
+          "market_conditions_unfavorable": true,
+          "portfolio_risk_exceeded": true
+        },
+        "ignore_criteria": {
+          "insufficient_quality_weight": 0.3,
+          "redundancy_detection_weight": 0.25,
+          "market_timing_weight": 0.25,
+          "risk_management_weight": 0.2
+        },
+        "documentation_requirements": {
+          "ignore_reason_classification": true,
+          "improvement_suggestions": true,
+          "pattern_analysis_for_learning": true
+        }
+      }
+    },
+
+    "priority_classification_system": {
+      "classification_criteria": {
+        "signal_quality_factor": 0.3,
+        "market_urgency_factor": 0.25,
+        "execution_confidence_factor": 0.25,
+        "risk_reward_ratio_factor": 0.2
+      },
+      "priority_levels": {
+        "CRITICAL": {
+          "emoji": "🚨",
+          "classification_threshold": 0.85,
+          "execution_confidence_min": 0.9,
+          "market_conditions": ["high_volatility_opportunity", "rapid_trend_change"],
+          "notification_config": {
+            "immediate_gmail": true,
+            "websocket_broadcast": true,
+            "sms_alert": true,
+            "delay": "0ms"
+          }
+        },
+        "HIGH": {
+          "emoji": "🎯", 
+          "classification_threshold": 0.75,
+          "execution_confidence_min": 0.8,
+          "market_conditions": ["strong_trend_confirmation", "breakout_pattern"],
+          "notification_config": {
+            "delayed_gmail": true,
+            "websocket_broadcast": true,
+            "frontend_highlight": true,
+            "delay": "300s"
+          }
+        },
+        "MEDIUM": {
+          "emoji": "📊",
+          "classification_threshold": 0.60,
+          "execution_confidence_min": 0.65,
+          "market_conditions": ["normal_market_conditions", "moderate_signals"],
+          "notification_config": {
+            "websocket_update": true,
+            "dashboard_display": true,
+            "delay": "1800s"
+          }
+        },
+        "LOW": {
+          "emoji": "📈",
+          "classification_threshold": 0.40,
+          "execution_confidence_min": 0.5,
+          "market_conditions": ["weak_signals", "research_opportunities"],
+          "notification_config": {
+            "batch_processing": true,
+            "research_log": true,
+            "delay": "batch_end_of_day"
+          }
+        }
+      }
+    },
+
+    "notification_system": {
+      "delivery_channels": {
+        "gmail_integration": {
+          "critical_template": "urgent_trading_alert",
+          "high_template": "important_signal_alert", 
+          "formatting": "html_with_charts",
+          "authentication": "oauth2_secure"
+        },
+        "websocket_broadcast": {
+          "real_time_updates": true,
+          "client_filtering": true,
+          "message_persistence": "24_hours"
+        },
+        "frontend_integration": {
+          "dashboard_updates": true,
+          "alert_popups": true,
+          "priority_highlighting": true,
+          "sound_notifications": true
+        },
+        "sms_emergency": {
+          "critical_only": true,
+          "rate_limiting": "max_3_per_hour",
+          "message_truncation": "160_chars"
+        }
+      },
+      "delay_management": {
+        "CRITICAL": "immediate_delivery",
+        "HIGH": "5_minute_batch",
+        "MEDIUM": "30_minute_batch", 
+        "LOW": "end_of_day_summary"
+      },
+      "content_optimization": {
+        "dynamic_template_selection": true,
+        "market_context_inclusion": true,
+        "performance_metrics_attachment": true,
+        "action_button_integration": true
+      }
+    },
+
+    "risk_management_framework": {
+      "portfolio_level_controls": {
+        "max_concurrent_positions": 8,
+        "max_portfolio_correlation": 0.7,
+        "max_sector_concentration": 0.4,
+        "daily_risk_budget": 0.05
+      },
+      "position_level_controls": {
+        "max_position_size": 0.15,
+        "stop_loss_enforcement": true,
+        "take_profit_optimization": true,
+        "trailing_stop_activation": true
+      },
+      "dynamic_risk_adjustment": {
+        "market_volatility_scaling": true,
+        "correlation_based_sizing": true,
+        "drawdown_protection": true,
+        "stress_testing_integration": true
+      }
+    },
+
+    "performance_tracking": {
+      "decision_metrics": {
+        "decision_accuracy_rate": "track_by_timeframe",
+        "execution_latency": "track_by_priority",
+        "risk_reward_realization": "track_by_scenario",
+        "notification_effectiveness": "track_by_channel"
+      },
+      "learning_integration": {
+        "decision_outcome_feedback": true,
+        "threshold_optimization": true,
+        "pattern_recognition_improvement": true,
+        "model_parameter_adaptation": true
+      }
+    },
+
+    "system_configuration": {
+      "processing_timeouts": {
+        "decision_evaluation_max": "500ms",
+        "risk_calculation_max": "200ms",
+        "notification_dispatch_max": "100ms",
+        "total_epl_processing_max": "800ms"
+      },
+      "resource_management": {
+        "max_concurrent_evaluations": 10,
+        "memory_usage_limit": "512MB",
+        "cpu_usage_limit": "70%",
+        "database_connection_pool": 5
+      },
+      "fallback_mechanisms": {
+        "decision_engine_failure": "default_to_ignore_with_logging",
+        "notification_system_failure": "queue_for_retry",
+        "risk_system_failure": "conservative_default_limits",
+        "database_failure": "memory_cache_fallback"
+      }
+    },
+
+    "phase2_integration_enhancements": {
+      "epl_preprocessing_awareness": {
+        "express_channel_priority": "automatic_high_classification",
+        "standard_channel_processing": "normal_priority_flow",
+        "deep_channel_analysis": "comprehensive_risk_assessment"
+      },
+      "embedded_scoring_utilization": {
+        "five_dimension_score_integration": true,
+        "micro_anomaly_detection_influence": true,
+        "source_consensus_validation_impact": true,
+        "dynamic_threshold_adjustment_based_on_scoring": true
+      },
+      "parallel_monitoring_integration": {
+        "real_time_quality_metrics_influence": true,
+        "system_load_aware_processing": true,
+        "anomaly_detection_decision_modification": true
+      }
+    },
+
+    "advanced_features": {
+      "market_regime_adaptation": {
+        "bull_market_threshold_adjustment": true,
+        "bear_market_risk_enhancement": true,
+        "sideways_market_filtering": true,
+        "volatility_regime_detection": true
+      },
+      "machine_learning_integration": {
+        "decision_outcome_prediction": true,
+        "optimal_timing_prediction": true,
+        "risk_estimation_enhancement": true,
+        "pattern_recognition_integration": true
+      },
+      "multi_timeframe_validation": {
+        "short_term_confirmation": "1m_5m_analysis",
+        "medium_term_alignment": "15m_1h_analysis", 
+        "long_term_trend_validation": "4h_1d_analysis",
+        "timeframe_weight_optimization": true
+      }
+    },
+
+    "quality_assurance": {
+      "testing_framework": {
+        "unit_testing_coverage": "95%_minimum",
+        "integration_testing": "full_phase1_phase2_flow",
+        "stress_testing": "high_volume_simulation",
+        "backtesting_validation": "historical_data_verification"
+      },
+      "monitoring_and_alerting": {
+        "decision_latency_monitoring": true,
+        "accuracy_rate_tracking": true,
+        "system_health_monitoring": true,
+        "anomaly_detection_for_decisions": true
+      },
+      "documentation_requirements": {
+        "decision_reasoning_logging": true,
+        "performance_metrics_reporting": true,
+        "error_case_documentation": true,
+        "improvement_recommendation_tracking": true
+      }
+    },
+
+    "deployment_configuration": {
+      "environment_settings": {
+        "development": {
+          "debug_logging": true,
+          "decision_simulation": true,
+          "risk_limits_relaxed": true
+        },
+        "staging": {
+          "full_integration_testing": true,
+          "performance_benchmarking": true,
+          "load_testing": true
+        },
+        "production": {
+          "optimized_performance": true,
+          "strict_risk_controls": true,
+          "comprehensive_monitoring": true,
+          "automated_failover": true
+        }
+      },
+      "scalability_considerations": {
+        "horizontal_scaling_support": true,
+        "load_balancing_integration": true,
+        "database_partitioning": true,
+        "caching_strategy_optimization": true
+      }
+    }
+  }
+}

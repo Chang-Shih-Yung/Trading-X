@@ -1,0 +1,116 @@
+{
+  "signal_scoring_engine_dependency": {
+    "strategy_name": "Enhanced Signal Scoring Engine (Integrated Version)",
+    "version": "2.1.0", 
+    "description": "Integrated signal scoring system with micro-anomaly detection and source consensus validation",
+    "module_type": "embedded_scoring_engine",
+    
+    "strategy_dependency_graph": {
+      "core_dependencies": {
+        "enhanced_scoring_algorithms": {
+          "strength_scoring": {
+            "algorithm": "linear_scoring_based_on_signal_strength",
+            "range": "0.0-1.0",
+            "weight": "0.3",
+            "micro_anomaly_adjustment": "volatility_jump_penalty"
+          },
+          "confidence_scoring": {
+            "algorithm": "direct_confidence_mapping_with_drop_rate_detection",
+            "range": "0.0-1.0", 
+            "weight": "0.25",
+            "micro_anomaly_adjustment": "confidence_drop_rate_monitoring"
+          },
+          "quality_scoring": {
+            "algorithm": "average_of_strength_and_confidence",
+            "range": "0.0-1.0",
+            "weight": "0.2"
+          },
+          "risk_scoring": {
+            "algorithm": "inverse_risk_assessment",
+            "range": "0.0-1.0",
+            "weight": "0.15"
+          },
+          "timing_scoring": {
+            "algorithm": "adaptive_time_scoring_based_on_market_stress",
+            "range": "0.6-1.0",
+            "weight": "0.1",
+            "market_stress_adjustment": "dynamic_timing_evaluation"
+          }
+        },
+        "source_consensus_validation": {
+          "source_overlap_scoring": {
+            "algorithm": "jaccard_similarity_coefficient",
+            "threshold": "0.72",
+            "weight_factor": "0.8"
+          },
+          "model_diversity_scoring": {
+            "algorithm": "entropy_based_diversity_measure",
+            "threshold": "0.8",
+            "preservation_rule": "preserve_if_diversity_score > threshold"
+          },
+          "action_bias_scoring": {
+            "algorithm": "directional_consensus_measure",
+            "threshold": "0.85",
+            "conflict_resolution": "weighted_average_approach"
+          }
+        },
+        "micro_anomaly_detection": {
+          "signal_volatility_monitor": {
+            "algorithm": "rolling_standard_deviation_analysis",
+            "window_size": "15_minutes",
+            "jump_threshold": "0.3"
+          },
+          "confidence_drop_detector": {
+            "algorithm": "rate_of_change_analysis",
+            "baseline": "historical_confidence_average",
+            "drop_threshold": "0.1"
+          }
+        }
+        }
+      }
+    },
+
+    "dependencies": {
+      "upstream_modules": [
+        {
+          "module": "any_signal_generator",
+          "type": "signal_data",
+          "critical": false,
+          "timeout": "500ms"
+        }
+      ],
+      "downstream_modules": [
+        {
+          "module": "any_consumer",
+          "type": "scoring_consumer",
+          "delivery_guarantee": "best_effort"
+        }
+      ]
+    },
+
+    "computation_flow": {
+      "processing_layers": {
+        "layer_0_data_extraction": {
+          "input": "signal_data_dict",
+          "processing": "extract_value_and_confidence",
+          "output": "extracted_metrics",
+          "expected_processing_time": "1ms"
+        },
+        "layer_1_score_calculation": {
+          "input": "extracted_metrics",
+          "processing": "calculate_all_scores",
+          "output": "complete_score_dict",
+          "expected_processing_time": "2ms"
+        }
+      },
+      "total_expected_processing_time": "3ms (embedded processing)",
+      "concurrency_level": "single_threaded",
+      "integration_mode": "embedded_in_epl_step3_quality_control",
+      "enhanced_capabilities": {
+        "micro_anomaly_detection": "real_time_signal_variation_monitoring",
+        "source_consensus_validation": "multi_model_signal_diversity_preservation",
+        "adaptive_scoring": "market_stress_responsive_algorithms"
+      }
+    }
+  }
+

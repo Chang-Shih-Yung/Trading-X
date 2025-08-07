@@ -1,0 +1,402 @@
+{
+  "PHASE3_EXECUTION_POLICY_CORE_FLOW": {
+    "流程概述": "Phase3執行決策層 - 四情境智能決策引擎視覺化流程",
+    "版本": "2.1.0",
+    "核心理念": "智能決策 → 四情境覆蓋 → 風險控制 → 優先分類 → 精準通知",
+
+    "🔄 數據流程視覺化": {
+      "Step_-1": {
+        "層級": "layer_-1_data_intake_validation",
+        "名稱": "📥 數據接收與驗證層",
+        "輸入": "Phase2 final_epl_ready_candidates",
+        "處理": "🔍 格式驗證 + 📊 範圍檢查 + ⏰ 時間戳同步 + 🛡️ 完整性驗證",
+        "輸出": "✅ validated_epl_candidates + format_compliance_report",
+        "時間": "50ms",
+        "並行度": "單線程驗證",
+        "視覺標記": "🟢 綠燈 → 數據接收完成",
+        "驗證項目": [
+          "📊 signal_strength (0.0-1.0範圍)",
+          "🎯 confidence (0.0-1.0範圍)",
+          "⏰ timestamp (ISO_8601_UTC格式)",
+          "📈 technical_snapshot (完整性)",
+          "🌍 market_environment (完整性)",
+          "✅ final_epl_ready_status",
+          "🔢 embedded_quality_scores",
+          "🔄 correlation_analysis_result"
+        ]
+      },
+
+      "Step_0": {
+        "層級": "layer_0_scenario_router",
+        "名稱": "🚦 情境路由決策層",
+        "輸入": "✅ validated_epl_candidates",
+        "處理": "🔍 持倉狀態檢查 + 📊 相關分析結果解析 + 🎯 決策路由分配",
+        "輸出": "🚦 scenario_routing_decisions + candidate_scenario_mapping",
+        "時間": "30ms",
+        "並行度": "批次路由處理",
+        "視覺標記": "🔵 藍色 → 情境分類完成",
+        "路由邏輯": {
+          "🔁 Replace路由": "現有持倉 + REPLACE_CANDIDATE_from_epl_step2",
+          "➕ Strengthen路由": "現有持倉 + STRENGTHEN_CANDIDATE_from_epl_step2",
+          "✅ New Position路由": "無持倉 + NEW_CANDIDATE_from_epl_step2",
+          "❌ Ignore路由": "品質不足 或 風險超標 或 重複性高"
+        }
+      },
+
+      "Step_1_ABCD_PARALLEL": {
+        "層級": "並行執行組 (四情境決策引擎)",
+        "名稱": "⚡ 四情境並行決策層",
+        "並行處理": {
+          "🔁 Scenario_A_Replacement": {
+            "處理_1": "📊 信心度差異評估 (權重40%)",
+            "處理_2": "⏰ 市場時機分析 (權重25%)",
+            "處理_3": "💰 持倉表現評估 (權重20%)",
+            "處理_4": "⚠️ 風險評估分析 (權重15%)",
+            "閾值檢查": "最低替換評分 ≥ 0.75",
+            "輸出": "🔁 replacement_decision + execution_params + risk_assessment",
+            "時間": "120ms",
+            "觸發條件": "信心度提升 > 15% + 方向相反 + 持倉年齡 > 5分鐘"
+          },
+          "➕ Scenario_B_Strengthening": {
+            "處理_1": "📈 信心度提升評估 (權重35%)",
+            "處理_2": "💎 持倉表現分析 (權重25%)",
+            "處理_3": "⚖️ 風險集中度檢查 (權重25%)",
+            "處理_4": "⏰ 市場時機評估 (權重15%)",
+            "閾值檢查": "最低加倉評分 ≥ 0.70",
+            "輸出": "➕ strengthening_decision + position_sizing + risk_limits",
+            "時間": "100ms",
+            "觸發條件": "信心度提升 > 8% + 方向一致 + 持倉表現為正"
+          },
+          "✅ Scenario_C_New_Position": {
+            "處理_1": "🎯 信號品質評估 (權重40%)",
+            "處理_2": "🌍 市場適合度分析 (權重25%)",
+            "處理_3": "🔗 組合相關性評估 (權重20%)",
+            "處理_4": "⏰ 時機優化分析 (權重15%)",
+            "閾值檢查": "最低創建評分 ≥ 0.70 + 品質 > 80%",
+            "輸出": "✅ new_position_decision + kelly_sizing + stop_take_levels",
+            "時間": "150ms",
+            "觸發條件": "無現有持倉 + 品質 > 80% + 組合容量可用"
+          },
+          "❌ Scenario_D_Ignore": {
+            "處理_1": "📉 品質不足分析 (權重30%)",
+            "處理_2": "🔄 重複性檢測 (權重25%)",
+            "處理_3": "🌪️ 市場時機評估 (權重25%)",
+            "處理_4": "🛡️ 風險管理評估 (權重20%)",
+            "文檔要求": "忽略原因分類 + 改進建議 + 模式分析",
+            "輸出": "❌ ignore_decision + ignore_reasoning + learning_data",
+            "時間": "60ms",
+            "觸發條件": "品質 < 40% 或 高重複性 或 市場不利 或 風險超標"
+          }
+        },
+        "總時間": "150ms (並行執行最慢情境)",
+        "視覺標記": "🟡 黃色並行區塊",
+        "協調機制": "🔄 情境結果匯聚與決策整合"
+      },
+
+      "Step_2": {
+        "層級": "layer_2_risk_management_validation",
+        "名稱": "🛡️ 風險管理驗證層",
+        "輸入": "✅ 四情境決策結果",
+        "處理詳情": {
+          "組合層級風險控制": {
+            "max_concurrent_positions": "8個持倉上限檢查",
+            "max_portfolio_correlation": "70%相關性限制",
+            "max_sector_concentration": "40%行業集中度",
+            "daily_risk_budget": "5%每日風險預算"
+          },
+          "持倉層級風險控制": {
+            "max_position_size": "15%單一持倉限制",
+            "stop_loss_enforcement": "強制止損執行",
+            "take_profit_optimization": "止盈優化策略",
+            "trailing_stop_activation": "移動止損啟動"
+          },
+          "動態風險調整": {
+            "market_volatility_scaling": "市場波動性動態調整",
+            "correlation_based_sizing": "基於相關性的倉位調整",
+            "drawdown_protection": "回撤保護機制",
+            "stress_testing_integration": "壓力測試整合"
+          }
+        },
+        "輸出": "🛡️ risk_validated_decisions + risk_management_params + safety_limits",
+        "時間": "80ms",
+        "視覺標記": "🟠 橙色 → 風險驗證完成"
+      },
+
+      "Step_3": {
+        "層級": "layer_3_priority_classification",
+        "名稱": "🎯 優先級分類層",
+        "輸入": "✅ 風險驗證通過的決策",
+        "處理": {
+          "分類權重計算": {
+            "signal_quality_factor": "30% 信號品質因子",
+            "market_urgency_factor": "25% 市場緊急度因子",
+            "execution_confidence_factor": "25% 執行信心度因子",
+            "risk_reward_ratio_factor": "20% 風險回報比因子"
+          },
+          "🚨 CRITICAL級判定": {
+            "classification_threshold": "≥ 0.85",
+            "execution_confidence_min": "≥ 0.9",
+            "market_conditions": ["高波動機會", "快速趨勢變化"],
+            "通知配置": "即時Gmail + WebSocket + SMS"
+          },
+          "🎯 HIGH級判定": {
+            "classification_threshold": "≥ 0.75",
+            "execution_confidence_min": "≥ 0.8",
+            "market_conditions": ["強趨勢確認", "突破模式"],
+            "通知配置": "延遲Gmail + WebSocket + 前端高亮"
+          },
+          "📊 MEDIUM級判定": {
+            "classification_threshold": "≥ 0.60",
+            "execution_confidence_min": "≥ 0.65",
+            "market_conditions": ["正常市場條件", "中等信號"],
+            "通知配置": "WebSocket + 儀表板顯示"
+          },
+          "📈 LOW級判定": {
+            "classification_threshold": "≥ 0.40",
+            "execution_confidence_min": "≥ 0.5",
+            "market_conditions": ["弱信號", "研究機會"],
+            "通知配置": "批量處理 + 研究記錄"
+          }
+        },
+        "輸出": "🎯 priority_classified_decisions + notification_configs + urgency_levels",
+        "時間": "40ms",
+        "視覺標記": "🟣 紫色 → 優先級分類完成"
+      },
+
+      "Step_4": {
+        "層級": "layer_4_performance_tracking_setup",
+        "名稱": "📊 績效追蹤設置層",
+        "輸入": "✅ 優先級分類完成的決策",
+        "處理": {
+          "決策指標追蹤": {
+            "decision_accuracy_rate": "按時間框架追蹤決策準確率",
+            "execution_latency": "按優先級追蹤執行延遲",
+            "risk_reward_realization": "按情境追蹤風險回報實現",
+            "notification_effectiveness": "按通道追蹤通知效果"
+          },
+          "學習整合設置": {
+            "decision_outcome_feedback": "決策結果反饋循環",
+            "threshold_optimization": "閾值優化調整",
+            "pattern_recognition_improvement": "模式識別改進",
+            "model_parameter_adaptation": "模型參數自適應"
+          },
+          "追蹤元數據生成": {
+            "tracking_id": "唯一追蹤識別碼",
+            "baseline_expectations": "基線預期設定",
+            "success_criteria": "成功標準定義",
+            "learning_weights": "學習權重分配"
+          }
+        },
+        "輸出": "📊 tracking_setup_complete + performance_baselines + learning_configs",
+        "時間": "30ms",
+        "視覺標記": "🔷 淺藍色 → 追蹤設置完成"
+      },
+
+      "Step_5_FINAL": {
+        "層級": "layer_5_notification_dispatch",
+        "名稱": "📡 通知分發執行層",
+        "輸入": "✅ 所有前置層完整輸出",
+        "處理": {
+          "📧 Gmail通知分發": {
+            "CRITICAL模板": "urgent_trading_alert (HTML圖表)",
+            "HIGH模板": "important_signal_alert (HTML圖表)",
+            "認證方式": "OAuth2安全認證",
+            "內容優化": "動態模板選擇 + 市場背景 + 績效指標"
+          },
+          "🌐 WebSocket廣播": {
+            "即時更新": "real_time_updates到所有連接客戶端",
+            "客戶端過濾": "基於用戶偏好的智能過濾",
+            "消息持久化": "24小時消息持久化",
+            "連接管理": "自動重連與狀態同步"
+          },
+          "🖥️ 前端整合": {
+            "儀表板更新": "即時儀表板數據更新",
+            "警報彈窗": "優先級導向的彈窗警報",
+            "優先級高亮": "視覺高亮顯示重要信號",
+            "聲音通知": "可配置的聲音警報"
+          },
+          "📱 緊急SMS": {
+            "僅CRITICAL級": "只有最高優先級觸發SMS",
+            "速率限制": "每小時最多3次防止騷擾",
+            "消息截斷": "160字符限制精簡表達",
+            "優先隊列": "緊急消息優先處理"
+          }
+        },
+        "延遲管理": {
+          "🚨 CRITICAL": "immediate_delivery (0ms延遲)",
+          "🎯 HIGH": "5_minute_batch (300s延遲)",
+          "📊 MEDIUM": "30_minute_batch (1800s延遲)",
+          "📈 LOW": "end_of_day_summary (批量處理)"
+        },
+        "輸出格式": "📡 {priority}_{channel}_{delivery_status}_{timestamp}",
+        "例如": "CRITICAL_gmail_delivered_2025-08-07T10:30:00Z",
+        "時間": "100ms",
+        "視覺標記": "🔴 紅色 → 最終通知分發完成"
+      }
+    },
+
+    "⚡ 四情境決策邏輯視覺化": {
+      "🔁 替換決策流程": {
+        "信心度差異計算": "new_confidence - current_confidence ≥ 0.15",
+        "方向檢查": "new_direction ≠ current_direction (相反方向)",
+        "持倉年齡驗證": "position_age ≥ 5_minutes (避免頻繁切換)",
+        "市場時機評估": "RSI極端值 + MACD動量 + 布林帶位置",
+        "風險轉換評估": "平倉風險 vs 新倉風險 + 滑點估算",
+        "最終決策": "加權評分 ≥ 0.75 → 執行替換"
+      },
+      "➕ 加倉決策流程": {
+        "信心度提升檢查": "confidence_improvement ≥ 0.08",
+        "方向一致驗證": "signal_direction = position_direction",
+        "持倉表現要求": "unrealized_pnl > 0 (必須盈利)",
+        "風險集中度檢查": "additional_size + current_size ≤ 30% portfolio",
+        "波動風險評估": "market_volatility ≤ 6% (控制額外風險)",
+        "倉位計算": "confidence_weighted + volatility_adjusted",
+        "最終決策": "加權評分 ≥ 0.70 → 執行加倉"
+      },
+      "✅ 新倉決策流程": {
+        "持倉狀態檢查": "no_existing_position_for_symbol = true",
+        "品質門檻驗證": "embedded_quality_score ≥ 0.8 (80%品質要求)",
+        "市場適合度評估": "liquidity ≥ 60% + volatility適中",
+        "組合相關性檢查": "portfolio_correlation ≤ 70%",
+        "組合容量驗證": "current_positions < 8 (最大持倉數)",
+        "凱利公式倉位": "kelly_criterion_modified + 2%風險限制",
+        "止損止盈設置": "2xATR止損 + 4xATR止盈 (2:1風險回報)",
+        "最終決策": "綜合評分 ≥ 0.70 → 創建新倉"
+      },
+      "❌ 忽略決策流程": {
+        "品質檢查": "embedded_quality_score < 0.4 → 品質不足",
+        "重複性檢測": "similar_signal_within_15min → 高重複性",
+        "市場條件": "low_liquidity OR extreme_volatility → 不利條件",
+        "風險超標": "portfolio_risk > daily_budget → 風險過高",
+        "學習記錄": "ignore_reason + improvement_suggestion + pattern_data",
+        "最終決策": "任一條件滿足 → 忽略信號並記錄學習數據"
+      }
+    },
+
+    "🎯 優先級分類算法視覺化": {
+      "評分計算公式": "priority_score = quality×0.3 + urgency×0.25 + confidence×0.25 + risk_reward×0.2",
+      "🚨 CRITICAL級觸發": {
+        "數值條件": "priority_score ≥ 0.85 AND execution_confidence ≥ 0.9",
+        "市場條件": "高波動機會 OR 快速趨勢變化",
+        "技術條件": "突破關鍵阻力 OR 極端RSI反轉",
+        "風險條件": "風險回報比 ≥ 3:1",
+        "通知策略": "全通道即時通知 (Gmail+WebSocket+SMS)"
+      },
+      "🎯 HIGH級觸發": {
+        "數值條件": "priority_score ≥ 0.75 AND execution_confidence ≥ 0.8",
+        "市場條件": "強趨勢確認 OR 突破模式",
+        "技術條件": "多重指標確認 OR 成交量突破",
+        "風險條件": "風險回報比 ≥ 2:1",
+        "通知策略": "主要通道延遲通知 (5分鐘批量)"
+      },
+      "📊 MEDIUM級觸發": {
+        "數值條件": "priority_score ≥ 0.60 AND execution_confidence ≥ 0.65",
+        "市場條件": "正常市場條件 OR 中等信號強度",
+        "技術條件": "單一指標確認 OR 模式初期",
+        "風險條件": "風險回報比 ≥ 1.5:1",
+        "通知策略": "標準通道定時通知 (30分鐘批量)"
+      },
+      "📈 LOW級觸發": {
+        "數值條件": "priority_score ≥ 0.40 AND execution_confidence ≥ 0.5",
+        "市場條件": "弱信號 OR 研究性機會",
+        "技術條件": "指標分歧 OR 不確定模式",
+        "風險條件": "風險回報比 ≥ 1:1",
+        "通知策略": "研究通道批量通知 (日終摘要)"
+      }
+    },
+
+    "📊 總體流程時間線": {
+      "完整EPL處理": "450ms (layer_-1:50ms → layer_0:30ms → [四情境並行]:150ms → layer_2:80ms → layer_3:40ms → layer_4:30ms → layer_5:100ms)",
+      "性能目標": "總處理時間 < 800ms (配置限制)",
+      "並行效益": {
+        "🔁 替換決策": "120ms",
+        "➕ 加倉決策": "100ms", 
+        "✅ 新倉決策": "150ms",
+        "❌ 忽略決策": "60ms"
+      },
+      "關鍵路徑": "數據驗證 → 情境路由 → 並行決策 → 風險驗證 → 優先分類 → 通知分發",
+      "效率優化": "⬆️ 並行處理四情境 + 智能路由 + 批量通知"
+    },
+
+    "🔗 Phase2整合增強視覺化": {
+      "EPL預處理感知": {
+        "🚀 Express通道": "自動HIGH級以上分類",
+        "📊 Standard通道": "正常優先級流程", 
+        "🔍 Deep通道": "全面風險評估要求"
+      },
+      "內嵌評分利用": {
+        "五維度評分": "直接用於決策權重計算",
+        "微異常檢測": "影響風險評估和閾值調整",
+        "來源共識": "影響信心度權重",
+        "動態閾值": "基於Phase2評分自動調整決策門檻"
+      },
+      "並行監控整合": {
+        "即時品質指標": "影響優先級分類",
+        "系統負載感知": "自動調整處理策略",
+        "異常檢測": "修正決策參數"
+      }
+    },
+
+    "🎯 輸出標準化": {
+      "決策結果格式": "📊 {decision_type}_{priority}_{timestamp}_{execution_params}",
+      "EPLDecisionResult結構": {
+        "decision": "🔁/➕/✅/❌ 決策類型",
+        "priority": "🚨/🎯/📊/📈 優先級別",
+        "candidate": "📊 原始信號候選",
+        "reasoning": "📝 決策推理過程",
+        "execution_params": "⚙️ 執行參數",
+        "risk_management": "🛡️ 風險管理設置",
+        "performance_tracking": "📊 績效追蹤信息",
+        "notification_config": "📡 通知配置",
+        "timestamp": "⏰ 決策時間戳"
+      },
+      "通知格式": {
+        "gmail_format": "📧 HTML模板 + 圖表 + 執行按鈕",
+        "websocket_format": "🌐 JSON結構化數據",
+        "frontend_format": "🖥️ 儀表板友好格式",
+        "sms_format": "📱 160字符精簡格式"
+      }
+    },
+
+    "🔬 高級特性視覺化": {
+      "市場制度適應": {
+        "🐂 牛市調整": "降低風險閾值，提高激進度",
+        "🐻 熊市調整": "提高風險控制，保守策略",
+        "🔄 橫盤調整": "加強信號過濾，減少噪音",
+        "🌪️ 波動制度": "動態調整所有決策參數"
+      },
+      "機器學習整合": {
+        "🎯 決策結果預測": "基於歷史數據預測成功概率",
+        "⏰ 最佳時機預測": "預測最佳執行時間窗口",
+        "⚠️ 風險估算增強": "ML模型增強風險評估精度",
+        "🔍 模式識別": "自動識別成功決策模式"
+      },
+      "多時間框架驗證": {
+        "📊 短期確認": "1m+5m技術指標確認",
+        "📈 中期對齊": "15m+1h趨勢對齊檢查",
+        "📉 長期驗證": "4h+1d大趨勢驗證",
+        "⚖️ 權重優化": "動態調整各時間框架權重"
+      }
+    },
+
+    "🚨 系統彈性與容錯設計": {
+      "故障轉移機制": {
+        "決策引擎失效": "🔄 default_to_ignore_with_logging",
+        "通知系統失效": "📬 queue_for_retry + 備用通道",
+        "風險系統失效": "🛡️ conservative_default_limits",
+        "資料庫失效": "💾 memory_cache_fallback"
+      },
+      "性能降級策略": {
+        "高負載時": "⚡ 優先處理CRITICAL級決策",
+        "資源不足時": "📊 簡化決策邏輯，保證核心功能",
+        "網路延遲時": "🌐 本地快取決策，後續同步"
+      },
+      "自我監控": {
+        "決策延遲監控": "⏰ 超過500ms觸發警報",
+        "準確率追蹤": "📊 實時追蹤決策成功率",
+        "系統健康監控": "💚 CPU/記憶體/連接數監控",
+        "異常決策檢測": "🔍 異常決策模式自動檢測"
+      }
+    }
+  }
+}

@@ -1,0 +1,318 @@
+{
+  "epl_pre_processing_system_dependency": {
+    "strategy_name": "EPL Pre-Processing System",
+    "version": "2.1.0",
+    "description": "Enhanced three-step signal quality control EPL pre-processing layer with advanced optimization strategies",
+    "module_type": "pre_evaluation_layer",
+    
+    "strategy_dependency_graph": {
+      "core_dependencies": {
+        "three_step_processing_engines": {
+          "deduplication_engine": {
+            "type": "intelligent_deduplication_analysis_engine",
+            "function": "leverage_phase1_dynamic_params_for_fast_dedup",
+            "phase1_data_reuse": "id + dynamic_params.adaptation_timestamp",
+            "threshold": "85% similarity, 15 minutes time overlap",
+            "optimization_strategy": "skip_duplicate_check_for_high_quality_phase1_signals",
+            "dependency_level": "critical",
+            "enhanced_features": {
+              "source_consensus_validation": {
+                "source_overlap_score_threshold": 0.72,
+                "model_diversity_score_threshold": 0.8,
+                "action_bias_score_threshold": 0.85,
+                "preservation_rule": "preserve_if_model_diversity_score > 0.8"
+              }
+            }
+          },
+          "correlation_analyzer": {
+            "type": "contextual_correlation_analyzer",
+            "function": "leverage_phase1_market_environment_for_fast_decision", 
+            "phase1_data_reuse": "market_environment.volatility + liquidity_score",
+            "logic": "strengthen/replace/independent_decision",
+            "optimization_strategy": "trust_phase1_market_analysis_results",
+            "dependency_level": "critical"
+          },
+          "quality_control_gate": {
+            "type": "lightweight_quality_control_gate",
+            "function": "trust_phase1_quality_indicators_supplement_risk_assessment",
+            "phase1_data_reuse": "data_completeness + signal_clarity + confidence",
+            "threshold": "trust_phase1_assessment_supplement_extreme_risk_check",
+            "optimization_strategy": "high_quality_signal_express_lane",
+            "dependency_level": "critical",
+            "integrated_scoring": {
+              "signal_scoring_engine_integration": "embedded_in_quality_assessment",
+              "scoring_algorithm": "strength(0.3) + confidence(0.25) + quality(0.2) + risk(0.15) + timing(0.1)",
+              "real_data_quality_monitoring": "parallel_monitoring_for_validation"
+            },
+            "enhanced_features": {
+              "delayed_observation_reinforcement": {
+                "tracking_duration": "5_minutes",
+                "performance_improvement_threshold": 0.15,
+                "upgrade_to": "reinforced_candidate",
+                "reentry_lane": "standard_lane"
+              }
+            }
+          }
+        },
+        "input_integration": {
+          "unified_signal_candidate_pool": {
+            "type": "primary_signal_source",
+            "data_format": "SignalCandidate objects",
+            "data_completeness": "phase1_preprocessed (data_completeness, signal_clarity)",
+            "technical_indicators": "phase1_calculated (RSI, MACD, BB, Volume, Trend)",
+            "market_environment": "phase1_analyzed (volatility, liquidity, momentum)",
+            "update_frequency": "real_time",
+            "dependency_level": "critical",
+            "phase1_quality_trust_level": "high_trust_mode"
+          }
+        },
+        "intelligent_routing_system": {
+          "express_lane": {
+            "type": "fast_track",
+            "trigger_conditions": "data_completeness>=0.9 AND signal_clarity>=0.8 AND confidence>=0.75 AND micro_anomaly_score<0.2 AND market_stress_index<0.7",
+            "processing_time": "3ms",
+            "quality_trust": "direct_trust_phase1_assessment",
+            "enhanced_validation": {
+              "micro_anomaly_filter": {
+                "signal_volatility_jump_threshold": 0.3,
+                "confidence_drop_rate_threshold": 0.1,
+                "review_required_trigger": "confidence_drop_rate > 0.1"
+              }
+            }
+          },
+          "standard_lane": {
+            "type": "standard_track", 
+            "trigger_conditions": "medium_quality_signals",
+            "processing_time": "15ms",
+            "quality_validation": "selective_verification"
+          },
+          "deep_analysis": {
+            "type": "deep_analysis_track",
+            "trigger_conditions": "complex_market_conditions_or_quality_concerns",
+            "processing_time": "40ms",
+            "quality_validation": "complete_verification_process"
+          },
+          "dynamic_allocation": {
+            "stable_market": {
+              "express_ratio": "40%",
+              "standard_ratio": "50%", 
+              "deep_ratio": "10%"
+            },
+            "high_risk_market": {
+              "express_ratio": "15%",
+              "standard_ratio": "65%",
+              "deep_ratio": "20%"
+            },
+            "extreme_market": {
+              "express_ratio": "5%",
+              "standard_ratio": "70%",
+              "deep_ratio": "25%"
+            },
+            "allocation_trigger": {
+              "market_stress_index_threshold": [0.3, 0.7],
+              "volatility_score_threshold": [0.4, 0.8]
+            }
+          }
+        }
+      }
+    },
+
+    "dependencies": {
+      "upstream_modules": [
+        {
+          "module": "unified_signal_candidate_pool",
+          "type": "signal_candidate_source",
+          "critical": true,
+          "timeout": "3000ms",
+          "retry_strategy": "exponential_backoff"
+        }
+      ],
+      "downstream_modules": [
+        {
+          "module": "epl_decision_layer",
+          "type": "epl_consumer",
+          "delivery_guarantee": "exactly_once",
+          "max_queue_size": 500
+        }
+      ],
+      "parallel_monitoring_modules": [
+        {
+          "module": "real_data_signal_quality_engine",
+          "type": "quality_monitor",
+          "critical": false,
+          "function": "parallel_quality_validation_and_monitoring",
+          "timeout": "2000ms"
+        },
+        {
+          "module": "system_load_monitor",
+          "type": "performance_monitor",
+          "critical": false,
+          "function": "cpu_usage_and_queue_length_monitoring",
+          "timeout": "1000ms"
+        }
+      ],
+      "integrated_modules": [
+        {
+          "module": "signal_scoring_engine",
+          "type": "embedded_scoring",
+          "integration_point": "step_3_quality_control",
+          "function": "provide_scoring_algorithms_for_quality_assessment"
+        }
+      ]
+    },
+
+    "computation_flow": {
+      "processing_layers": {
+        "intelligent_routing": {
+          "input": "phase1_signal_candidates",
+          "processing": "smart_lane_decision_with_micro_anomaly_filter_and_dynamic_allocation",
+          "output": "express/standard/deep_lane_assignments",
+          "expected_processing_time": "2ms",
+          "phase1_dependency": "data_completeness, signal_clarity, confidence",
+          "enhanced_features": {
+            "micro_anomaly_screening": "signal_volatility_jump + confidence_drop_rate",
+            "dynamic_lane_allocation": "market_stress_index + volatility_score_based"
+          }
+        },
+        "step_1_smart_deduplication": {
+          "input": "lane_assigned_candidates", 
+          "processing": "leverage_phase1_dynamic_params_for_dedup_with_source_consensus",
+          "output": "dedup_filtered_candidates",
+          "expected_processing_time": "4ms (enhanced from 3ms)",
+          "phase1_reuse": "dynamic_params.adaptation_timestamp",
+          "enhanced_features": {
+            "source_consensus_matrix": "source_overlap + model_diversity + action_bias",
+            "diversity_preservation": "preserve_signals_with_model_diversity > 0.8"
+          },
+          "error_handling": "circuit_breaker_pattern"
+        },
+        "step_2_context_correlation": {
+          "input": "dedup_filtered_candidates",
+          "processing": "trust_phase1_market_environment_analysis", 
+          "output": "correlation_analyzed_candidates",
+          "expected_processing_time": "4ms (optimized from 12ms)",
+          "phase1_reuse": "market_environment.volatility + liquidity_score",
+          "error_handling": "graceful_degradation"
+        },
+        "step_3_lightweight_quality": {
+          "input": "correlation_analyzed_candidates",
+          "processing": "trust_phase1_quality_with_risk_supplement_and_delayed_observation_tracking",
+          "output": "final_epl_ready_candidates", 
+          "expected_processing_time": "6ms (enhanced from 5ms)",
+          "phase1_reuse": "data_completeness + signal_clarity",
+          "integrated_scoring": {
+            "embedded_signal_scoring_engine": {
+              "strength_scoring": "0.3 weight",
+              "confidence_scoring": "0.25 weight", 
+              "quality_scoring": "0.2 weight",
+              "risk_scoring": "0.15 weight",
+              "timing_scoring": "0.1 weight"
+            },
+            "real_data_quality_validation": "parallel_monitoring_check"
+          },
+          "enhanced_features": {
+            "delayed_observation_tracking": {
+              "monitoring_period": "5_minutes",
+              "performance_metrics": "price_movement_accuracy + signal_effectiveness",
+              "reinforcement_logic": "auto_upgrade_to_reinforced_candidate"
+            }
+          },
+          "error_handling": "default_pass_through"
+        }
+      },
+      
+      "total_expected_processing_time": "12ms (enhanced optimized flow)",
+      "express_lane_processing_time": "3ms",
+      "standard_lane_processing_time": "15ms", 
+      "deep_lane_processing_time": "40ms",
+      "extreme_market_processing_time": "<18ms (adaptive performance)",
+      "concurrency_level": "sequential_async_pipeline",
+      "memory_usage": "<120MB",
+      "system_resilience": {
+        "load_balancing": {
+          "cpu_threshold": "85%",
+          "queue_threshold": "1000_signals",
+          "degradation_mode": "partial_analysis_mode"
+        }
+      }
+    },
+
+    "configuration": {
+      "deduplication_params": {
+        "similarity_threshold": 0.85,
+        "time_overlap_minutes": 15,
+        "confidence_diff_threshold": 0.03,
+        "source_consensus_params": {
+          "source_overlap_score_threshold": 0.72,
+          "model_diversity_score_threshold": 0.8,
+          "action_bias_score_threshold": 0.85
+        }
+      },
+      "correlation_params": {
+        "direction_conflict_threshold": 0.15,
+        "confidence_improvement_threshold": 0.08
+      },
+      "quality_control_params": {
+        "strength_threshold": 70.0,
+        "liquidity_threshold": 0.6,
+        "risk_score_threshold": 0.3,
+        "micro_anomaly_params": {
+          "signal_volatility_jump_threshold": 0.3,
+          "confidence_drop_rate_threshold": 0.1
+        },
+        "delayed_observation_params": {
+          "tracking_duration_minutes": 5,
+          "performance_improvement_threshold": 0.15,
+          "reinforcement_upgrade_threshold": 0.2
+        }
+      },
+      "performance_targets": {
+        "processing_latency_p99": "<18ms (enhanced adaptive performance)",
+        "express_lane_latency": "<3ms",
+        "standard_lane_latency": "<15ms",
+        "deep_lane_latency": "<40ms",
+        "phase1_quality_trust_rate": ">90%",
+        "epl_pass_rate": "65-85% (improved with micro-anomaly filter)",
+        "accuracy_baseline": ">88% (enhanced with source consensus)",
+        "system_availability": ">99.9%",
+        "phase1_data_reuse_rate": ">95%",
+        "dynamic_allocation_efficiency": ">85%"
+      },
+      "phase1_integration": {
+        "data_trust_strategy": "high_trust_for_quality_indicators",
+        "duplicate_computation_avoidance": "leverage_phase1_preprocessing",
+        "express_lane_ratio": "dynamic_allocation_based_on_market_conditions",
+        "data_integrity_validation": "spot_check_only",
+        "enhanced_market_adaptation": {
+          "market_stress_monitoring": "real_time_volatility_and_liquidity_tracking",
+          "dynamic_threshold_adjustment": "confidence_and_quality_thresholds_adaptive_to_market"
+        }
+      },
+      "integrated_components": {
+        "signal_scoring_engine": {
+          "integration_method": "embedded_in_step3_quality_control",
+          "benefit": "unified_scoring_algorithm_no_separate_calls",
+          "performance_gain": "eliminates_3ms_separate_processing"
+        },
+        "real_data_quality_engine": {
+          "integration_method": "parallel_monitoring_validation",
+          "benefit": "continuous_quality_monitoring_without_blocking",
+          "performance_impact": "zero_latency_addition"
+        }
+      },
+      "architectural_optimization": {
+        "primary_flow": "unified_signal_pool → enhanced_epl_3_steps → epl_decision",
+        "monitoring_flow": "real_data_quality_engine + system_load_monitor → monitoring_dashboard",
+        "eliminated_redundancy": "removed_separate_scoring_step",
+        "maintained_functionality": "all_original_capabilities_preserved",
+        "enhanced_capabilities": {
+          "micro_anomaly_detection": "real_time_signal_variation_monitoring",
+          "dynamic_resource_allocation": "adaptive_lane_distribution_based_on_market_stress",
+          "source_diversity_preservation": "multi_model_signal_consensus_validation",
+          "delayed_observation_reinforcement": "continuous_signal_performance_tracking",
+          "system_resilience": "load_balancing_with_graceful_degradation"
+        }
+      }
+    }
+  }
+}

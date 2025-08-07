@@ -1,311 +1,311 @@
 {
   "UNIFIED_SIGNAL_CANDIDATE_POOL_V3_DEPENDENCY": {
-    "策略名稱": "統一信號候選池管理器 v3.0",
-    "描述": "完整EPL預處理 + Phase1A整合 + 事件驅動 + AI適應學習的下一代信號管理中樞",
-    "版本": "3.0.0",
-    "核心理念": "為EPL系統提供高品質信號候選者 + 實時適應 + 智能過濾 + 性能優化",
+    "strategy_name": "Unified Signal Candidate Pool Manager v3.0",
+    "description": "Complete EPL preprocessing + Phase1A integration + event-driven + AI adaptive learning next-generation signal management hub",
+    "version": "3.0.0",
+    "core_concept": "Provide high-quality signal candidates for EPL system + real-time adaptation + intelligent filtering + performance optimization",
 
-    "🔄 v3.0 重大升級": {
-      "EPL預處理整合": "為Phase2 EPL前處理層提供最佳化輸入",
-      "Phase1A基礎信號整合": "完整支援WebSocket驅動的Phase1A基礎信號",
-      "AI適應學習": "基於EPL決策反饋的自動學習調整機制",
-      "多維度品質評分": "7維度綜合評分系統，精準度提升30%",
-      "極端市場適應": "BTC波動>3%時的緊急處理模式",
-      "跨時間框架智能融合": "1m/5m/15m/1h時間框架的智能權重分配"
+    "🔄 v3.0_major_upgrades": {
+      "epl_preprocessing_integration": "Provide optimized input for Phase2 EPL preprocessing layer",
+      "phase1a_basic_signal_integration": "Complete support for WebSocket-driven Phase1A basic signals",
+      "ai_adaptive_learning": "Automatic learning adjustment mechanism based on EPL decision feedback",
+      "multi_dimensional_quality_scoring": "7-dimensional comprehensive scoring system, 30% accuracy improvement",
+      "extreme_market_adaptation": "Emergency processing mode when BTC volatility > 3%",
+      "cross_timeframe_intelligent_fusion": "Intelligent weight allocation for 1m/5m/15m/1h timeframes"
     },
 
-    "🌐 完整輸入源整合": {
-      "Phase1A輸入": {
-        "來源": "phase1a_basic_signal_generation",
-        "信號類型": ["PRICE_BREAKOUT", "VOLUME_SURGE", "MOMENTUM_SHIFT", "EXTREME_EVENT"],
-        "品質範圍": "0.0-1.0 標準化 (統一標準)",
-        "延遲要求": "< 30ms",
-        "權重": "0.25 (基礎權重)",
-        "格式驗證": "確保所有輸入信號強度在 0.0-1.0 範圍"
+    "🌐 complete_input_source_integration": {
+      "phase1a_input": {
+        "source": "phase1a_basic_signal_generation",
+        "signal_types": ["PRICE_BREAKOUT", "VOLUME_SURGE", "MOMENTUM_SHIFT", "EXTREME_EVENT"],
+        "quality_range": "0.0-1.0 standardized (unified standard)",
+        "latency_requirement": "< 30ms",
+        "weight": "0.25 (basic weight)",
+        "format_validation": "ensure all input signal strength in 0.0-1.0 range"
       },
-        "Indicator Graph輸入": {
-        "來源": "indicator_dependency_graph",
-        "信號類型": ["RSI_signals", "MACD_signals", "BB_signals", "Volume_signals"],
-        "計算時間": "45ms parallel processing",
-        "權重": "0.20 (技術分析權重)",
-        "格式驗證": "確保所有技術指標信號強度標準化為 0.0-1.0"
+      "indicator_graph_input": {
+        "source": "indicator_dependency_graph",
+        "signal_types": ["RSI_signals", "MACD_signals", "BB_signals", "Volume_signals"],
+        "computation_time": "45ms parallel processing",
+        "weight": "0.20 (technical analysis weight)",
+        "format_validation": "ensure all technical indicator signals standardized to 0.0-1.0"
       },
-      "Phase1B輸入": {
-        "來源": "phase1b_volatility_adaptation",
-        "信號類型": ["VOLATILITY_BREAKOUT", "REGIME_CHANGE", "MEAN_REVERSION"],
-        "波動適應": "市場制度感知調整",
-        "權重": "0.25 (波動性權重)",
-        "格式驗證": "確保波動性信號標準化為 0.0-1.0 範圍"
+      "phase1b_input": {
+        "source": "phase1b_volatility_adaptation",
+        "signal_types": ["VOLATILITY_BREAKOUT", "REGIME_CHANGE", "MEAN_REVERSION"],
+        "volatility_adaptation": "market regime awareness adjustment",
+        "weight": "0.25 (volatility weight)",
+        "format_validation": "ensure volatility signals standardized to 0.0-1.0 range"
       },
-      "Phase1C輸入": {
-        "來源": "phase1c_signal_standardization",
-        "處理延遲": "25ms 5層處理",
-        "品質保證": "multi-dimensional scoring",
-        "權重": "0.30 (標準化權重，最高)",
-        "格式保證": "Phase1C 已確保所有信號為 0.0-1.0 標準化格式"
+      "phase1c_input": {
+        "source": "phase1c_signal_standardization",
+        "processing_latency": "25ms 5-layer processing",
+        "quality_assurance": "multi-dimensional scoring",
+        "weight": "0.30 (standardization weight, highest)",
+        "format_guarantee": "Phase1C ensures all signals in 0.0-1.0 standardized format"
       }
     },
 
-    "🧠 AI適應學習引擎": {
+    "🧠 ai_adaptive_learning_engine": {
       "Layer_AI_Learning_Engine": {
-        "層級": "layer_ai_adaptive_learning",
-        "描述": "基於EPL決策反饋的自適應學習系統",
-        "依賴": "Phase2_EPL_decision_feedback",
-        "時間": "5ms",
-        "操作": {
-          "📚 歷史決策學習": {
-            "學習數據": "EPL_decision_history (7天滾動)",
-            "學習指標": {
-              "決策準確率": "EPL正確決策 / 總決策數",
-              "信號貢獻度": "各信號源對最終決策的貢獻權重",
-              "時間效應": "不同時間段EPL決策偏好",
-              "市場制度效應": "趨勢/橫盤/波動市場的決策模式"
+        "layer_level": "layer_ai_adaptive_learning",
+        "description": "Adaptive learning system based on EPL decision feedback",
+        "dependency": "Phase2_EPL_decision_feedback",
+        "time": "5ms",
+        "operations": {
+          "📚 historical_decision_learning": {
+            "learning_data": "EPL_decision_history (7-day rolling)",
+            "learning_metrics": {
+              "decision_accuracy": "EPL correct decisions / total decisions",
+              "signal_contribution": "contribution weight of each signal source to final decision",
+              "time_effect": "EPL decision preferences in different time periods",
+              "market_regime_effect": "decision patterns in trending/ranging/volatile markets"
             },
-            "權重調整": {
-              "高貢獻信號源": "權重提升 1.1-1.3x",
-              "低貢獻信號源": "權重降低 0.7-0.9x",
-              "動態調整頻率": "每4小時重新計算",
-              "最大調整幅度": "±30% from baseline"
+            "weight_adjustment": {
+              "high_contribution_signals": "weight increase 1.1-1.3x",
+              "low_contribution_signals": "weight decrease 0.7-0.9x",
+              "dynamic_adjustment_frequency": "recalculate every 4 hours",
+              "max_adjustment_range": "±30% from baseline"
             }
           },
-          "🎯 預測性過濾": {
-            "ML模型": "Random Forest + XGBoost ensemble",
-            "特徵工程": {
-              "信號特徵": ["signal_strength", "confidence", "source_reliability"],
-              "市場特徵": ["volatility_regime", "trading_session", "btc_correlation"],
-              "時間特徵": ["hour_of_day", "day_of_week", "market_events"],
-              "技術特徵": ["rsi_level", "macd_momentum", "volume_profile"]
+          "🎯 predictive_filtering": {
+            "ml_model": "Random Forest + XGBoost ensemble",
+            "feature_engineering": {
+              "signal_features": ["signal_strength", "confidence", "source_reliability"],
+              "market_features": ["volatility_regime", "trading_session", "btc_correlation"],
+              "time_features": ["hour_of_day", "day_of_week", "market_events"],
+              "technical_features": ["rsi_level", "macd_momentum", "volume_profile"]
             },
-            "預測目標": "EPL_decision_probability",
-            "過濾閾值": {
+            "prediction_target": "EPL_decision_probability",
+            "filtering_thresholds": {
               "HIGH_PASS": "predicted_epl_pass > 0.7",
               "MEDIUM_PASS": "predicted_epl_pass > 0.5", 
               "LOW_PASS": "predicted_epl_pass > 0.3",
               "REJECT": "predicted_epl_pass <= 0.3"
             }
           },
-          "🔄 實時適應": {
-            "適應觸發": "EPL決策偏差 > 20%",
-            "快速學習": "近1小時數據權重加倍",
-            "緊急調整": "極端市場時暫停學習，使用保守權重",
-            "穩定性保證": "權重變化需連續3次確認"
+          "🔄 real_time_adaptation": {
+            "adaptation_trigger": "EPL decision deviation > 20%",
+            "fast_learning": "past 1-hour data weight doubled",
+            "emergency_adjustment": "suspend learning in extreme markets, use conservative weights",
+            "stability_guarantee": "weight changes require 3 consecutive confirmations"
           }
         }
       }
     },
 
-    "🔄 Phase1完整流程整合": {
+    "🔄 phase1_complete_flow_integration": {
       "Layer_0_Complete_Phase1_Sync": {
-        "層級": "layer_0_complete_phase1_integration", 
-        "描述": "Phase1A到1C完整流程同步整合層",
-        "依賴": "所有Phase1模組",
-        "時間": "3ms",
-        "操作": {
-          "🕐 統一時間戳同步": {
-            "同步源": "websocket_realtime_driver timestamp (主時間源)",
-            "同步範圍": ["phase1a", "indicator_graph", "phase1b", "phase1c"],
-            "容忍度": "100ms (統一標準，從phase1c的200ms降低)",
-            "驗證": "cross_module_timestamp_alignment",
-            "失敗處理": "使用最新有效時間戳",
-            "衝突解決": "以 websocket_realtime_driver 為主時間源，所有模組必須對齊"
+        "layer_level": "layer_0_complete_phase1_integration", 
+        "description": "Complete Phase1A to 1C flow synchronization integration layer",
+        "dependency": "all_phase1_modules",
+        "time": "3ms",
+        "operations": {
+          "🕐 unified_timestamp_sync": {
+            "sync_source": "websocket_realtime_driver timestamp (primary time source)",
+            "sync_scope": ["phase1a", "indicator_graph", "phase1b", "phase1c"],
+            "tolerance": "100ms (unified standard, reduced from phase1c's 200ms)",
+            "validation": "cross_module_timestamp_alignment",
+            "failure_handling": "use_latest_valid_timestamp",
+            "conflict_resolution": "websocket_realtime_driver as primary time source, all modules must align"
           },
-          "🔗 數據流完整性": {
-            "流程驗證": "WebSocket → Phase1A → Indicators → Phase1B → Phase1C → Pool",
-            "中斷檢測": "任意環節數據中斷檢測",
-            "降級策略": "部分數據源失效時的降級處理",
-            "恢復機制": "數據源恢復後的快速同步"
+          "🔗 data_flow_integrity": {
+            "flow_validation": "WebSocket → Phase1A → Indicators → Phase1B → Phase1C → Pool",
+            "interruption_detection": "data interruption detection at any stage",
+            "degradation_strategy": "degradation handling when partial data sources fail",
+            "recovery_mechanism": "rapid synchronization after data source recovery"
           },
-          "⚡ 極端市場快速通道": {
-            "觸發條件": "BTC_5min_change > 3% OR volume_surge > 8x",
-            "快速通道": {
+          "⚡ extreme_market_fast_track": {
+            "trigger_condition": "BTC_5min_change > 3% OR volume_surge > 8x",
+            "fast_track": {
               "Phase1A": "< 10ms emergency processing",
               "Indicators": "< 20ms priority calculation", 
               "Phase1B": "< 15ms volatility emergency",
               "Phase1C": "< 10ms tier1 fast track",
               "Pool": "< 5ms immediate routing"
             },
-            "總延遲目標": "< 60ms for extreme events"
+            "total_latency_target": "< 60ms for extreme events"
           }
         }
       },
 
       "Layer_1_Multi_Source_Fusion": {
-        "層級": "layer_1_enhanced_multi_source_fusion",
-        "描述": "增強版多源信號融合與品質評估",
-        "依賴": "✅ layer_0_complete_phase1_integration + AI_learning_engine",
-        "時間": "12ms",
-        "操作": {
-          "🎯 智能信號收集": {
-            "輸入源動態權重": {
-              "Phase1A基礎信號": "base_weight: 0.25, ai_adjusted: 0.20-0.35",
-              "Indicator技術信號": "base_weight: 0.20, ai_adjusted: 0.15-0.30", 
-              "Phase1B波動信號": "base_weight: 0.25, ai_adjusted: 0.20-0.35",
-              "Phase1C標準化信號": "base_weight: 0.30, ai_adjusted: 0.25-0.40"
+        "layer_level": "layer_1_enhanced_multi_source_fusion",
+        "description": "Enhanced multi-source signal fusion and quality assessment",
+        "dependency": "✅ layer_0_complete_phase1_integration + AI_learning_engine",
+        "time": "12ms",
+        "operations": {
+          "🎯 intelligent_signal_collection": {
+            "input_source_dynamic_weights": {
+              "Phase1A_basic_signals": "base_weight: 0.25, ai_adjusted: 0.20-0.35",
+              "Indicator_technical_signals": "base_weight: 0.20, ai_adjusted: 0.15-0.30", 
+              "Phase1B_volatility_signals": "base_weight: 0.25, ai_adjusted: 0.20-0.35",
+              "Phase1C_standardized_signals": "base_weight: 0.30, ai_adjusted: 0.25-0.40"
             },
-            "市場制度適應": {
-              "趨勢市場": "Phase1B權重+20%, Phase1A權重+10%",
-              "橫盤市場": "Indicator權重+25%, Phase1C權重+15%", 
-              "波動市場": "Phase1A權重+30%, Phase1B權重+25%"
+            "market_regime_adaptation": {
+              "trending_market": "Phase1B weight +20%, Phase1A weight +10%",
+              "ranging_market": "Indicator weight +25%, Phase1C weight +15%", 
+              "volatile_market": "Phase1A weight +30%, Phase1B weight +25%"
             },
-            "信號品質過濾": {
-              "Phase1A過濾": "quality_score >= 0.6 AND signal_strength in [0.0, 1.0]",
-              "Indicator過濾": "confidence >= 0.65 AND standardized_to_0_1_range",
-              "Phase1B過濾": "stability_score >= 0.7 AND signal_strength in [0.0, 1.0]", 
-              "Phase1C過濾": "tier_1或tier_2信號 AND 已標準化為 0.0-1.0",
-              "統一驗證": "所有信號源必須通過 0.0-1.0 範圍驗證"
+            "signal_quality_filtering": {
+              "phase1a_filtering": "quality_score >= 0.6 AND signal_strength in [0.0, 1.0]",
+              "indicator_filtering": "confidence >= 0.65 AND standardized_to_0_1_range",
+              "phase1b_filtering": "stability_score >= 0.7 AND signal_strength in [0.0, 1.0]", 
+              "phase1c_filtering": "tier_1_or_tier_2_signals AND standardized_to_0_0_1_0",
+              "unified_validation": "all signal sources must pass 0.0-1.0 range validation"
             }
           },
-          "🏭 7維度綜合評分": {
-            "評分維度": {
-              "信號強度": {
-                "權重": "0.25",
-                "計算": "weighted_avg(source_strength * source_weight)",
-                "範圍": "0.0-1.0"
+          "🏭 seven_dimensional_comprehensive_scoring": {
+            "scoring_dimensions": {
+              "signal_strength": {
+                "weight": "0.25",
+                "calculation": "weighted_avg(source_strength * source_weight)",
+                "range": "0.0-1.0"
               },
-              "置信度": {
-                "權重": "0.20", 
-                "計算": "confidence_aggregation + cross_validation",
-                "調整": "AI學習權重調整"
+              "confidence": {
+                "weight": "0.20", 
+                "calculation": "confidence_aggregation + cross_validation",
+                "adjustment": "AI learning weight adjustment"
               },
-              "數據品質": {
-                "權重": "0.15",
-                "因子": ["timestamp_sync", "data_completeness", "validation_pass"],
-                "閾值": "minimum 0.8 for CRITICAL signals"
+              "data_quality": {
+                "weight": "0.15",
+                "factors": ["timestamp_sync", "data_completeness", "validation_pass"],
+                "threshold": "minimum 0.8 for CRITICAL signals"
               },
-              "市場一致性": {
-                "權重": "0.12",
-                "計算": "btc_correlation + market_sentiment_alignment",
-                "跨市場驗證": "crypto_market_correlation"
+              "market_consistency": {
+                "weight": "0.12",
+                "calculation": "btc_correlation + market_sentiment_alignment",
+                "cross_market_validation": "crypto_market_correlation"
               },
-              "時間效應": {
-                "權重": "0.10",
-                "因子": ["trading_session_effect", "time_of_day_bias"],
-                "亞洲時段": "技術指標權重+15%",
-                "美洲時段": "成交量指標權重+20%"
+              "time_effect": {
+                "weight": "0.10",
+                "factors": ["trading_session_effect", "time_of_day_bias"],
+                "asian_session": "technical indicator weight +15%",
+                "american_session": "volume indicator weight +20%"
               },
-              "流動性因子": {
-                "權重": "0.10",
-                "計算": "24h_volume / orderbook_depth",
-                "調整": "低流動性懲罰 -20%"
+              "liquidity_factor": {
+                "weight": "0.10",
+                "calculation": "24h_volume / orderbook_depth",
+                "adjustment": "low liquidity penalty -20%"
               },
-              "歷史準確率": {
-                "權重": "0.08",
-                "數據": "過去30天相似信號的EPL通過率",
-                "動態調整": "準確率>80%: +15%, <60%: -25%"
+              "historical_accuracy": {
+                "weight": "0.08",
+                "data": "past 30-day similar signal EPL pass rate",
+                "dynamic_adjustment": "accuracy >80%: +15%, <60%: -25%"
               }
             },
-            "綜合分數計算": "weighted_sum(all_dimensions)",
-            "AI增強": "ML模型微調最終分數 ±0.1"
+            "comprehensive_score_calculation": "weighted_sum(all_dimensions)",
+            "ai_enhancement": "ML model fine-tuning final score ±0.1"
           }
         }
       },
 
       "Layer_2_EPL_Preprocessor": {
-        "層級": "layer_2_epl_preprocessing_optimization",
-        "描述": "為EPL系統優化的預處理層",
-        "依賴": "✅ layer_1_enhanced_multi_source_fusion",
-        "時間": "8ms",
-        "操作": {
-          "🎯 EPL導向過濾": {
-            "輸入": "7_dimensional_scored_signals",
-            "EPL成功預測": {
-              "預測模型": "基於歷史EPL決策的XGBoost模型",
-              "特徵": ["signal_score", "market_state", "source_diversity", "timing"],
-              "預測準確率": "> 75%",
-              "過濾策略": "僅保留predicted_epl_pass > 0.4的信號"
+        "layer_level": "layer_2_epl_preprocessing_optimization",
+        "description": "Preprocessing layer optimized for EPL system",
+        "dependency": "✅ layer_1_enhanced_multi_source_fusion",
+        "time": "8ms",
+        "operations": {
+          "🎯 epl_oriented_filtering": {
+            "input": "7_dimensional_scored_signals",
+            "epl_success_prediction": {
+              "prediction_model": "XGBoost model based on historical EPL decisions",
+              "features": ["signal_score", "market_state", "source_diversity", "timing"],
+              "prediction_accuracy": "> 75%",
+              "filtering_strategy": "keep only signals with predicted_epl_pass > 0.4"
             },
-            "信號優化": {
-              "去重增強": "30秒時間窗口 + 相似度 > 0.8",
-              "互補性選擇": "優先選擇互補型信號組合",
-              "數量控制": "每交易對最多5個候選信號",
-              "品質保證": "最低品質分數 0.65"
+            "signal_optimization": {
+              "enhanced_deduplication": "30-second time window + similarity > 0.8",
+              "complementary_selection": "prioritize complementary signal combinations",
+              "quantity_control": "maximum 5 candidate signals per trading pair",
+              "quality_assurance": "minimum quality score 0.65"
             }
           },
-          "📊 EPL輸入格式化": {
-            "標準化輸出": {
+          "📊 epl_input_formatting": {
+            "standardized_output": {
               "signal_id": "unified_pool_v3_{timestamp}_{sequence}",
               "signal_source": "phase1_unified_pool",
-              "signal_strength": "0.0-1.0 EPL標準",
-              "confidence_score": "0.0-1.0 綜合置信度",
+              "signal_strength": "0.0-1.0 EPL standard",
+              "confidence_score": "0.0-1.0 comprehensive confidence",
               "epl_prediction": "predicted_pass_probability",
-              "market_context": "市場環境標記",
-              "processing_metadata": "處理過程元數據"
+              "market_context": "market environment tag",
+              "processing_metadata": "processing metadata"
             },
-            "EPL優化欄位": {
-              "risk_assessment": "風險評估分數",
-              "execution_priority": "執行優先級建議",
-              "position_sizing": "建議倉位大小",
-              "stop_loss_suggestion": "止損建議",
-              "take_profit_levels": "止盈水平建議"
+            "epl_optimized_fields": {
+              "risk_assessment": "risk assessment score",
+              "execution_priority": "execution priority recommendation",
+              "position_sizing": "recommended position size",
+              "stop_loss_suggestion": "stop loss recommendation",
+              "take_profit_levels": "take profit level recommendations"
             }
           },
-          "⚡ 緊急信號優先通道": {
-            "極端市場信號": {
-              "檢測": "market_shock OR flash_crash OR massive_volume",
-              "處理": "跳過正常排隊，直接進入EPL",
-              "標記": "EMERGENCY_SIGNAL + priority_level",
-              "延遲": "< 10ms to EPL"
+          "⚡ emergency_signal_priority_channel": {
+            "extreme_market_signals": {
+              "detection": "market_shock OR flash_crash OR massive_volume",
+              "processing": "skip normal queue, direct to EPL",
+              "tagging": "EMERGENCY_SIGNAL + priority_level",
+              "latency": "< 10ms to EPL"
             }
           }
         }
       }
     },
 
-    "🎯 v3.0性能目標": {
-      "總處理時間": "28ms (3+12+8+5ms AI)",
-      "極端市場": "< 60ms end-to-end",
-      "EPL預處理延遲": "< 30ms to Phase2",
-      "AI適應學習": "< 5ms overhead",
-      "分層處理時間": {
-        "layer_0_phase1_sync": "3ms (完整Phase1同步)",
-        "layer_1_multi_fusion": "12ms (7維度評分 + AI權重)",
-        "layer_2_epl_preprocessor": "8ms (EPL優化 + 格式化)",
-        "layer_ai_learning": "5ms (實時學習調整)"
+    "🎯 v3_0_performance_targets": {
+      "total_processing_time": "28ms (3+12+8+5ms AI)",
+      "extreme_market": "< 60ms end-to-end",
+      "epl_preprocessing_latency": "< 30ms to Phase2",
+      "ai_adaptive_learning": "< 5ms overhead",
+      "layered_processing_time": {
+        "layer_0_phase1_sync": "3ms (complete Phase1 synchronization)",
+        "layer_1_multi_fusion": "12ms (7-dimensional scoring + AI weighting)",
+        "layer_2_epl_preprocessor": "8ms (EPL optimization + formatting)",
+        "layer_ai_learning": "5ms (real-time learning adjustment)"
       },
-      "預測準確率": {
-        "EPL通過預測": "> 75%",
-        "AI權重調整": "> 80% improvement detection",
-        "極端事件檢測": "> 90% recall"
+      "prediction_accuracy": {
+        "epl_pass_prediction": "> 75%",
+        "ai_weight_adjustment": "> 80% improvement detection",
+        "extreme_event_detection": "> 90% recall"
       }
     },
 
-    "🔗 v3.0整合接口": {
-      "完整輸入源": [
+    "🔗 v3_0_integration_interfaces": {
+      "complete_input_sources": [
         "websocket_realtime_driver",
         "phase1a_basic_signal_generation", 
         "indicator_dependency_graph",
         "phase1b_volatility_adaptation",
         "phase1c_signal_standardization"
       ],
-      "主要輸出": [
+      "primary_outputs": [
         "phase2_epl_preprocessing_layer",
         "signal_performance_monitor",
         "ai_learning_feedback_loop"
       ],
-      "反饋輸入": [
+      "feedback_inputs": [
         "phase2_epl_decision_results",
         "phase3_execution_results",
         "phase4_output_performance"
       ]
     },
 
-    "💡 v3.0創新特色": {
-      "完整Phase1整合": "從WebSocket到Phase1C的完整數據流整合",
-      "AI適應學習": "基於EPL反饋的自動權重調整，準確率提升30%",
-      "EPL預處理優化": "專為EPL系統設計的預處理和格式化",
-      "極端市場快速通道": "< 60ms緊急處理，滿足極端市場要求",
-      "7維度評分": "比v2.0增加3個維度，評分精準度提升",
-      "預測性過濾": "75%準確率的EPL通過預測，減少無效處理",
-      "動態權重系統": "市場制度感知的動態權重調整"
+    "💡 v3_0_innovative_features": {
+      "complete_phase1_integration": "Complete data flow integration from WebSocket to Phase1C",
+      "ai_adaptive_learning": "Automatic weight adjustment based on EPL feedback, 30% accuracy improvement",
+      "epl_preprocessing_optimization": "Preprocessing and formatting designed specifically for EPL system",
+      "extreme_market_fast_track": "< 60ms emergency processing, meets extreme market requirements",
+      "7_dimensional_scoring": "3 additional dimensions compared to v2.0, improved scoring precision",
+      "predictive_filtering": "75% accuracy EPL pass prediction, reduces invalid processing",
+      "dynamic_weight_system": "Market regime-aware dynamic weight adjustment"
     },
 
-    "📈 預期效果": {
-      "EPL輸入品質": "提升40% (vs v2.1)",
-      "處理延遲": "降低25% (28ms vs 38ms)", 
-      "AI適應效果": "權重調整帶來20%性能提升",
-      "極端市場響應": "< 60ms緊急處理能力",
-      "EPL成功率": "預測性過濾提升EPL通過率15%",
-      "系統穩定性": "99.8%+ 運行穩定性"
+    "📈 expected_results": {
+      "epl_input_quality": "40% improvement (vs v2.1)",
+      "processing_latency": "25% reduction (28ms vs 38ms)", 
+      "ai_adaptation_effect": "20% performance improvement from weight adjustment",
+      "extreme_market_response": "< 60ms emergency processing capability",
+      "epl_success_rate": "Predictive filtering improves EPL pass rate by 15%",
+      "system_stability": "99.8%+ operational stability"
     }
   }
 }

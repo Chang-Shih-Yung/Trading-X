@@ -1,0 +1,298 @@
+{
+  "PHASE4_UNIFIED_MONITORING_DASHBOARD": {
+    "system_metadata": {
+      "version": "2.1.0",
+      "last_updated": "2025-08-07",
+      "description": "Phase4 Unified Monitoring Dashboard - Real-time System Status and Performance Monitoring",
+      "data_consistency_status": "validated_with_phase1_to_phase3_integration"
+    },
+
+    "integration_standards": {
+      "data_format_consistency": {
+        "signal_strength_range": "0.0-1.0",
+        "confidence_range": "0.0-1.0",
+        "priority_levels": ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
+        "timestamp_format": "ISO_8601_UTC",
+        "sync_tolerance": "100ms"
+      },
+      "upstream_integration": {
+        "phase1_signal_pool": {
+          "input_source": "unified_signal_candidate_pool_v3",
+          "data_validation": "0.0-1.0_range_enforcement"
+        },
+        "phase2_pre_evaluation": {
+          "monitoring_input": "parallel_monitoring_metrics",
+          "quality_scores": "embedded_quality_scores"
+        },
+        "phase3_execution_policy": {
+          "decision_results": "EPLDecisionResult",
+          "priority_classification": "SignalPriority_enum",
+          "notification_configs": "notification_dispatch_configs"
+        }
+      }
+    },
+
+    "monitoring_architecture": {
+      "real_time_dashboard": {
+        "update_frequency": "1_second_refresh",
+        "data_retention": "24_hours_active_display",
+        "display_layers": [
+          "system_status_overview",
+          "signal_processing_statistics", 
+          "epl_decision_tracking",
+          "notification_success_rates",
+          "performance_metrics_monitoring"
+        ]
+      },
+      "data_aggregation": {
+        "signal_processing_stats": {
+          "total_signals_processed": "counter",
+          "signals_by_priority": "categorized_counter",
+          "signals_by_source": "source_breakdown",
+          "processing_latency": "time_series_metrics"
+        },
+        "epl_decision_tracking": {
+          "decision_types": ["REPLACE", "STRENGTHEN", "CREATE_NEW", "IGNORE"],
+          "decision_success_rates": "percentage_tracking",
+          "execution_latency": "time_measurement",
+          "priority_distribution": "classification_analytics"
+        },
+        "notification_performance": {
+          "delivery_success_rates": "per_channel_analytics",
+          "delivery_latency": "time_to_delivery_tracking",
+          "user_engagement": "click_through_analytics",
+          "error_rates": "failure_analytics"
+        }
+      }
+    },
+
+    "dashboard_widgets": {
+      "system_status_overview": {
+        "widget_type": "status_indicator_grid",
+        "refresh_rate": "real_time_1s",
+        "components": {
+          "phase1_signal_generation": {
+            "status_indicator": "green_yellow_red",
+            "metrics": ["signals_per_minute", "quality_distribution", "source_availability"],
+            "alert_thresholds": {
+              "low_signal_rate": "< 10_signals_per_minute",
+              "quality_degradation": "< 60%_average_quality",
+              "source_failure": "any_source_offline"
+            }
+          },
+          "phase2_pre_evaluation": {
+            "status_indicator": "green_yellow_red", 
+            "metrics": ["processing_latency", "channel_distribution", "quality_scores"],
+            "alert_thresholds": {
+              "high_latency": "> 15ms_processing_time",
+              "channel_imbalance": "> 70%_single_channel",
+              "quality_drop": "< 0.6_average_embedded_score"
+            }
+          },
+          "phase3_execution_policy": {
+            "status_indicator": "green_yellow_red",
+            "metrics": ["decision_latency", "decision_distribution", "risk_violations"],
+            "alert_thresholds": {
+              "decision_delay": "> 500ms_decision_time",
+              "ignore_rate_high": "> 60%_ignore_decisions",
+              "risk_breach": "any_risk_limit_exceeded"
+            }
+          },
+          "notification_system": {
+            "status_indicator": "green_yellow_red",
+            "metrics": ["delivery_success_rate", "channel_health", "queue_depth"],
+            "alert_thresholds": {
+              "delivery_failure": "< 95%_success_rate",
+              "channel_down": "any_channel_offline",
+              "queue_backup": "> 100_pending_notifications"
+            }
+          }
+        }
+      },
+
+      "signal_processing_analytics": {
+        "widget_type": "time_series_charts_and_counters",
+        "refresh_rate": "5_second_updates",
+        "components": {
+          "signal_volume_chart": {
+            "chart_type": "line_chart_with_moving_average",
+            "time_range": "last_4_hours",
+            "metrics": ["total_signals", "signals_by_priority", "signals_by_source"],
+            "aggregation": "1_minute_buckets"
+          },
+          "processing_latency_chart": {
+            "chart_type": "multi_line_latency_chart",
+            "time_range": "last_2_hours", 
+            "metrics": ["phase1_latency", "phase2_latency", "phase3_latency", "total_latency"],
+            "percentiles": ["p50", "p95", "p99"]
+          },
+          "quality_distribution_histogram": {
+            "chart_type": "real_time_histogram",
+            "time_range": "last_1_hour",
+            "metrics": ["signal_quality_distribution", "confidence_distribution"],
+            "bins": "0.1_increments_from_0_to_1"
+          }
+        }
+      },
+
+      "epl_decision_tracking": {
+        "widget_type": "decision_analytics_dashboard",
+        "refresh_rate": "real_time_updates",
+        "components": {
+          "decision_type_pie_chart": {
+            "chart_type": "real_time_pie_chart",
+            "time_range": "last_24_hours",
+            "categories": ["REPLACE_POSITION", "STRENGTHEN_POSITION", "CREATE_NEW_POSITION", "IGNORE_SIGNAL"],
+            "percentage_display": true
+          },
+          "decision_timeline": {
+            "chart_type": "timeline_visualization",
+            "time_range": "last_4_hours",
+            "events": ["decision_points", "execution_points", "outcome_updates"],
+            "priority_color_coding": {
+              "CRITICAL": "red",
+              "HIGH": "orange", 
+              "MEDIUM": "yellow",
+              "LOW": "blue"
+            }
+          },
+          "success_rate_metrics": {
+            "chart_type": "gauge_meters",
+            "metrics": [
+              "overall_decision_accuracy",
+              "replacement_success_rate",
+              "strengthening_effectiveness", 
+              "new_position_performance"
+            ],
+            "target_thresholds": {
+              "excellent": "> 85%",
+              "good": "70-85%",
+              "needs_improvement": "< 70%"
+            }
+          }
+        }
+      },
+
+      "notification_success_monitoring": {
+        "widget_type": "notification_performance_dashboard",
+        "refresh_rate": "30_second_updates",
+        "components": {
+          "delivery_success_matrix": {
+            "widget_type": "channel_priority_matrix",
+            "dimensions": ["notification_channel", "priority_level"],
+            "metrics": ["delivery_rate", "delivery_latency", "error_count"],
+            "color_coding": "green_yellow_red_scale"
+          },
+          "notification_volume_chart": {
+            "chart_type": "stacked_area_chart",
+            "time_range": "last_6_hours",
+            "stack_by": "notification_channel",
+            "metrics": ["notifications_sent", "notifications_delivered", "notifications_failed"]
+          },
+          "user_engagement_analytics": {
+            "chart_type": "engagement_funnel",
+            "metrics": ["notifications_sent", "notifications_opened", "actions_taken"],
+            "conversion_rates": "percentage_calculation"
+          }
+        }
+      },
+
+      "system_performance_monitoring": {
+        "widget_type": "performance_metrics_dashboard", 
+        "refresh_rate": "10_second_updates",
+        "components": {
+          "resource_utilization": {
+            "chart_type": "multi_gauge_display",
+            "metrics": ["cpu_usage", "memory_usage", "disk_io", "network_io"],
+            "alert_levels": {
+              "warning": "80%_utilization",
+              "critical": "95%_utilization"
+            }
+          },
+          "throughput_metrics": {
+            "chart_type": "throughput_line_chart",
+            "time_range": "last_2_hours",
+            "metrics": ["signals_per_second", "decisions_per_second", "notifications_per_second"],
+            "capacity_indicators": "max_theoretical_vs_current"
+          },
+          "error_rate_monitoring": {
+            "chart_type": "error_rate_chart_with_alerts",
+            "time_range": "last_4_hours", 
+            "metrics": ["processing_errors", "notification_errors", "system_errors"],
+            "alert_thresholds": {
+              "warning": "1%_error_rate",
+              "critical": "5%_error_rate"
+            }
+          }
+        }
+      }
+    },
+
+    "alert_configuration": {
+      "system_alerts": {
+        "high_priority_alerts": {
+          "phase_offline": {
+            "trigger": "any_phase_completely_offline",
+            "notification": ["email_to_admin", "sms_to_oncall", "slack_alert"],
+            "escalation": "immediate"
+          },
+          "data_corruption": {
+            "trigger": "data_format_validation_failure",
+            "notification": ["email_to_admin", "system_log_critical"],
+            "escalation": "15_minutes"
+          },
+          "performance_degradation": {
+            "trigger": "total_latency > 2000ms",
+            "notification": ["email_to_admin", "dashboard_alert"],
+            "escalation": "30_minutes"
+          }
+        },
+        "medium_priority_alerts": {
+          "quality_degradation": {
+            "trigger": "average_signal_quality < 0.6_for_10_minutes",
+            "notification": ["email_to_team", "dashboard_warning"],
+            "escalation": "1_hour"
+          },
+          "notification_failures": {
+            "trigger": "notification_failure_rate > 10%_for_5_minutes",
+            "notification": ["email_to_team"],
+            "escalation": "2_hours"
+          }
+        }
+      }
+    },
+
+    "data_export_configuration": {
+      "real_time_api": {
+        "endpoint": "/api/v1/monitoring/dashboard",
+        "update_frequency": "1_second",
+        "data_format": "json",
+        "compression": "gzip"
+      },
+      "historical_data_export": {
+        "formats": ["csv", "json", "parquet"],
+        "time_ranges": ["1_hour", "1_day", "1_week", "1_month"],
+        "scheduling": "automated_daily_export"
+      },
+      "metrics_streaming": {
+        "websocket_endpoint": "/ws/monitoring",
+        "data_filtering": "client_configurable",
+        "rate_limiting": "100_updates_per_second_per_client"
+      }
+    },
+
+    "performance_targets": {
+      "dashboard_performance": {
+        "page_load_time": "< 2_seconds",
+        "chart_render_time": "< 500ms",
+        "real_time_update_latency": "< 100ms",
+        "concurrent_users": "up_to_50_simultaneous"
+      },
+      "data_accuracy": {
+        "real_time_accuracy": "99.9%_data_freshness",
+        "historical_accuracy": "100%_data_integrity", 
+        "calculation_accuracy": "99.99%_mathematical_precision"
+      }
+    }
+  }
+}
