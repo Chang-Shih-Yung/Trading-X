@@ -1,0 +1,154 @@
+{
+  "phase2_test_configuration": {
+    "description": "Phase2策略層級測試的數據規則和參數配置",
+    "version": "1.0",
+    "created_at": "2025-08-10T23:30:00Z",
+    
+    "multi_timeframe_analysis": {
+      "description": "多時間框架分析測試規則",
+      "success_criteria": {
+        "consensus_accuracy_threshold": 0.75,
+        "signal_consistency_threshold": 0.70,
+        "analysis_time_limit_ms": 50.0,
+        "timeframe_coverage_minimum": 5
+      },
+      "signal_consistency_calculation": {
+        "method": "convergence_based",
+        "description": "基於信號收斂度計算一致性，而非簡單的去重",
+        "formula": "convergence_score = matching_signals / total_signals",
+        "minimum_convergence_threshold": 0.70
+      },
+      "timeframe_weights": {
+        "1m": 0.1,
+        "5m": 0.15,
+        "15m": 0.2,
+        "1h": 0.25,
+        "4h": 0.3
+      },
+      "consensus_rules": {
+        "bullish_threshold": 0.6,
+        "bearish_threshold": 0.6,
+        "mixed_fallback": true
+      }
+    },
+    
+    "risk_management_system": {
+      "description": "風險管理系統測試規則",
+      "success_criteria": {
+        "accuracy_rate_threshold": 90.0,
+        "response_time_limit_ms": 25.0
+      },
+      "risk_scoring_rules": {
+        "portfolio_exposure_weight": 0.4,
+        "position_size_weight": 0.3,
+        "stop_loss_weight": 0.3,
+        "risk_levels": {
+          "low": {
+            "threshold": 0.15,
+            "action": "APPROVE"
+          },
+          "medium": {
+            "threshold": 0.25,
+            "action": "CAUTION"
+          },
+          "high": {
+            "threshold": 1.0,
+            "action": "REJECT"
+          }
+        }
+      },
+      "test_scenarios": [
+        {
+          "name": "正常風險範圍",
+          "portfolio_exposure": 0.15,
+          "position_size": 0.05,
+          "stop_loss_distance": 0.02,
+          "expected_action": "APPROVE",
+          "expected_risk_level": "LOW"
+        },
+        {
+          "name": "中等風險警告",
+          "portfolio_exposure": 0.35,
+          "position_size": 0.08,
+          "stop_loss_distance": 0.05,
+          "expected_action": "CAUTION",
+          "expected_risk_level": "MEDIUM"
+        },
+        {
+          "name": "高風險阻止",
+          "portfolio_exposure": 0.60,
+          "position_size": 0.15,
+          "stop_loss_distance": 0.10,
+          "expected_action": "REJECT",
+          "expected_risk_level": "HIGH"
+        }
+      ]
+    },
+    
+    "signal_priority_sorting": {
+      "description": "信號優先級排序測試規則",
+      "success_criteria": {
+        "ranking_accuracy_threshold": 0.80,
+        "sorting_time_limit_ms": 15.0
+      },
+      "priority_scoring_rules": {
+        "confidence_weight": 0.3,
+        "profit_potential_weight": 0.25,
+        "risk_reward_weight": 0.25,
+        "time_sensitivity_weight": 0.2,
+        "time_sensitivity_multipliers": {
+          "CRITICAL": 1.0,
+          "HIGH": 0.8,
+          "MEDIUM": 0.6,
+          "LOW": 0.4
+        },
+        "normalization_factors": {
+          "profit_potential_multiplier": 10,
+          "risk_reward_divisor": 10,
+          "risk_reward_cap": 1.0
+        }
+      },
+      "ranking_validation": {
+        "method": "critical_priority_first",
+        "description": "確保CRITICAL時間敏感性和高置信度信號排在前面",
+        "critical_criteria": [
+          {"field": "time_sensitivity", "value": "CRITICAL"},
+          {"field": "confidence", "threshold": 0.9}
+        ],
+        "top_positions_to_check": 2
+      }
+    },
+    
+    "performance_benchmarks": {
+      "strategy_engine_core_logic": {
+        "accuracy_rate_minimum": 90.0,
+        "processing_time_limit_ms": 50.0
+      },
+      "multi_timeframe_analysis": {
+        "consensus_accuracy_minimum": 0.75,
+        "signal_consistency_minimum": 0.70,
+        "analysis_time_limit_ms": 50.0
+      },
+      "risk_management_system": {
+        "accuracy_rate_minimum": 90.0,
+        "response_time_limit_ms": 25.0
+      },
+      "signal_priority_sorting": {
+        "ranking_accuracy_minimum": 0.80,
+        "sorting_time_limit_ms": 15.0
+      },
+      "strategy_execution_optimization": {
+        "success_rate_minimum": 80.0,
+        "execution_time_limit_ms": 5.0
+      }
+    },
+    
+    "data_validation_rules": {
+      "confidence_range": [0.0, 1.0],
+      "profit_potential_range": [0.0, 1.0],
+      "risk_reward_minimum": 1.0,
+      "time_sensitivity_values": ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
+      "required_fields": ["signal_id", "type", "confidence", "profit_potential", "risk_reward", "time_sensitivity"]
+    }
+  }
+}

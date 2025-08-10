@@ -1,0 +1,53 @@
+{
+  "phase4_test_configuration": {
+    "description": "Phase4前端整合端到端測試的數據規則和參數配置",
+    "version": "1.0",
+    "created_at": "2025-08-10T23:30:00Z",
+    
+    "frontend_backend_data_sync": {
+      "description": "前後端數據同步測試規則",
+      "success_criteria": {
+        "acceptable_delay_rate_threshold": 90.0,
+        "consistency_rate_threshold": 98.0,
+        "data_integrity_rate_threshold": 99.0,
+        "avg_reliability_threshold": 95.0
+      },
+      "sync_scenarios": [
+        {
+          "name": "交易信號狀態同步",
+          "data_type": "trading_signals",
+          "backend_updates": 10,
+          "sync_interval_ms": 500,
+          "acceptable_delay_ms": 100
+        },
+        {
+          "name": "投資組合餘額同步",
+          "data_type": "portfolio_balance",
+          "backend_updates": 5,
+          "sync_interval_ms": 1000,
+          "acceptable_delay_ms": 200
+        },
+        {
+          "name": "風險指標實時同步",
+          "data_type": "risk_metrics",
+          "backend_updates": 15,
+          "sync_interval_ms": 200,
+          "acceptable_delay_ms": 50
+        },
+        {
+          "name": "市場數據流同步",
+          "data_type": "market_data",
+          "backend_updates": 50,
+          "sync_interval_ms": 100,
+          "acceptable_delay_ms": 30
+        }
+      ],
+      "sync_delay_calculation": {
+        "method": "realistic_network_simulation",
+        "base_delay_ms": 20,
+        "variance_factor": 0.3,
+        "minimum_delay_ms": 5
+      }
+    }
+  }
+}
