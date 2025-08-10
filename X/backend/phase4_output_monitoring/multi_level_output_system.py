@@ -73,50 +73,163 @@ class CriticalSignalProcessor:
         self.notification_handlers = []
         self.critical_history: List[EPLDecisionResult] = []
     
+    def _extract_processing_metrics(self, decision_result: EPLDecisionResult) -> Dict[str, Any]:
+        """提取處理元數據指標"""
+        if hasattr(decision_result, 'processing_metadata') and decision_result.processing_metadata:
+            metadata = decision_result.processing_metadata
+            return {
+                "processing_id": metadata.get("processing_id", "unknown"),
+                "processing_time_ms": metadata.get("processing_time_ms", 0),
+                "timestamp": metadata.get("timestamp", datetime.now().isoformat()),
+                "engine_version": metadata.get("engine_version", "unknown"),
+                "performance_score": self._calculate_performance_score(metadata),
+                "efficiency_rating": self._rate_processing_efficiency(metadata)
+            }
+        return {
+            "processing_id": "unknown",
+            "processing_time_ms": 0,
+            "timestamp": datetime.now().isoformat(),
+            "engine_version": "unknown",
+            "performance_score": 0.0,
+            "efficiency_rating": "未知"
+        }
+    
+    def _calculate_performance_score(self, metadata: Dict) -> float:
+        """計算性能分數"""
+        processing_time = metadata.get("processing_time_ms", 0)
+        
+        # 基於處理時間計算性能分數 (越快分數越高)
+        if processing_time <= 100:
+            return 1.0  # 優秀
+        elif processing_time <= 300:
+            return 0.8  # 良好  
+        elif processing_time <= 500:
+            return 0.6  # 一般
+        elif processing_time <= 800:
+            return 0.4  # 較慢
+        else:
+            return 0.2  # 需優化
+    
+    def _rate_processing_efficiency(self, metadata: Dict) -> str:
+        """評級處理效率"""
+        processing_time = metadata.get("processing_time_ms", 0)
+        
+        if processing_time <= 100:
+            return "🚀 極速"
+        elif processing_time <= 300:  
+            return "⚡ 快速"
+        elif processing_time <= 500:
+            return "📊 標準"
+        elif processing_time <= 800:
+            return "⏰ 較慢"
+        else:
+            return "🐌 需優化"
+    
     async def process_critical_signal(self, decision_result: EPLDecisionResult) -> Dict[str, Any]:
-        """處理 CRITICAL 級信號"""
+        """處理 CRITICAL 級信號 - 增強版 (包含完整 EPL 元數據)"""
         try:
             logger.critical(f"🚨 CRITICAL級信號: {decision_result.candidate.symbol}")
             
-            # 創建緊急通知消息
-            message = self._create_critical_message(decision_result)
+            # 提取處理元數據
+            processing_metrics = self._extract_processing_metrics(decision_result)
             
-            # 即時 Gmail 通知
+            # 創建增強的緊急通知消息
+            message = self._create_enhanced_critical_message(decision_result, processing_metrics)
+            
+            # 記錄性能監控數據
+            await self._record_critical_performance(decision_result, processing_metrics)
+            
+            # 即時 Gmail 通知 (包含性能數據)
             await self._send_immediate_gmail(message)
             
-            # WebSocket 即時推送
-            await self._send_websocket_alert(message)
+            # WebSocket 即時推送 (包含元數據)
+            await self._send_websocket_alert(message, processing_metrics)
             
-            # 前端紅色警報顯示
-            await self._trigger_frontend_alert(message)
+            # 前端紅色警報顯示 (包含處理時間)
+            await self._trigger_frontend_alert(message, processing_metrics)
             
             # 自動觸發風險評估
             risk_assessment = await self._trigger_risk_assessment(decision_result)
             
-            # 記錄到關鍵信號歷史
-            self.critical_history.append(decision_result)
-            
-            # 保持歷史記錄在合理範圍 (最近24小時)
-            cutoff_time = datetime.now() - timedelta(hours=24)
-            self.critical_history = [s for s in self.critical_history if s.timestamp > cutoff_time]
+            # 記錄到關鍵信號歷史 (包含完整元數據)
+            await self._record_critical_history(decision_result, processing_metrics)
             
             processing_result = {
                 "status": "critical_processed",
                 "message": message,
+                "processing_metrics": processing_metrics,
                 "risk_assessment": risk_assessment,
                 "notification_sent": True,
                 "alert_triggered": True,
-                "processing_time": datetime.now()
+                "processing_time": datetime.now(),
+                "performance_score": processing_metrics.get("performance_score", 0.0),
+                "efficiency_rating": processing_metrics.get("efficiency_rating", "未知")
             }
             
-            logger.critical(f"✅ CRITICAL級信號處理完成: {decision_result.candidate.symbol}")
+            logger.critical(f"✅ CRITICAL級信號處理完成: {decision_result.candidate.symbol} "
+                          f"(處理時間: {processing_metrics.get('processing_time_ms', 0)}ms, "
+                          f"效率: {processing_metrics.get('efficiency_rating', '未知')})")
+            
             return processing_result
             
         except Exception as e:
             logger.error(f"❌ CRITICAL級信號處理失敗: {e}")
             return {"status": "critical_error", "error": str(e)}
     
-    def _create_critical_message(self, decision_result: EPLDecisionResult) -> NotificationMessage:
+    def _create_enhanced_critical_message(self, decision_result: EPLDecisionResult, 
+                                        processing_metrics: Dict) -> NotificationMessage:
+        """創建增強的緊急通知消息 (包含處理性能信息)"""
+        candidate = decision_result.candidate
+        
+        title = f"🚨 緊急交易信號: {candidate.symbol}"
+        
+        # 添加處理性能信息
+        performance_info = f"""
+        
+【處理性能】
+處理ID: {processing_metrics.get('processing_id', 'N/A')}
+處理時間: {processing_metrics.get('processing_time_ms', 0)}ms
+效率評級: {processing_metrics.get('efficiency_rating', '未知')}
+引擎版本: {processing_metrics.get('engine_version', 'N/A')}
+性能分數: {processing_metrics.get('performance_score', 0.0):.2f}/1.0
+        """
+        
+        content = f"""
+【緊急信號警報】
+標的: {candidate.symbol}
+方向: {candidate.direction}
+信號強度: {candidate.signal_strength:.1f}/100
+信心度: {candidate.confidence:.2%}
+
+【EPL 決策詳情】
+決策: {decision_result.decision.value if hasattr(decision_result.decision, 'value') else decision_result.decision}
+優先級: {decision_result.priority.value if hasattr(decision_result.priority, 'value') else decision_result.priority}
+推理: {decision_result.reasoning}
+
+【風險管理】
+{self._format_risk_info(decision_result.risk_management)}
+
+{performance_info}
+
+【執行建議】
+{self._format_execution_params(decision_result.execution_params)}
+
+時間: {decision_result.timestamp}
+        """
+        
+        return NotificationMessage(
+            title=title,
+            content=content,
+            priority="CRITICAL",
+            channel="gmail",
+            metadata={
+                "symbol": candidate.symbol,
+                "signal_strength": candidate.signal_strength,
+                "confidence": candidate.confidence,
+                "processing_metrics": processing_metrics,
+                "epl_decision": decision_result.decision.value if hasattr(decision_result.decision, 'value') else str(decision_result.decision)
+            }
+        )
         """創建緊急通知消息"""
         candidate = decision_result.candidate
         

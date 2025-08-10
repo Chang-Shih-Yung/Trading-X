@@ -56,6 +56,45 @@
           "minimum_position_age": "5_minutes",
           "correlation_analysis_result": "REPLACE_CANDIDATE_from_epl_step2"
         },
+        "expected_inputs": {
+          "signal_candidate": {
+            "format": "SignalCandidate_object",
+            "required_fields": ["symbol", "direction", "confidence", "signal_strength", "timestamp", "technical_snapshot", "market_environment"],
+            "validation": "0.0-1.0_range_for_confidence_and_strength"
+          },
+          "existing_position": {
+            "format": "PositionInfo_object", 
+            "required_fields": ["symbol", "direction", "size", "entry_price", "current_price", "unrealized_pnl", "position_age_minutes"],
+            "validation": "position_direction_opposition_check"
+          },
+          "market_data": {
+            "format": "MarketSnapshot_object",
+            "required_fields": ["volatility", "liquidity", "spread", "market_trend"],
+            "validation": "real_time_data_freshness_check"
+          }
+        },
+        "output_format": {
+          "decision": {
+            "format": "EPLDecision_enum",
+            "values": ["REPLACE_POSITION", "IGNORE_SIGNAL"]
+          },
+          "confidence": {
+            "format": "float",
+            "range": "0.0-1.0"
+          },
+          "replacement_score": {
+            "format": "float", 
+            "range": "0.0-1.0"
+          },
+          "execution_priority": {
+            "format": "SignalPriority_enum",
+            "values": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+          },
+          "risk_assessment": {
+            "format": "Dict[str, float]",
+            "required_keys": ["transition_risk", "market_impact", "slippage_estimate"]
+          }
+        },
         "evaluation_criteria": {
           "confidence_delta_weight": 0.4,
           "market_timing_weight": 0.25,
@@ -81,6 +120,50 @@
           "direction_alignment_required": true,
           "correlation_analysis_result": "STRENGTHEN_CANDIDATE_from_epl_step2",
           "position_performance_positive": true
+        },
+        "expected_inputs": {
+          "signal_candidate": {
+            "format": "SignalCandidate_object",
+            "required_fields": ["symbol", "direction", "confidence", "signal_strength", "timestamp", "technical_snapshot", "market_environment"],
+            "validation": "0.0-1.0_range_for_confidence_and_strength"
+          },
+          "existing_position": {
+            "format": "PositionInfo_object",
+            "required_fields": ["symbol", "direction", "size", "entry_price", "current_price", "unrealized_pnl", "position_age_minutes"],
+            "validation": "position_direction_alignment_check"
+          },
+          "portfolio_data": {
+            "format": "PortfolioSnapshot_object",
+            "required_fields": ["total_exposure", "sector_concentration", "correlation_matrix", "available_capital"],
+            "validation": "portfolio_limits_check"
+          }
+        },
+        "output_format": {
+          "decision": {
+            "format": "EPLDecision_enum",
+            "values": ["STRENGTHEN_POSITION", "IGNORE_SIGNAL"]
+          },
+          "confidence": {
+            "format": "float",
+            "range": "0.0-1.0"
+          },
+          "strengthening_score": {
+            "format": "float",
+            "range": "0.0-1.0"
+          },
+          "additional_size_ratio": {
+            "format": "float",
+            "range": "0.0-0.5",
+            "description": "proportion_of_existing_position_to_add"
+          },
+          "execution_priority": {
+            "format": "SignalPriority_enum",
+            "values": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+          },
+          "risk_assessment": {
+            "format": "Dict[str, float]",
+            "required_keys": ["concentration_risk", "volatility_risk", "correlation_risk"]
+          }
         },
         "evaluation_criteria": {
           "confidence_improvement_weight": 0.35,
@@ -109,6 +192,49 @@
           "correlation_analysis_result": "NEW_CANDIDATE_from_epl_step2",
           "portfolio_capacity_available": true
         },
+        "expected_inputs": {
+          "signal_candidate": {
+            "format": "SignalCandidate_object",
+            "required_fields": ["symbol", "direction", "confidence", "signal_strength", "timestamp", "technical_snapshot", "market_environment", "quality_score"],
+            "validation": "0.0-1.0_range_for_confidence_strength_and_quality"
+          },
+          "portfolio_status": {
+            "format": "PortfolioStatus_object",
+            "required_fields": ["available_capital", "position_count", "sector_exposure", "correlation_matrix"],
+            "validation": "portfolio_capacity_check"
+          },
+          "market_liquidity": {
+            "format": "LiquiditySnapshot_object",
+            "required_fields": ["bid_ask_spread", "volume", "market_depth", "volatility"],
+            "validation": "minimum_liquidity_threshold_check"
+          }
+        },
+        "output_format": {
+          "decision": {
+            "format": "EPLDecision_enum",
+            "values": ["CREATE_NEW_POSITION", "IGNORE_SIGNAL"]
+          },
+          "confidence": {
+            "format": "float",
+            "range": "0.0-1.0"
+          },
+          "creation_score": {
+            "format": "float",
+            "range": "0.0-1.0"
+          },
+          "position_size": {
+            "format": "float",
+            "description": "calculated_position_size_based_on_kelly_criterion"
+          },
+          "execution_priority": {
+            "format": "SignalPriority_enum",
+            "values": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+          },
+          "risk_parameters": {
+            "format": "Dict[str, float]",
+            "required_keys": ["stop_loss_price", "take_profit_price", "risk_per_trade", "atr_stop_multiplier"]
+          }
+        },
         "evaluation_criteria": {
           "signal_quality_weight": 0.4,
           "market_suitability_weight": 0.25,
@@ -135,6 +261,50 @@
           "high_redundancy_detected": true,
           "market_conditions_unfavorable": true,
           "portfolio_risk_exceeded": true
+        },
+        "expected_inputs": {
+          "signal_candidate": {
+            "format": "SignalCandidate_object",
+            "required_fields": ["symbol", "direction", "confidence", "signal_strength", "timestamp", "quality_score"],
+            "validation": "basic_format_validation"
+          },
+          "redundancy_analysis": {
+            "format": "RedundancyReport_object",
+            "required_fields": ["similar_signals_count", "correlation_score", "time_clustering"],
+            "validation": "redundancy_threshold_check"
+          },
+          "market_conditions": {
+            "format": "MarketConditions_object",
+            "required_fields": ["volatility_level", "trend_strength", "liquidity_status"],
+            "validation": "market_favorability_assessment"
+          },
+          "portfolio_risk": {
+            "format": "RiskMetrics_object",
+            "required_fields": ["current_exposure", "var_limit", "correlation_risk", "concentration_risk"],
+            "validation": "risk_limit_compliance_check"
+          }
+        },
+        "output_format": {
+          "decision": {
+            "format": "EPLDecision_enum",
+            "values": ["IGNORE_SIGNAL"]
+          },
+          "ignore_reason": {
+            "format": "str",
+            "categories": ["QUALITY_INSUFFICIENT", "HIGH_REDUNDANCY", "UNFAVORABLE_MARKET", "RISK_EXCEEDED", "MULTIPLE_FACTORS"]
+          },
+          "ignore_confidence": {
+            "format": "float",
+            "range": "0.0-1.0"
+          },
+          "improvement_suggestions": {
+            "format": "List[str]",
+            "suggestions": ["quality_enhancement", "timing_adjustment", "market_condition_wait", "risk_reduction"]
+          },
+          "learning_data": {
+            "format": "Dict[str, Any]",
+            "required_keys": ["pattern_classification", "frequency_analysis", "performance_impact"]
+          }
         },
         "ignore_criteria": {
           "insufficient_quality_weight": 0.3,

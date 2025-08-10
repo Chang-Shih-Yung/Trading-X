@@ -167,6 +167,72 @@
     },
 
     "user_engagement_analytics": {
+      "notification_action_tracking": {
+        "trade_execution_actions": {
+          "signal_to_execution_conversion": "notification_driven_trade_execution_rate",
+          "execution_timing_analysis": "time_from_notification_to_trade_execution",
+          "execution_success_correlation": "notification_quality_to_execution_success_correlation",
+          "portfolio_action_tracking": "portfolio_changes_triggered_by_notifications"
+        },
+        "decision_response_tracking": {
+          "epl_decision_responses": "user_response_to_epl_decision_notifications",
+          "decision_implementation_rate": "epl_decision_notification_to_implementation_rate",
+          "decision_modification_tracking": "user_modifications_to_suggested_decisions",
+          "decision_rejection_analysis": "epl_decision_rejection_patterns_and_reasons"
+        },
+        "real_time_action_monitoring": {
+          "immediate_actions": "real_time_user_actions_post_notification",
+          "delayed_actions": "user_actions_within_24_hours_of_notification",
+          "multi_step_actions": "complex_trading_actions_initiated_by_notifications",
+          "action_completion_tracking": "notification_driven_action_completion_rates"
+        }
+      },
+      "engagement_correlation_analysis": {
+        "notification_to_action_correlation": {
+          "signal_notification_to_trade_correlation": "signal_notification_effectiveness_in_driving_trades",
+          "decision_notification_to_implementation_correlation": "decision_notification_implementation_effectiveness",
+          "result_notification_to_portfolio_adjustment_correlation": "result_notification_impact_on_portfolio_adjustments",
+          "priority_level_action_correlation": "notification_priority_to_user_action_correlation"
+        },
+        "cross_phase_engagement_tracking": {
+          "phase1_signal_engagement": "user_engagement_with_phase1_signal_notifications",
+          "phase2_decision_engagement": "user_engagement_with_phase2_decision_notifications",
+          "phase3_execution_engagement": "user_engagement_with_phase3_execution_notifications",
+          "cross_phase_engagement_consistency": "user_engagement_consistency_across_phases"
+        },
+        "temporal_engagement_patterns": {
+          "intraday_engagement_patterns": "user_engagement_patterns_throughout_trading_day",
+          "market_condition_engagement_correlation": "user_engagement_correlation_with_market_conditions",
+          "volatility_engagement_impact": "market_volatility_impact_on_notification_engagement",
+          "session_engagement_tracking": "user_engagement_during_different_market_sessions"
+        }
+      },
+      "notification_effectiveness_measurement": {
+        "click_through_rates": {
+          "email_ctr_by_content_type": "gmail_notification_click_through_rate_by_content_type",
+          "frontend_ctr_by_alert_type": "frontend_alert_click_through_rate_by_alert_type",
+          "cross_channel_ctr_analysis": "click_through_rate_comparison_across_channels",
+          "priority_ctr_correlation": "click_through_rate_correlation_with_priority_level"
+        },
+        "action_completion_rates": {
+          "trade_completion_rate": "notification_driven_trade_completion_rate",
+          "decision_implementation_rate": "notification_driven_decision_implementation_rate",
+          "portfolio_adjustment_rate": "notification_driven_portfolio_adjustment_rate",
+          "multi_action_completion_rate": "complex_action_sequence_completion_rate"
+        },
+        "user_satisfaction_metrics": {
+          "notification_relevance_scoring": "user_perceived_notification_relevance_scores",
+          "timing_satisfaction_scoring": "user_satisfaction_with_notification_timing",
+          "channel_preference_satisfaction": "user_satisfaction_with_notification_channel_selection",
+          "overall_system_satisfaction": "overall_user_satisfaction_with_notification_system"
+        },
+        "performance_impact_analysis": {
+          "portfolio_performance_correlation": "notification_system_impact_on_portfolio_performance",
+          "trading_efficiency_improvement": "notification_system_impact_on_trading_efficiency",
+          "decision_quality_improvement": "notification_system_impact_on_decision_quality",
+          "risk_management_effectiveness": "notification_system_impact_on_risk_management"
+        }
+      },
       "notification_interaction_tracking": {
         "open_rate_analysis": {
           "email_open_rates": "gmail_notification_open_rate_by_priority",
@@ -216,6 +282,72 @@
           "re_engagement_patterns": "user_re_engagement_after_opt_out",
           "recommendation_sharing": "user_recommendation_and_sharing_of_notifications"
         }
+      }
+    },
+
+    "cross_phase_data_tracking": {
+      "phase_integration_mapping": {
+        "phase1_signal_to_notification_mapping": {
+          "signal_id_tracking": "phase1_signal_id_to_notification_correlation",
+          "signal_quality_impact_on_delivery": "signal_quality_score_to_delivery_priority_mapping",
+          "real_time_signal_notification_latency": "signal_generation_to_notification_delivery_time",
+          "signal_source_delivery_optimization": "signal_source_based_notification_channel_optimization"
+        },
+        "phase2_decision_to_notification_mapping": {
+          "epl_decision_id_tracking": "phase2_epl_decision_id_to_notification_correlation",
+          "decision_confidence_impact_on_delivery": "decision_confidence_to_notification_urgency_mapping",
+          "evaluation_result_notification_timing": "evaluation_completion_to_notification_delivery_time",
+          "decision_type_notification_customization": "epl_decision_type_based_notification_customization"
+        },
+        "phase3_execution_to_notification_mapping": {
+          "execution_id_tracking": "phase3_execution_id_to_notification_correlation",
+          "execution_status_real_time_updates": "execution_status_change_to_notification_delivery",
+          "performance_result_notification": "execution_outcome_to_performance_notification_mapping",
+          "execution_quality_notification_impact": "execution_quality_score_to_notification_effectiveness"
+        }
+      },
+      "unified_tracking_system": {
+        "master_transaction_id_system": {
+          "unified_id_across_phases": "master_transaction_id_linking_all_phases",
+          "phase_specific_sub_ids": "phase_specific_tracking_with_master_id_correlation",
+          "notification_chain_tracking": "complete_notification_chain_from_signal_to_result",
+          "cross_phase_performance_correlation": "notification_performance_correlation_across_phases"
+        },
+        "data_consistency_monitoring": {
+          "phase_data_synchronization": "data_consistency_monitoring_across_phases",
+          "notification_data_integrity": "notification_data_integrity_across_phase_transitions",
+          "cross_phase_latency_tracking": "end_to_end_latency_from_signal_to_final_notification",
+          "unified_performance_metrics": "unified_notification_performance_metrics_across_phases"
+        }
+      }
+    },
+
+    "data_storage_and_retrieval": {
+      "notification_data_storage": {
+        "raw_notification_data": {
+          "delivery_logs": "complete_notification_delivery_logs_with_timestamps",
+          "user_interaction_logs": "detailed_user_interaction_logs_with_notification_data",
+          "cross_channel_delivery_data": "multi_channel_notification_delivery_data",
+          "retention_period": "5_years_raw_notification_data_retention"
+        },
+        "aggregated_analytics_data": {
+          "daily_performance_summaries": "daily_aggregated_notification_performance_data",
+          "weekly_engagement_summaries": "weekly_user_engagement_summary_data",
+          "monthly_effectiveness_reports": "monthly_notification_effectiveness_reports",
+          "retention_period": "10_years_aggregated_analytics_retention"
+        },
+        "cross_phase_correlation_data": {
+          "signal_to_notification_correlations": "phase1_signal_to_phase4_notification_correlation_data",
+          "decision_to_notification_correlations": "phase2_decision_to_phase4_notification_correlation_data",
+          "execution_to_notification_correlations": "phase3_execution_to_phase4_notification_correlation_data",
+          "retention_period": "7_years_cross_phase_correlation_data_retention"
+        }
+      },
+      "real_time_data_access": {
+        "live_notification_monitoring": "real_time_notification_delivery_status_monitoring",
+        "instant_user_engagement_tracking": "real_time_user_engagement_tracking",
+        "cross_phase_real_time_correlation": "real_time_cross_phase_data_correlation_monitoring",
+        "performance_alert_triggers": "real_time_performance_degradation_alert_triggers"
       }
     },
 

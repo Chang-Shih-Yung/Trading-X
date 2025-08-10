@@ -21,8 +21,8 @@
           "data_validation": "0.0-1.0_range_enforcement"
         },
         "phase2_pre_evaluation": {
-          "monitoring_input": "parallel_monitoring_metrics",
-          "quality_scores": "embedded_quality_scores"
+          "monitoring_input": "EnhancedRealDataQualityMonitoringEngine",
+          "quality_scores": "real_data_quality_monitoring"
         },
         "phase3_execution_policy": {
           "decision_results": "EPLDecisionResult",

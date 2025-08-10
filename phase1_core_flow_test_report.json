@@ -1,0 +1,301 @@
+{
+  "test_timestamp": "2025-08-09T14:05:01.863062",
+  "overall_statistics": {
+    "total_cycles": 3,
+    "avg_cycle_time": 1224.5960235595703,
+    "avg_processing_time": 1223.131815592448,
+    "avg_success_rate": 1.0,
+    "avg_quality": 0.8666666666666667,
+    "target_compliance_rate": 0.0
+  },
+  "performance_grade": {
+    "total_score": 51.7,
+    "grade": "F",
+    "description": "不合格",
+    "component_scores": {
+      "success_rate": 100.0,
+      "target_compliance": 0.0,
+      "quality": 86.7,
+      "efficiency": 0
+    }
+  },
+  "stage_statistics": {
+    "A_WebSocket實時數據": {
+      "total_tests": 3,
+      "successful_tests": 3,
+      "avg_processing_time": 5.5090586344401045,
+      "avg_quality": 0.9499999999999998,
+      "target_compliance": 0,
+      "success_rate": 1.0,
+      "target_compliance_rate": 0.0
+    },
+    "B_Phase1A基礎信號生成": {
+      "total_tests": 3,
+      "successful_tests": 3,
+      "avg_processing_time": 26.1233647664388,
+      "avg_quality": 0.85,
+      "target_compliance": 0,
+      "success_rate": 1.0,
+      "target_compliance_rate": 0.0
+    },
+    "C_indicator_dependency_graph": {
+      "total_tests": 3,
+      "successful_tests": 3,
+      "avg_processing_time": 46.187241872151695,
+      "avg_quality": 0.8500000000000001,
+      "target_compliance": 0,
+      "success_rate": 1.0,
+      "target_compliance_rate": 0.0
+    },
+    "D_Phase1B波動適應": {
+      "total_tests": 3,
+      "successful_tests": 3,
+      "avg_processing_time": 414.1697883605957,
+      "avg_quality": 0.85,
+      "target_compliance": 0,
+      "success_rate": 1.0,
+      "target_compliance_rate": 0.0
+    },
+    "E_Phase1C信號標準化": {
+      "total_tests": 3,
+      "successful_tests": 3,
+      "avg_processing_time": 702.0343939463297,
+      "avg_quality": 0.85,
+      "target_compliance": 0,
+      "success_rate": 1.0,
+      "target_compliance_rate": 0.0
+    },
+    "F_unified_signal_pool_v3.0": {
+      "total_tests": 3,
+      "successful_tests": 3,
+      "avg_processing_time": 29.107968012491863,
+      "avg_quality": 0.85,
+      "target_compliance": 0,
+      "success_rate": 1.0,
+      "target_compliance_rate": 0.0
+    }
+  },
+  "cycle_summaries": [
+    {
+      "cycle": 1,
+      "total_time_ms": 1225.597858428955,
+      "processing_time_ms": 1224.5452404022217,
+      "successful_stages": 6,
+      "total_stages": 6,
+      "success_rate": 1.0,
+      "avg_quality": 0.8666666666666667,
+      "meets_target": false
+    },
+    {
+      "cycle": 2,
+      "total_time_ms": 1224.8191833496094,
+      "processing_time_ms": 1223.3593463897705,
+      "successful_stages": 6,
+      "total_stages": 6,
+      "success_rate": 1.0,
+      "avg_quality": 0.8666666666666667,
+      "meets_target": false
+    },
+    {
+      "cycle": 3,
+      "total_time_ms": 1223.3710289001465,
+      "processing_time_ms": 1221.4908599853516,
+      "successful_stages": 6,
+      "total_stages": 6,
+      "success_rate": 1.0,
+      "avg_quality": 0.8666666666666667,
+      "meets_target": false
+    }
+  ],
+  "performance_targets": {
+    "websocket": 5.0,
+    "phase1a": 25.0,
+    "indicator": 45.0,
+    "phase1b": 45.0,
+    "phase1c": 25.0,
+    "unified_pool": 28.0,
+    "total_flow": 173.0
+  },
+  "detailed_results": [
+    {
+      "stage_name": "A_WebSocket實時數據",
+      "success": true,
+      "processing_time_ms": 5.691289901733398,
+      "data_count": 3,
+      "quality_score": 0.95,
+      "error_message": null,
+      "performance_target_ms": 5.0,
+      "meets_target": false
+    },
+    {
+      "stage_name": "B_Phase1A基礎信號生成",
+      "success": true,
+      "processing_time_ms": 26.107072830200195,
+      "data_count": 3,
+      "quality_score": 0.85,
+      "error_message": null,
+      "performance_target_ms": 25.0,
+      "meets_target": false
+    },
+    {
+      "stage_name": "C_indicator_dependency_graph",
+      "success": true,
+      "processing_time_ms": 46.25082015991211,
+      "data_count": 9,
+      "quality_score": 0.8500000000000001,
+      "error_message": null,
+      "performance_target_ms": 45.0,
+      "meets_target": false
+    },
+    {
+      "stage_name": "D_Phase1B波動適應",
+      "success": true,
+      "processing_time_ms": 413.41304779052734,
+      "data_count": 27,
+      "quality_score": 0.85,
+      "error_message": null,
+      "performance_target_ms": 45.0,
+      "meets_target": false
+    },
+    {
+      "stage_name": "E_Phase1C信號標準化",
+      "success": true,
+      "processing_time_ms": 704.0650844573975,
+      "data_count": 81,
+      "quality_score": 0.85,
+      "error_message": null,
+      "performance_target_ms": 25.0,
+      "meets_target": false
+    },
+    {
+      "stage_name": "F_unified_signal_pool_v3.0",
+      "success": true,
+      "processing_time_ms": 29.017925262451172,
+      "data_count": 3,
+      "quality_score": 0.85,
+      "error_message": null,
+      "performance_target_ms": 28.0,
+      "meets_target": false
+    },
+    {
+      "stage_name": "A_WebSocket實時數據",
+      "success": true,
+      "processing_time_ms": 5.089998245239258,
+      "data_count": 3,
+      "quality_score": 0.95,
+      "error_message": null,
+      "performance_target_ms": 5.0,
+      "meets_target": false
+    },
+    {
+      "stage_name": "B_Phase1A基礎信號生成",
+      "success": true,
+      "processing_time_ms": 26.107072830200195,
+      "data_count": 3,
+      "quality_score": 0.85,
+      "error_message": null,
+      "performance_target_ms": 25.0,
+      "meets_target": false
+    },
+    {
+      "stage_name": "C_indicator_dependency_graph",
+      "success": true,
+      "processing_time_ms": 46.196937561035156,
+      "data_count": 9,
+      "quality_score": 0.8500000000000001,
+      "error_message": null,
+      "performance_target_ms": 45.0,
+      "meets_target": false
+    },
+    {
+      "stage_name": "D_Phase1B波動適應",
+      "success": true,
+      "processing_time_ms": 413.96021842956543,
+      "data_count": 27,
+      "quality_score": 0.85,
+      "error_message": null,
+      "performance_target_ms": 45.0,
+      "meets_target": false
+    },
+    {
+      "stage_name": "E_Phase1C信號標準化",
+      "success": true,
+      "processing_time_ms": 702.862024307251,
+      "data_count": 81,
+      "quality_score": 0.85,
+      "error_message": null,
+      "performance_target_ms": 25.0,
+      "meets_target": false
+    },
+    {
+      "stage_name": "F_unified_signal_pool_v3.0",
+      "success": true,
+      "processing_time_ms": 29.143095016479492,
+      "data_count": 3,
+      "quality_score": 0.85,
+      "error_message": null,
+      "performance_target_ms": 28.0,
+      "meets_target": false
+    },
+    {
+      "stage_name": "A_WebSocket實時數據",
+      "success": true,
+      "processing_time_ms": 5.745887756347656,
+      "data_count": 3,
+      "quality_score": 0.95,
+      "error_message": null,
+      "performance_target_ms": 5.0,
+      "meets_target": false
+    },
+    {
+      "stage_name": "B_Phase1A基礎信號生成",
+      "success": true,
+      "processing_time_ms": 26.155948638916016,
+      "data_count": 3,
+      "quality_score": 0.85,
+      "error_message": null,
+      "performance_target_ms": 25.0,
+      "meets_target": false
+    },
+    {
+      "stage_name": "C_indicator_dependency_graph",
+      "success": true,
+      "processing_time_ms": 46.11396789550781,
+      "data_count": 9,
+      "quality_score": 0.8500000000000001,
+      "error_message": null,
+      "performance_target_ms": 45.0,
+      "meets_target": false
+    },
+    {
+      "stage_name": "D_Phase1B波動適應",
+      "success": true,
+      "processing_time_ms": 415.13609886169434,
+      "data_count": 27,
+      "quality_score": 0.85,
+      "error_message": null,
+      "performance_target_ms": 45.0,
+      "meets_target": false
+    },
+    {
+      "stage_name": "E_Phase1C信號標準化",
+      "success": true,
+      "processing_time_ms": 699.1760730743408,
+      "data_count": 81,
+      "quality_score": 0.85,
+      "error_message": null,
+      "performance_target_ms": 25.0,
+      "meets_target": false
+    },
+    {
+      "stage_name": "F_unified_signal_pool_v3.0",
+      "success": true,
+      "processing_time_ms": 29.162883758544922,
+      "data_count": 3,
+      "quality_score": 0.85,
+      "error_message": null,
+      "performance_target_ms": 28.0,
+      "meets_target": false
+    }
+  ]
+}

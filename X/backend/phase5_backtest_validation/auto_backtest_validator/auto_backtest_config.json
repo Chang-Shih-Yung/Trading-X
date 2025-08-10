@@ -1,0 +1,262 @@
+{
+  "version": "1.0.0",
+  "config_name": "自動回測驗證器配置",
+  "description": "48小時信號驗證與動態閾值調整系統",
+  "last_updated": "2025-08-09T00:00:00Z",
+  
+  "backtest_validator": {
+    "class_name": "AutoBacktestValidator",
+    "validation_mode": "continuous",
+    "validation_window_hours": 48,
+    "update_frequency_minutes": 30,
+    "parallel_validation": true
+  },
+  
+  "validation_methodology": {
+    "signal_tracking": {
+      "entry_point_validation": true,
+      "exit_point_calculation": "automated",
+      "profit_loss_tracking": "real_time",
+      "time_horizon_hours": 24
+    },
+    "performance_metrics": {
+      "win_rate": {
+        "calculation": "successful_trades / total_trades",
+        "target_threshold": 0.70,
+        "minimum_sample_size": 30
+      },
+      "profit_loss_ratio": {
+        "calculation": "average_profit / average_loss",
+        "target_threshold": 1.5,
+        "risk_adjustment": true
+      },
+      "sharpe_ratio": {
+        "calculation": "excess_return / volatility",
+        "target_threshold": 1.0,
+        "risk_free_rate": 0.02
+      },
+      "maximum_drawdown": {
+        "calculation": "peak_to_trough_decline",
+        "target_threshold": 0.15,
+        "rolling_window": 168
+      }
+    }
+  },
+  
+  "dynamic_threshold_system": {
+    "adjustment_frequency_hours": 6,
+    "adjustment_factors": {
+      "market_volatility": {
+        "low_volatility": 0.05,
+        "medium_volatility": 0.03,
+        "high_volatility": 0.02
+      },
+      "win_rate_trend": {
+        "improving": 0.02,
+        "stable": 0.00,
+        "declining": -0.05
+      },
+      "sample_size_confidence": {
+        "high_confidence": 0.00,
+        "medium_confidence": 0.03,
+        "low_confidence": 0.05
+      }
+    },
+    "threshold_bounds": {
+      "win_rate_min": 0.60,
+      "win_rate_max": 0.85,
+      "profit_loss_min": 1.2,
+      "profit_loss_max": 2.5
+    }
+  },
+  
+  "signal_categorization": {
+    "excellent_signals": {
+      "win_rate_threshold": 0.80,
+      "profit_loss_threshold": 2.0,
+      "action": "increase_frequency",
+      "priority_boost": 0.2
+    },
+    "good_signals": {
+      "win_rate_range": [0.70, 0.80],
+      "profit_loss_range": [1.5, 2.0],
+      "action": "maintain_frequency",
+      "priority_boost": 0.1
+    },
+    "marginal_signals": {
+      "win_rate_range": [0.60, 0.70],
+      "profit_loss_range": [1.2, 1.5],
+      "action": "reduce_frequency",
+      "priority_boost": 0.0
+    },
+    "poor_signals": {
+      "win_rate_threshold": 0.60,
+      "profit_loss_threshold": 1.2,
+      "action": "disable_temporarily",
+      "priority_boost": -0.3
+    }
+  },
+  
+  "market_condition_analysis": {
+    "trend_markets": {
+      "identification_criteria": {
+        "trend_strength": 0.7,
+        "trend_duration_hours": 8,
+        "volatility_threshold": 0.03
+      },
+      "signal_adjustments": {
+        "trend_following_boost": 0.1,
+        "reversal_penalty": -0.2
+      }
+    },
+    "ranging_markets": {
+      "identification_criteria": {
+        "volatility_threshold": 0.015,
+        "trend_strength": 0.3,
+        "sideways_duration_hours": 6
+      },
+      "signal_adjustments": {
+        "mean_reversion_boost": 0.15,
+        "breakout_boost": 0.1
+      }
+    },
+    "high_volatility_markets": {
+      "identification_criteria": {
+        "volatility_threshold": 0.05,
+        "volume_spike": 3.0
+      },
+      "signal_adjustments": {
+        "risk_reduction": 0.3,
+        "frequency_reduction": 0.5
+      }
+    }
+  },
+  
+  "real_time_validation": {
+    "live_tracking": {
+      "track_open_positions": true,
+      "update_frequency_seconds": 60,
+      "profit_loss_calculation": "mark_to_market"
+    },
+    "early_warning_system": {
+      "performance_degradation_threshold": 0.1,
+      "consecutive_losses_threshold": 5,
+      "drawdown_alert_threshold": 0.1
+    },
+    "automatic_adjustments": {
+      "emergency_stop": {
+        "triggered_by": "consecutive_losses > 10",
+        "action": "disable_signal_generation",
+        "duration_hours": 2
+      },
+      "performance_degradation": {
+        "triggered_by": "win_rate < 0.5 for 4 hours",
+        "action": "reduce_signal_frequency",
+        "reduction_factor": 0.5
+      }
+    }
+  },
+  
+  "historical_analysis": {
+    "lookback_periods": [7, 14, 30, 60, 90],
+    "rolling_statistics": {
+      "win_rate_trend": "7_day_rolling",
+      "profit_volatility": "14_day_rolling",
+      "correlation_analysis": "30_day_rolling"
+    },
+    "seasonal_adjustments": {
+      "time_of_day": {
+        "asian_session": {"adjustment": 0.05},
+        "european_session": {"adjustment": 0.03},
+        "us_session": {"adjustment": 0.07}
+      },
+      "day_of_week": {
+        "monday": {"adjustment": 0.02},
+        "friday": {"adjustment": -0.05}
+      }
+    }
+  },
+  
+  "integration_points": {
+    "intelligent_trigger_engine": {
+      "feedback_mechanism": "real_time_performance_data",
+      "threshold_updates": "automatic_adjustment",
+      "signal_quality_scores": "continuous_update"
+    },
+    "unified_monitoring_dashboard": {
+      "validation_metrics": "real_time_display",
+      "performance_charts": "historical_trends",
+      "alert_integration": "threshold_violations"
+    },
+    "risk_management": {
+      "position_sizing": "performance_based",
+      "exposure_limits": "dynamic_adjustment",
+      "correlation_monitoring": "portfolio_level"
+    }
+  },
+  
+  "data_management": {
+    "storage_strategy": {
+      "raw_signals": "7_days_retention",
+      "validation_results": "90_days_retention",
+      "performance_metrics": "1_year_retention",
+      "statistical_summaries": "permanent_retention"
+    },
+    "compression": {
+      "enabled": true,
+      "compression_ratio": 0.3,
+      "archive_after_days": 30
+    },
+    "backup_strategy": {
+      "frequency": "daily",
+      "retention_days": 30,
+      "cloud_backup": true
+    }
+  },
+  
+  "reporting_system": {
+    "automated_reports": {
+      "daily_performance_summary": {
+        "schedule": "08:00_UTC",
+        "recipients": ["trading_team", "risk_management"],
+        "format": "pdf_and_json"
+      },
+      "weekly_analysis": {
+        "schedule": "monday_10:00_UTC",
+        "deep_dive_analysis": true,
+        "recommendations": true
+      }
+    },
+    "alert_conditions": {
+      "critical_performance_drop": {
+        "trigger": "win_rate < 0.5 for 2 hours",
+        "urgency": "immediate"
+      },
+      "threshold_adjustment": {
+        "trigger": "automatic_threshold_change > 5%",
+        "urgency": "normal"
+      }
+    }
+  },
+  
+  "machine_learning_integration": {
+    "predictive_modeling": {
+      "enabled": true,
+      "model_type": "ensemble_methods",
+      "features": [
+        "historical_win_rate",
+        "market_volatility",
+        "volume_patterns",
+        "technical_indicator_states",
+        "time_features"
+      ],
+      "retrain_frequency": "weekly",
+      "validation_split": 0.2
+    },
+    "anomaly_detection": {
+      "enabled": true,
+      "sensitivity": 0.95,
+      "notification": "immediate"
+    }
+  }
+}

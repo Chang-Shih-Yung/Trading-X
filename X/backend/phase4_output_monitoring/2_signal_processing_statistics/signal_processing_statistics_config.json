@@ -1,274 +1,136 @@
 {
   "PHASE4_SIGNAL_PROCESSING_STATISTICS": {
     "system_metadata": {
-      "version": "2.1.0",
-      "last_updated": "2025-08-07",
-      "description": "Phase4 Signal Processing Statistics - Comprehensive Analytics and Performance Tracking",
-      "integration_validation": "phase1_to_phase3_data_flow_verified"
+      "version": "2.2.0",
+      "last_updated": "2025-08-09",
+      "description": "優化後的信號處理統計配置 - 精簡高效",
+      "optimization_notes": "移除冗餘配置，專注實際使用功能"
     },
-
-    "statistics_architecture": {
-      "real_time_processing_analytics": {
-        "signal_volume_tracking": {
-          "total_signals_processed": {
-            "aggregation_method": "cumulative_counter",
-            "reset_frequency": "daily_at_midnight",
-            "historical_retention": "30_days"
+    "statistical_analysis": {
+      "quality_distribution_tracking": {
+        "bin_count": 10,
+        "quality_thresholds": [
+          0.1,
+          0.2,
+          0.3,
+          0.4,
+          0.5,
+          0.6,
+          0.7,
+          0.8,
+          0.9,
+          1.0
+        ],
+        "trend_analysis_enabled": true,
+        "quality_target": 0.8
+      },
+      "priority_level_analytics": {
+        "categories": [
+          "CRITICAL",
+          "HIGH",
+          "MEDIUM",
+          "LOW"
+        ],
+        "success_rate_tracking": true,
+        "processing_time_correlation": true,
+        "priority_distribution_analysis": true
+      },
+      "processing_time_analysis": {
+        "percentiles": [
+          50,
+          90,
+          95,
+          99
+        ],
+        "phase_breakdown_enabled": true,
+        "phases": {
+          "phase1_signal_generation": {
+            "target_latency_ms": 200,
+            "alert_threshold_ms": 500
           },
-          "signals_by_priority": {
-            "categories": {
-              "CRITICAL": "priority_level_4",
-              "HIGH": "priority_level_3", 
-              "MEDIUM": "priority_level_2",
-              "LOW": "priority_level_1"
-            },
-            "aggregation": "categorical_counting",
-            "percentage_calculation": "real_time_distribution"
+          "phase2_pre_evaluation": {
+            "target_latency_ms": 15,
+            "alert_threshold_ms": 30
           },
-          "signals_by_source": {
-            "source_categories": {
-              "BOLLINGER_BANDS": "technical_indicator_source",
-              "RSI_DIVERGENCE": "momentum_indicator_source",
-              "MACD_SIGNAL": "trend_indicator_source", 
-              "SNIPER_SYSTEM": "integrated_system_source",
-              "VOLUME_ANALYSIS": "volume_indicator_source"
-            },
-            "quality_scoring": "per_source_quality_average",
-            "reliability_tracking": "source_success_rate_monitoring"
-          },
-          "temporal_distribution": {
-            "hourly_patterns": "24_hour_signal_distribution",
-            "daily_patterns": "7_day_weekly_pattern",
-            "market_session_analysis": "trading_session_correlation",
-            "volatility_correlation": "signal_volume_vs_market_volatility"
+          "phase3_execution_policy": {
+            "target_latency_ms": 450,
+            "alert_threshold_ms": 800
           }
         },
-
-        "processing_latency_analytics": {
-          "phase_level_latency": {
-            "phase1_signal_generation": {
-              "target_latency": "< 200ms",
-              "measurement_points": ["signal_detection", "standardization", "pool_addition"],
-              "percentile_tracking": ["p50", "p95", "p99"],
-              "alert_threshold": "> 500ms"
-            },
-            "phase2_pre_evaluation": {
-              "target_latency": "< 15ms", 
-              "measurement_points": ["channel_routing", "embedded_scoring", "correlation_analysis"],
-              "percentile_tracking": ["p50", "p95", "p99"],
-              "alert_threshold": "> 30ms"
-            },
-            "phase3_execution_policy": {
-              "target_latency": "< 450ms",
-              "measurement_points": ["scenario_routing", "parallel_decisions", "risk_validation", "priority_classification"],
-              "percentile_tracking": ["p50", "p95", "p99"],
-              "alert_threshold": "> 800ms"
-            },
-            "phase4_notification": {
-              "target_latency": "< 100ms",
-              "measurement_points": ["message_preparation", "channel_dispatch", "delivery_confirmation"],
-              "percentile_tracking": ["p50", "p95", "p99"],
-              "alert_threshold": "> 200ms"
-            }
-          },
-          "end_to_end_latency": {
-            "total_processing_time": "phase1_to_phase4_complete",
-            "target_total_latency": "< 800ms",
-            "critical_path_analysis": "bottleneck_identification",
-            "optimization_recommendations": "automated_performance_tuning"
-          }
-        },
-
-        "quality_analytics": {
-          "signal_quality_distribution": {
-            "quality_score_histogram": {
-              "bins": "0.05_increments_from_0_to_1",
-              "real_time_distribution": "live_quality_tracking",
-              "quality_trends": "quality_improvement_over_time"
-            },
-            "confidence_distribution": {
-              "confidence_histogram": "0.05_increments_from_0_to_1",
-              "confidence_vs_success": "correlation_analysis",
-              "confidence_calibration": "prediction_accuracy_validation"
-            },
-            "source_quality_comparison": {
-              "per_source_quality": "average_quality_by_source",
-              "quality_consistency": "variance_tracking_per_source",
-              "quality_improvement": "trend_analysis_per_source"
-            }
-          },
-          "embedded_scoring_analytics": {
-            "five_dimension_analysis": {
-              "technical_strength": "0.0_to_1.0_scoring",
-              "market_timing": "0.0_to_1.0_scoring",
-              "risk_assessment": "0.0_to_1.0_scoring",
-              "source_reliability": "0.0_to_1.0_scoring",
-              "execution_feasibility": "0.0_to_1.0_scoring"
-            },
-            "composite_scoring": {
-              "weighted_average": "dynamic_weight_adjustment",
-              "score_validation": "outcome_correlation_tracking",
-              "calibration_accuracy": "prediction_vs_reality_analysis"
-            }
-          }
+        "total_target_latency_ms": 800,
+        "latency_trend_analysis": true
+      },
+      "source_performance_comparison": {
+        "enable_benchmarking": true,
+        "reliability_tracking": true,
+        "quality_correlation": true,
+        "supported_sources": [
+          "binance",
+          "coinbase",
+          "kraken",
+          "huobi",
+          "unknown"
+        ],
+        "reliability_thresholds": {
+          "excellent": 0.95,
+          "good": 0.85,
+          "acceptable": 0.75
         }
       },
-
-      "decision_outcome_tracking": {
-        "decision_type_analytics": {
-          "replacement_decisions": {
-            "frequency": "percentage_of_total_decisions",
-            "success_rate": "profitable_replacements_percentage",
-            "average_improvement": "confidence_and_performance_gains",
-            "time_to_execution": "decision_to_execution_latency"
-          },
-          "strengthening_decisions": {
-            "frequency": "percentage_of_total_decisions",
-            "success_rate": "profitable_additions_percentage", 
-            "position_size_impact": "average_position_increase",
-            "risk_impact": "additional_risk_measurement"
-          },
-          "new_position_decisions": {
-            "frequency": "percentage_of_total_decisions",
-            "success_rate": "profitable_new_positions_percentage",
-            "initial_performance": "first_hour_performance_tracking",
-            "portfolio_impact": "portfolio_correlation_changes"
-          },
-          "ignore_decisions": {
-            "frequency": "percentage_of_total_decisions",
-            "ignore_reasons_breakdown": "categorized_ignore_analysis",
-            "false_negative_rate": "missed_opportunity_analysis",
-            "learning_effectiveness": "ignore_pattern_improvement"
-          }
-        },
-
-        "priority_classification_accuracy": {
-          "critical_signal_validation": {
-            "true_critical_rate": "actually_urgent_vs_classified_critical",
-            "false_critical_rate": "unnecessarily_urgent_classifications",
-            "response_time_impact": "priority_vs_action_latency"
-          },
-          "priority_outcome_correlation": {
-            "high_priority_success": "high_priority_signal_performance",
-            "medium_priority_baseline": "standard_signal_performance",
-            "low_priority_filtering": "low_priority_noise_reduction"
-          }
-        }
-      },
-
-      "performance_optimization_analytics": {
-        "bottleneck_identification": {
-          "processing_bottlenecks": {
-            "cpu_intensive_operations": "computation_time_analysis",
-            "io_intensive_operations": "data_access_time_analysis",
-            "memory_intensive_operations": "memory_usage_pattern_analysis"
-          },
-          "data_flow_bottlenecks": {
-            "phase_transition_delays": "inter_phase_data_transfer_time",
-            "serialization_overhead": "data_format_conversion_time",
-            "network_latency": "distributed_component_communication"
-          }
-        },
-        "capacity_planning": {
-          "throughput_analysis": {
-            "current_max_throughput": "signals_per_second_capacity",
-            "projected_growth": "capacity_vs_expected_load",
-            "scaling_recommendations": "horizontal_vs_vertical_scaling"
-          },
-          "resource_utilization": {
-            "cpu_utilization_patterns": "peak_vs_average_usage",
-            "memory_utilization_patterns": "heap_vs_stack_usage",
-            "network_bandwidth_usage": "data_transfer_patterns"
-          }
-        }
+      "temporal_analysis": {
+        "hourly_patterns_enabled": true,
+        "daily_patterns_enabled": true,
+        "peak_window_detection": true,
+        "trend_analysis_window_hours": 24
       }
     },
-
+    "real_time_monitoring": {
+      "update_intervals": {
+        "comprehensive_statistics_seconds": 5,
+        "real_time_metrics_seconds": 1,
+        "performance_benchmarks_seconds": 10
+      },
+      "data_retention": {
+        "signal_history_max_count": 10000,
+        "hourly_stats_retention_hours": 48,
+        "daily_stats_retention_days": 30,
+        "cleanup_interval_hours": 24
+      },
+      "performance_monitoring": {
+        "throughput_target_per_minute": 60,
+        "latency_compliance_threshold_ms": 500,
+        "quality_achievement_target": 0.8,
+        "efficiency_ratio_target": 0.8
+      }
+    },
     "reporting_configuration": {
-      "real_time_dashboards": {
-        "signal_volume_dashboard": {
-          "update_frequency": "1_second",
-          "chart_types": ["line_chart", "bar_chart", "pie_chart"],
-          "time_ranges": ["1_hour", "4_hours", "24_hours"],
-          "metrics": ["total_count", "rate_per_minute", "priority_distribution"]
-        },
-        "latency_monitoring_dashboard": {
-          "update_frequency": "5_seconds", 
-          "chart_types": ["line_chart", "heatmap", "percentile_chart"],
-          "metrics": ["average_latency", "p95_latency", "p99_latency", "max_latency"],
-          "alert_visualization": "red_line_threshold_indicators"
-        },
-        "quality_analytics_dashboard": {
-          "update_frequency": "10_seconds",
-          "chart_types": ["histogram", "scatter_plot", "trend_line"],
-          "metrics": ["quality_distribution", "confidence_vs_outcome", "source_comparison"],
-          "statistical_overlays": ["moving_averages", "standard_deviation_bands"]
-        }
+      "output_formats": [
+        "json",
+        "csv"
+      ],
+      "dashboard_integration": true,
+      "historical_analysis": {
+        "enabled": true,
+        "retention_days": 30,
+        "trend_analysis": true
       },
-
-      "historical_reports": {
-        "daily_statistics_report": {
-          "generation_time": "end_of_trading_day",
-          "content": ["signal_volume_summary", "quality_analysis", "decision_breakdown", "performance_metrics"],
-          "format": ["pdf_report", "csv_data_export", "json_structured_data"],
-          "distribution": ["email_to_team", "file_storage", "database_archival"]
-        },
-        "weekly_performance_report": {
-          "generation_time": "sunday_evening",
-          "content": ["trend_analysis", "performance_comparison", "optimization_recommendations"],
-          "format": ["comprehensive_pdf", "executive_summary"],
-          "distribution": ["management_email", "team_slack_channel"]
-        },
-        "monthly_analytics_report": {
-          "generation_time": "last_day_of_month",
-          "content": ["strategic_insights", "capacity_planning", "system_evolution"],
-          "format": ["detailed_analysis_report", "presentation_slides"],
-          "distribution": ["stakeholder_meeting", "strategic_planning_input"]
-        }
+      "statistics_endpoints": {
+        "comprehensive_statistics": "/api/v1/signal-stats/comprehensive",
+        "real_time_metrics": "/api/v1/signal-stats/realtime",
+        "performance_benchmarks": "/api/v1/signal-stats/performance"
       }
     },
-
-    "data_retention_policy": {
-      "real_time_data": {
-        "retention_period": "24_hours",
-        "granularity": "1_second_resolution",
-        "storage_format": "in_memory_time_series"
+    "optimization_settings": {
+      "auto_cleanup_enabled": true,
+      "performance_tuning": {
+        "memory_optimization": true,
+        "calculation_caching": true,
+        "batch_processing": true
       },
-      "hourly_aggregates": {
-        "retention_period": "30_days",
-        "granularity": "1_hour_buckets",
-        "storage_format": "compressed_database_storage"
-      },
-      "daily_summaries": {
-        "retention_period": "1_year",
-        "granularity": "daily_summaries",
-        "storage_format": "archival_database_storage"
-      },
-      "monthly_analytics": {
-        "retention_period": "5_years", 
-        "granularity": "monthly_reports",
-        "storage_format": "data_warehouse_storage"
-      }
-    },
-
-    "api_endpoints": {
-      "real_time_statistics": {
-        "endpoint": "/api/v1/statistics/realtime",
-        "methods": ["GET"],
-        "parameters": ["time_range", "metrics", "granularity"],
-        "response_format": "json_time_series"
-      },
-      "historical_analytics": {
-        "endpoint": "/api/v1/statistics/historical", 
-        "methods": ["GET"],
-        "parameters": ["start_date", "end_date", "aggregation_level"],
-        "response_format": "json_aggregated_data"
-      },
-      "performance_metrics": {
-        "endpoint": "/api/v1/statistics/performance",
-        "methods": ["GET"],
-        "parameters": ["metric_type", "percentile", "time_range"],
-        "response_format": "json_performance_data"
+      "alert_thresholds": {
+        "low_quality_signals_percentage": 20,
+        "high_latency_signals_percentage": 15,
+        "system_overload_threshold": 0.9
       }
     }
   }

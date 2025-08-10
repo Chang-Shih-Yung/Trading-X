@@ -67,6 +67,11 @@ class SignalProcessingStatistics:
         # 初始化統計模塊
         self._initialize_statistics()
         
+        # 驗證配置
+        if not self.validate_configuration():
+            logger.warning("使用默認配置")
+            self.config = self._get_default_config()
+        
     def _load_config(self) -> Dict[str, Any]:
         """載入配置文件"""
         try:
@@ -82,10 +87,35 @@ class SignalProcessingStatistics:
         return {
             "PHASE4_SIGNAL_PROCESSING_STATISTICS": {
                 "statistical_analysis": {
-                    "quality_distribution_tracking": {"bin_count": 10},
-                    "priority_level_analytics": {"categories": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]},
-                    "processing_time_analysis": {"percentiles": [50, 90, 95, 99]},
-                    "source_performance_comparison": {"enable_benchmarking": True}
+                    "quality_distribution_tracking": {
+                        "bin_count": 10,
+                        "quality_thresholds": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+                        "trend_analysis_enabled": True,
+                        "quality_target": 0.8
+                    },
+                    "priority_level_analytics": {
+                        "categories": ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
+                        "success_rate_tracking": True,
+                        "processing_time_correlation": True
+                    },
+                    "processing_time_analysis": {
+                        "percentiles": [50, 90, 95, 99],
+                        "phases": {
+                            "phase1_signal_generation": {"target_latency_ms": 200},
+                            "phase2_pre_evaluation": {"target_latency_ms": 15},
+                            "phase3_execution_policy": {"target_latency_ms": 450}
+                        },
+                        "total_target_latency_ms": 800
+                    },
+                    "source_performance_comparison": {
+                        "enable_benchmarking": True,
+                        "reliability_tracking": True,
+                        "supported_sources": ["binance", "coinbase", "kraken", "huobi", "unknown"]
+                    }
+                },
+                "real_time_monitoring": {
+                    "update_intervals": {"comprehensive_statistics_seconds": 5},
+                    "data_retention": {"signal_history_max_count": 10000}
                 }
             }
         }
@@ -99,6 +129,45 @@ class SignalProcessingStatistics:
         
         # 設置統計間隔
         self.update_interval = 5  # 5秒更新一次統計
+        
+    def validate_configuration(self) -> bool:
+        """驗證配置完整性"""
+        try:
+            required_sections = [
+                "statistical_analysis",
+                "real_time_monitoring"
+            ]
+            
+            stats_config = self.config.get("PHASE4_SIGNAL_PROCESSING_STATISTICS", {})
+            
+            for section in required_sections:
+                if section not in stats_config:
+                    logger.warning(f"配置缺少必要部分: {section}")
+                    return False
+            
+            logger.info("配置驗證通過")
+            return True
+            
+        except Exception as e:
+            logger.error(f"配置驗證失敗: {e}")
+            return False
+    
+    def get_config_value(self, key_path: str, default_value: Any = None) -> Any:
+        """安全獲取配置值"""
+        try:
+            keys = key_path.split('.')
+            current = self.config
+            
+            for key in keys:
+                if isinstance(current, dict) and key in current:
+                    current = current[key]
+                else:
+                    return default_value
+            
+            return current
+            
+        except Exception:
+            return default_value
         
     def _cleanup_old_data(self):
         """清理過舊的數據"""
