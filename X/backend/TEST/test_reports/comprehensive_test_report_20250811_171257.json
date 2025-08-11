@@ -1,0 +1,2050 @@
+{
+  "execution_summary": {
+    "start_time": "2025-08-11T17:09:45.400673",
+    "end_time": "2025-08-11T17:12:57.929754",
+    "total_duration_s": 192.52904510498047,
+    "total_phases": 5,
+    "successful_phases": 4,
+    "failed_phases": 1,
+    "overall_success_rate": 80.0,
+    "overall_status": "✅ PASSED"
+  },
+  "phase_results": {
+    "websocket_data_layer": {
+      "test_type": "WebSocket實時數據層單元測試",
+      "start_time": "2025-08-11T17:09:45.400809",
+      "total_duration_s": 5.114311933517456,
+      "total_tests": 5,
+      "passed_tests": 5,
+      "failed_tests": 0,
+      "overall_success_rate": 100.0,
+      "status": "✅ PASSED",
+      "detailed_results": {
+        "test_data_reception_frequency": {
+          "test_name": "數據接收頻率測試",
+          "success": true,
+          "avg_interval_ms": 106.03902240594228,
+          "target_interval_ms": 100.0,
+          "frequency_deviation_percent": 6.039022405942271,
+          "total_messages": 48,
+          "test_duration_s": 5.0,
+          "status": "✅ PASSED"
+        },
+        "test_6_layer_processing_pipeline": {
+          "test_name": "6層處理管道測試",
+          "success": true,
+          "total_processing_time_ms": 8.228540420532227,
+          "layer_processing_times": {
+            "layer1_validation": 1.2469291687011719,
+            "layer2_cleaning": 1.1730194091796875,
+            "layer3_standardization": 1.1630058288574219,
+            "layer4_computation": 2.297639846801758,
+            "layer5_broadcasting": 1.1761188507080078,
+            "layer6_routing": 1.1718273162841797
+          },
+          "pipeline_results": {
+            "layer1": {
+              "success": true,
+              "valid": true,
+              "time_valid": true,
+              "price_valid": true,
+              "data": {
+                "type": "kline_data",
+                "symbol": "BTCUSDT",
+                "timestamp": 1754903390.4910212,
+                "open": 45000.0,
+                "high": 45500.0,
+                "low": 44800.0,
+                "close": 45200.0,
+                "volume": 1500.0,
+                "source_exchange": "binance"
+              },
+              "anomaly_flags": []
+            },
+            "layer2": {
+              "success": true,
+              "data": {
+                "type": "kline_data",
+                "symbol": "BTCUSDT",
+                "timestamp": 1754903390.4910212,
+                "open": 45000.0,
+                "high": 45500.0,
+                "low": 44800.0,
+                "close": 45200.0,
+                "volume": 1500.0,
+                "source_exchange": "binance",
+                "cleaned": true,
+                "outlier_removed": false,
+                "duplicates_removed": false
+              },
+              "cleaning_applied": [
+                "outlier_detection",
+                "deduplication"
+              ]
+            },
+            "layer3": {
+              "success": true,
+              "data": {
+                "type": "kline_data",
+                "symbol": "BTCUSDT",
+                "timestamp": 1754903390.4910212,
+                "open": 45000.0,
+                "high": 45500.0,
+                "low": 44800.0,
+                "close": 45200.0,
+                "volume": 1500.0,
+                "source_exchange": "binance",
+                "cleaned": true,
+                "outlier_removed": false,
+                "duplicates_removed": false,
+                "normalized": true
+              },
+              "standardization_applied": [
+                "min_max_scaling",
+                "time_normalization"
+              ]
+            },
+            "layer4": {
+              "success": true,
+              "data": {
+                "type": "kline_data",
+                "symbol": "BTCUSDT",
+                "timestamp": 1754903390.4910212,
+                "open": 45000.0,
+                "high": 45500.0,
+                "low": 44800.0,
+                "close": 45200.0,
+                "volume": 1500.0,
+                "source_exchange": "binance",
+                "cleaned": true,
+                "outlier_removed": false,
+                "duplicates_removed": false,
+                "normalized": true,
+                "indicators": {
+                  "price_momentum": 0.15,
+                  "volatility": 0.025,
+                  "volume_trend": 1.2
+                }
+              },
+              "computations_applied": [
+                "price_indicators",
+                "volume_indicators"
+              ]
+            },
+            "layer5": {
+              "success": true,
+              "data": {
+                "type": "kline_data",
+                "symbol": "BTCUSDT",
+                "timestamp": 1754903390.4910212,
+                "open": 45000.0,
+                "high": 45500.0,
+                "low": 44800.0,
+                "close": 45200.0,
+                "volume": 1500.0,
+                "source_exchange": "binance",
+                "cleaned": true,
+                "outlier_removed": false,
+                "duplicates_removed": false,
+                "normalized": true,
+                "indicators": {
+                  "price_momentum": 0.15,
+                  "volatility": 0.025,
+                  "volume_trend": 1.2
+                }
+              },
+              "events_broadcast": [
+                "real_time_price_updated",
+                "technical_indicators_calculated",
+                "market_depth_updated"
+              ],
+              "subscriber_count": 3
+            },
+            "layer6": {
+              "success": true,
+              "data": {
+                "type": "kline_data",
+                "symbol": "BTCUSDT",
+                "timestamp": 1754903390.4910212,
+                "open": 45000.0,
+                "high": 45500.0,
+                "low": 44800.0,
+                "close": 45200.0,
+                "volume": 1500.0,
+                "source_exchange": "binance",
+                "cleaned": true,
+                "outlier_removed": false,
+                "duplicates_removed": false,
+                "normalized": true,
+                "indicators": {
+                  "price_momentum": 0.15,
+                  "volatility": 0.025,
+                  "volume_trend": 1.2
+                }
+              },
+              "routing_targets": [
+                "phase1a_basic_signal_generation",
+                "indicator_dependency_graph",
+                "phase1b_volatility_adaptation",
+                "unified_signal_candidate_pool"
+              ],
+              "routing_success": true
+            }
+          },
+          "all_layers_success": true,
+          "status": "✅ PASSED"
+        },
+        "test_high_win_rate_detection_engine": {
+          "test_name": "高勝率檢測引擎測試",
+          "success": true,
+          "detection_accuracy": 100.0,
+          "scenario_results": [
+            {
+              "scenario_name": "高勝率多頭信號",
+              "detection_success": true,
+              "priority_correct": true,
+              "win_rate_accurate": true,
+              "detected_win_rate": 77.5,
+              "expected_win_rate": 78.5,
+              "assigned_priority": "HIGH_WIN_RATE"
+            },
+            {
+              "scenario_name": "中勝率空頭信號",
+              "detection_success": true,
+              "priority_correct": true,
+              "win_rate_accurate": true,
+              "detected_win_rate": 66.2,
+              "expected_win_rate": 65.2,
+              "assigned_priority": "MEDIUM_WIN_RATE"
+            },
+            {
+              "scenario_name": "低勝率混合信號",
+              "detection_success": true,
+              "priority_correct": true,
+              "win_rate_accurate": true,
+              "detected_win_rate": 35.8,
+              "expected_win_rate": 35.8,
+              "assigned_priority": "FILTERED_OUT"
+            }
+          ],
+          "total_scenarios": 3,
+          "status": "✅ PASSED"
+        },
+        "test_data_validation_layer": {
+          "test_name": "數據驗證層測試",
+          "success": true,
+          "success_rate": 100.0,
+          "validation_results": [
+            {
+              "case_name": "正常數據",
+              "passed_validation": true,
+              "expected_result": true,
+              "result_correct": true,
+              "validation_details": {
+                "success": true,
+                "valid": true,
+                "time_valid": true,
+                "price_valid": true,
+                "data": {
+                  "timestamp": 1754903390.5066519,
+                  "price": 45000.0,
+                  "volume": 1500.0
+                },
+                "anomaly_flags": []
+              }
+            },
+            {
+              "case_name": "過時數據",
+              "passed_validation": false,
+              "expected_result": false,
+              "result_correct": true,
+              "validation_details": {
+                "success": true,
+                "valid": false,
+                "time_valid": false,
+                "price_valid": true,
+                "data": null,
+                "anomaly_flags": [
+                  "invalid_data"
+                ]
+              }
+            },
+            {
+              "case_name": "異常價格",
+              "passed_validation": false,
+              "expected_result": false,
+              "result_correct": true,
+              "validation_details": {
+                "success": true,
+                "valid": false,
+                "time_valid": true,
+                "price_valid": false,
+                "data": null,
+                "anomaly_flags": [
+                  "invalid_data"
+                ]
+              }
+            }
+          ],
+          "total_cases": 3,
+          "status": "✅ PASSED"
+        },
+        "test_computation_broadcasting": {
+          "test_name": "計算與廣播測試",
+          "success": true,
+          "computation_time_ms": 2.299785614013672,
+          "broadcast_time_ms": 1.1911392211914062,
+          "routing_time_ms": 1.1730194091796875,
+          "total_time_ms": 4.663944244384766,
+          "performance_target_ms": 5.0,
+          "computation_success": true,
+          "broadcast_success": true,
+          "routing_success": true,
+          "status": "✅ PASSED"
+        }
+      },
+      "phase_duration_s": 5.1144702434539795
+    },
+    "phase1_comprehensive": {
+      "test_type": "Phase1信號生成系統綜合測試",
+      "start_time": "2025-08-11T17:09:50.515417",
+      "total_duration_s": 0.2122330665588379,
+      "total_tests": 5,
+      "passed_tests": 4,
+      "failed_tests": 1,
+      "overall_success_rate": 80.0,
+      "performance_statistics": {
+        "phase1a_latency": {
+          "avg_ms": 21.152973175048828,
+          "max_ms": 21.152973175048828,
+          "min_ms": 21.152973175048828
+        },
+        "phase1b_latency": {
+          "avg_ms": 31.08326594034831,
+          "max_ms": 31.095027923583984,
+          "min_ms": 31.06999397277832
+        },
+        "phase1c_latency": {
+          "avg_ms": 20.816326141357422,
+          "max_ms": 20.816326141357422,
+          "min_ms": 20.816326141357422
+        },
+        "unified_pool_latency": {
+          "avg_ms": 26.149988174438477,
+          "max_ms": 26.149988174438477,
+          "min_ms": 26.149988174438477
+        },
+        "indicator_calculation_latency": {
+          "avg_ms": 41.38898849487305,
+          "max_ms": 41.38898849487305,
+          "min_ms": 41.38898849487305
+        }
+      },
+      "status": "✅ PASSED",
+      "detailed_results": {
+        "test_phase1a_signal_generation": {
+          "test_name": "Phase1A基礎信號生成測試",
+          "success": false,
+          "processing_time_ms": 21.152973175048828,
+          "performance_target_ms": 25.0,
+          "performance_pass": true,
+          "signals_generated": 0,
+          "signal_quality": {
+            "all_valid": false,
+            "error": "no_signals_generated"
+          },
+          "generated_signals": [],
+          "status": "❌ FAILED"
+        },
+        "test_technical_indicator_calculation": {
+          "test_name": "技術指標計算測試",
+          "success": true,
+          "processing_time_ms": 41.38898849487305,
+          "performance_target_ms": 45.0,
+          "performance_pass": true,
+          "calculated_indicators": {
+            "rsi": 73.91304347826087,
+            "ema_12": 45700.0,
+            "ema_26": 45700.0,
+            "macd": 0.0,
+            "volume_trend": 1.0210526315789474,
+            "calculation_timestamp": 1754903390.5793421
+          },
+          "accuracy_checks": {
+            "rsi_range_valid": true,
+            "macd_exists": true,
+            "ema_exists": true,
+            "volume_indicators_exist": true
+          },
+          "validation_results": {
+            "validation_pass": true,
+            "validation_details": {
+              "required_indicators_present": true,
+              "rsi_in_valid_range": true,
+              "ema_values_positive": true,
+              "volume_trend_reasonable": true
+            },
+            "indicators_count": 6
+          },
+          "all_indicators_valid": true,
+          "status": "✅ PASSED"
+        },
+        "test_phase1b_volatility_adaptation": {
+          "test_name": "Phase1B波動率適應測試",
+          "success": "True",
+          "avg_processing_time_ms": 31.08326594034831,
+          "performance_target_ms": 45.0,
+          "performance_pass": "True",
+          "scenarios_tested": 3,
+          "adaptation_results": [
+            {
+              "scenario_name": "高波動率",
+              "volatility_level": 0.08,
+              "processing_time_ms": 31.084775924682617,
+              "signals_adapted": 2,
+              "adaptation_effective": true,
+              "adapted_signals": [
+                {
+                  "signal_type": "PRICE_BREAKOUT",
+                  "signal_strength": 0.84,
+                  "confidence_score": 0.8,
+                  "timestamp": 1754903390.580637,
+                  "adaptation_type": "high_volatility_boost",
+                  "volatility_adapted": true,
+                  "original_strength": 0.7,
+                  "volatility_level": 0.08,
+                  "adaptation_timestamp": 1754903390.611726
+                },
+                {
+                  "signal_type": "VOLUME_SURGE",
+                  "signal_strength": 0.72,
+                  "confidence_score": 0.75,
+                  "timestamp": 1754903390.5806432,
+                  "adaptation_type": "high_volatility_boost",
+                  "volatility_adapted": true,
+                  "original_strength": 0.6,
+                  "volatility_level": 0.08,
+                  "adaptation_timestamp": 1754903390.611728
+                }
+              ]
+            },
+            {
+              "scenario_name": "中等波動率",
+              "volatility_level": 0.04,
+              "processing_time_ms": 31.06999397277832,
+              "signals_adapted": 2,
+              "adaptation_effective": true,
+              "adapted_signals": [
+                {
+                  "signal_type": "PRICE_BREAKOUT",
+                  "signal_strength": 0.7,
+                  "confidence_score": 0.8,
+                  "timestamp": 1754903390.580637,
+                  "adaptation_type": "normal_volatility",
+                  "volatility_adapted": true,
+                  "original_strength": 0.7,
+                  "volatility_level": 0.04,
+                  "adaptation_timestamp": 1754903390.643967
+                },
+                {
+                  "signal_type": "VOLUME_SURGE",
+                  "signal_strength": 0.6,
+                  "confidence_score": 0.75,
+                  "timestamp": 1754903390.5806432,
+                  "adaptation_type": "normal_volatility",
+                  "volatility_adapted": true,
+                  "original_strength": 0.6,
+                  "volatility_level": 0.04,
+                  "adaptation_timestamp": 1754903390.643968
+                }
+              ]
+            },
+            {
+              "scenario_name": "低波動率",
+              "volatility_level": 0.015,
+              "processing_time_ms": 31.095027923583984,
+              "signals_adapted": 2,
+              "adaptation_effective": true,
+              "adapted_signals": [
+                {
+                  "signal_type": "PRICE_BREAKOUT",
+                  "signal_strength": 0.5599999999999999,
+                  "confidence_score": 0.8,
+                  "timestamp": 1754903390.580637,
+                  "adaptation_type": "low_volatility_dampening",
+                  "volatility_adapted": true,
+                  "original_strength": 0.7,
+                  "volatility_level": 0.015,
+                  "adaptation_timestamp": 1754903390.676228
+                },
+                {
+                  "signal_type": "VOLUME_SURGE",
+                  "signal_strength": 0.48,
+                  "confidence_score": 0.75,
+                  "timestamp": 1754903390.5806432,
+                  "adaptation_type": "low_volatility_dampening",
+                  "volatility_adapted": true,
+                  "original_strength": 0.6,
+                  "volatility_level": 0.015,
+                  "adaptation_timestamp": 1754903390.67623
+                }
+              ]
+            }
+          ],
+          "all_adaptations_effective": true,
+          "status": "✅ PASSED"
+        },
+        "test_phase1c_signal_standardization": {
+          "test_name": "Phase1C信號標準化測試",
+          "success": true,
+          "processing_time_ms": 20.816326141357422,
+          "performance_target_ms": 25.0,
+          "performance_pass": true,
+          "raw_signals_count": 3,
+          "standardized_signals_count": 3,
+          "completeness_checks": {
+            "all_signals_processed": true,
+            "tier_assignment_complete": true,
+            "priority_assignment_complete": true,
+            "standardization_applied": true
+          },
+          "standardization_checks": {
+            "validation_pass": true,
+            "standardized_count": 3,
+            "total_count": 3,
+            "standardization_rate": 100.0
+          },
+          "all_checks_pass": true,
+          "sample_standardized_signals": [
+            {
+              "signal_type": "BREAKOUT",
+              "value": 0.85,
+              "confidence": 0.7,
+              "source": "phase1a",
+              "timestamp": 1754903390.6776052,
+              "symbol": "BTCUSDT",
+              "standardized": true,
+              "tier_assignment": "tier_1_critical",
+              "execution_priority": 1,
+              "normalized_strength": 0.85,
+              "quality_score": 0.7,
+              "standardization_timestamp": 1754903390.698414,
+              "processing_order": 1
+            },
+            {
+              "signal_type": "MOMENTUM",
+              "value": 0.65,
+              "confidence": 0.8,
+              "source": "phase1b",
+              "timestamp": 1754903390.6776059,
+              "symbol": "BTCUSDT",
+              "standardized": true,
+              "tier_assignment": "tier_2_important",
+              "execution_priority": 2,
+              "normalized_strength": 0.65,
+              "quality_score": 0.8,
+              "standardization_timestamp": 1754903390.69842,
+              "processing_order": 2
+            }
+          ],
+          "status": "✅ PASSED"
+        },
+        "test_unified_signal_pool_aggregation": {
+          "test_name": "統一信號池聚合測試",
+          "success": true,
+          "processing_time_ms": 26.149988174438477,
+          "performance_target_ms": 28.0,
+          "performance_pass": true,
+          "aggregation_metrics": {
+            "input_signals_total": 6,
+            "output_signals_count": 6,
+            "deduplication_effective": false,
+            "quality_filtering_applied": false,
+            "source_diversity_maintained": true
+          },
+          "aggregation_checks": {
+            "validation_pass": true,
+            "aggregation_details": {
+              "signals_aggregated": true,
+              "duplicates_removed": true,
+              "quality_filtered": true,
+              "source_attribution_maintained": true,
+              "unified_processing_applied": true
+            },
+            "input_signals_total": 6,
+            "output_signals_count": 6,
+            "reduction_ratio": 0.0
+          },
+          "sample_aggregated_signals": [
+            {
+              "signal_type": "STANDARDIZED_MOMENTUM",
+              "strength": 0.9,
+              "confidence": 0.85,
+              "signal_id": "unified_0004",
+              "source": "phase1c",
+              "aggregation_timestamp": 1754903390.725895,
+              "unified_pool_processed": true,
+              "quality_score": 0.85,
+              "source_weight": 0.25,
+              "deduplication_applied": true,
+              "quality_filtering_applied": true
+            },
+            {
+              "signal_type": "VOLATILITY_ADAPTED",
+              "strength": 0.85,
+              "confidence": 0.8,
+              "signal_id": "unified_0003",
+              "source": "phase1b",
+              "aggregation_timestamp": 1754903390.725893,
+              "unified_pool_processed": true,
+              "quality_score": 0.8,
+              "source_weight": 0.25,
+              "deduplication_applied": true,
+              "quality_filtering_applied": true
+            },
+            {
+              "signal_type": "RSI_OVERSOLD",
+              "strength": 0.75,
+              "confidence": 0.8,
+              "signal_id": "unified_0005",
+              "source": "indicator_graph",
+              "aggregation_timestamp": 1754903390.725896,
+              "unified_pool_processed": true,
+              "quality_score": 0.8,
+              "source_weight": 0.2,
+              "deduplication_applied": true,
+              "quality_filtering_applied": true
+            }
+          ],
+          "status": "✅ PASSED"
+        }
+      },
+      "phase_duration_s": 0.21252775192260742
+    },
+    "phase2_strategy_level": {
+      "test_type": "Phase2策略層級綜合測試",
+      "start_time": "2025-08-11T17:09:50.727946",
+      "total_duration_s": 0.18937897682189941,
+      "total_tests": 5,
+      "passed_tests": 5,
+      "failed_tests": 0,
+      "overall_success_rate": 100.0,
+      "status": "✅ PASSED",
+      "detailed_results": {
+        "test_strategy_engine_core_logic": {
+          "test_name": "策略引擎核心邏輯測試",
+          "success": true,
+          "accuracy_rate": 100.0,
+          "avg_processing_time_ms": 26.27277374267578,
+          "total_processing_time_ms": 78.81832122802734,
+          "scenario_results": [
+            {
+              "scenario_name": "多頭突破策略",
+              "strategy_success": true,
+              "action_correct": true,
+              "confidence_accurate": true,
+              "processing_time_ms": 26.355266571044922,
+              "generated_action": "BUY",
+              "expected_action": "BUY",
+              "confidence_level": 0.7641990499162764
+            },
+            {
+              "scenario_name": "空頭反轉策略",
+              "strategy_success": true,
+              "action_correct": true,
+              "confidence_accurate": true,
+              "processing_time_ms": 26.135921478271484,
+              "generated_action": "SELL",
+              "expected_action": "SELL",
+              "confidence_level": 0.8257054785759934
+            },
+            {
+              "scenario_name": "橫盤觀望策略",
+              "strategy_success": true,
+              "action_correct": true,
+              "confidence_accurate": true,
+              "processing_time_ms": 26.327133178710938,
+              "generated_action": "HOLD",
+              "expected_action": "HOLD",
+              "confidence_level": 0.5463698041802746
+            }
+          ],
+          "total_scenarios": 3,
+          "successful_decisions": 3,
+          "status": "✅ PASSED"
+        },
+        "test_multi_timeframe_analysis": {
+          "test_name": "多時間框架分析測試",
+          "success": true,
+          "analysis_time_ms": 40.65513610839844,
+          "timeframe_coverage": 5,
+          "consensus_accuracy": 0.8,
+          "signal_consistency": 0.75,
+          "analyzed_timeframes": [
+            "1m",
+            "5m",
+            "15m",
+            "1h",
+            "4h"
+          ],
+          "overall_consensus": "bullish",
+          "confidence_level": 0.576,
+          "status": "✅ PASSED"
+        },
+        "test_risk_management_system": {
+          "test_name": "風險管理系統測試",
+          "success": true,
+          "accuracy_rate": 100.0,
+          "avg_response_time_ms": 16.889413197835285,
+          "total_response_time_ms": 50.66823959350586,
+          "risk_results": [
+            {
+              "scenario_name": "正常風險範圍",
+              "assessment_success": true,
+              "action_correct": true,
+              "risk_level_correct": true,
+              "response_time_ms": 15.987157821655273,
+              "assessed_action": "APPROVE",
+              "expected_action": "APPROVE",
+              "risk_level": "LOW",
+              "risk_score": 0.081
+            },
+            {
+              "scenario_name": "中等風險警告",
+              "assessment_success": true,
+              "action_correct": true,
+              "risk_level_correct": true,
+              "response_time_ms": 18.499135971069336,
+              "assessed_action": "CAUTION",
+              "expected_action": "CAUTION",
+              "risk_level": "MEDIUM",
+              "risk_score": 0.179
+            },
+            {
+              "scenario_name": "高風險阻止",
+              "assessment_success": true,
+              "action_correct": true,
+              "risk_level_correct": true,
+              "response_time_ms": 16.18194580078125,
+              "assessed_action": "REJECT",
+              "expected_action": "REJECT",
+              "risk_level": "HIGH",
+              "risk_score": 0.31499999999999995
+            }
+          ],
+          "total_scenarios": 3,
+          "accurate_assessments": 3,
+          "status": "✅ PASSED"
+        },
+        "test_signal_priority_sorting": {
+          "test_name": "信號優先級排序測試",
+          "success": true,
+          "sorting_time_ms": 9.129047393798828,
+          "signals_processed": 5,
+          "ranking_accuracy": 0.8500000000000001,
+          "sorting_efficiency": 547.7022721337164,
+          "sorted_signals": [
+            {
+              "signal_id": "sig_005",
+              "type": "arbitrage",
+              "confidence": 0.95,
+              "profit_potential": 0.15,
+              "risk_reward": 5.8,
+              "time_sensitivity": "CRITICAL",
+              "expected_priority": 1,
+              "priority_score": 1.005
+            },
+            {
+              "signal_id": "sig_002",
+              "type": "reversal",
+              "confidence": 0.75,
+              "profit_potential": 0.12,
+              "risk_reward": 4.5,
+              "time_sensitivity": "MEDIUM",
+              "expected_priority": 2,
+              "priority_score": 0.7575
+            },
+            {
+              "signal_id": "sig_001",
+              "type": "breakout",
+              "confidence": 0.92,
+              "profit_potential": 0.08,
+              "risk_reward": 3.2,
+              "time_sensitivity": "HIGH",
+              "expected_priority": 1,
+              "priority_score": 0.7160000000000001
+            },
+            {
+              "signal_id": "sig_003",
+              "type": "momentum",
+              "confidence": 0.88,
+              "profit_potential": 0.06,
+              "risk_reward": 2.8,
+              "time_sensitivity": "HIGH",
+              "expected_priority": 3,
+              "priority_score": 0.6440000000000001
+            },
+            {
+              "signal_id": "sig_004",
+              "type": "mean_reversion",
+              "confidence": 0.65,
+              "profit_potential": 0.04,
+              "risk_reward": 2.1,
+              "time_sensitivity": "LOW",
+              "expected_priority": 4,
+              "priority_score": 0.42750000000000005
+            }
+          ],
+          "priority_distribution": {
+            "high_priority": 3,
+            "medium_priority": 2,
+            "low_priority": 0
+          },
+          "status": "✅ PASSED"
+        },
+        "test_strategy_execution_optimization": {
+          "test_name": "策略執行優化測試",
+          "success": true,
+          "success_rate": 100.0,
+          "avg_execution_time_ms": 2.3476282755533853,
+          "overall_throughput": 227179.634394042,
+          "execution_results": [
+            {
+              "scenario_name": "單一策略執行",
+              "optimization_success": true,
+              "execution_time_ms": 2.3260116577148438,
+              "target_throughput": 500,
+              "actual_throughput": 514.4426483090846,
+              "throughput_efficiency": 102.88852966181692,
+              "strategy_count": 1,
+              "signal_volume": 100,
+              "optimization_techniques": []
+            },
+            {
+              "scenario_name": "並行策略執行",
+              "optimization_success": true,
+              "execution_time_ms": 2.3539066314697266,
+              "target_throughput": 800,
+              "actual_throughput": 1019.1990751041509,
+              "throughput_efficiency": 127.39988438801886,
+              "strategy_count": 5,
+              "signal_volume": 500,
+              "optimization_techniques": [
+                "parallel_execution",
+                "batch_processing"
+              ]
+            },
+            {
+              "scenario_name": "高負載執行",
+              "optimization_success": true,
+              "execution_time_ms": 2.362966537475586,
+              "target_throughput": 1200,
+              "actual_throughput": 1111.5846757806178,
+              "throughput_efficiency": 92.63205631505149,
+              "strategy_count": 10,
+              "signal_volume": 1000,
+              "optimization_techniques": [
+                "parallel_execution",
+                "batch_processing",
+                "memory_optimization",
+                "high_load_optimization"
+              ]
+            }
+          ],
+          "total_scenarios": 3,
+          "successful_optimizations": 3,
+          "status": "✅ PASSED"
+        }
+      },
+      "phase_duration_s": 0.18952226638793945
+    },
+    "phase3_cross_integration": {
+      "test_type": "Phase3跨階段整合測試",
+      "start_time": "2025-08-11T17:09:50.917498",
+      "total_duration_s": 124.01554894447327,
+      "total_tests": 5,
+      "passed_tests": 2,
+      "failed_tests": 3,
+      "overall_success_rate": 40.0,
+      "performance_statistics": {
+        "end_to_end_latency": {
+          "avg": 158.0637296040853,
+          "max": 161.9110107421875,
+          "min": 150.5141258239746,
+          "count": 3
+        },
+        "cross_component_latency": {
+          "avg": 6.4466774463653564,
+          "max": 11.118888854980469,
+          "min": 3.451108932495117,
+          "count": 40
+        },
+        "error_recovery_time": {
+          "avg": 638.2225743942995,
+          "max": 1365.6204917214445,
+          "min": 93.83928185601485,
+          "count": 4
+        },
+        "throughput_rates": {
+          "avg": 1076.4952962845286,
+          "max": 2897.6193436960275,
+          "min": 269.81113303027706,
+          "count": 40
+        }
+      },
+      "status": "❌ FAILED",
+      "detailed_results": {
+        "test_end_to_end_data_flow_integrity": {
+          "test_name": "端到端數據流完整性測試",
+          "success": false,
+          "avg_latency_ms": 158.0637296040853,
+          "integrity_success_rate": 100.0,
+          "latency_compliance": 0.0,
+          "scenarios_tested": 3,
+          "flow_results": [
+            {
+              "scenario_name": "標準市場數據流",
+              "total_latency_ms": 150.5141258239746,
+              "latency_target_ms": 100.0,
+              "latency_pass": false,
+              "flow_trace": {
+                "phases": [
+                  {
+                    "phase_name": "websocket",
+                    "processing_time_ms": 5.813121795654297,
+                    "data_size": 119,
+                    "completed": true
+                  },
+                  {
+                    "phase_name": "phase1a",
+                    "processing_time_ms": 16.09206199645996,
+                    "data_size": 164,
+                    "completed": true
+                  },
+                  {
+                    "phase_name": "phase1b",
+                    "processing_time_ms": 13.119935989379883,
+                    "data_size": 192,
+                    "completed": true
+                  },
+                  {
+                    "phase_name": "phase1c",
+                    "processing_time_ms": 9.007692337036133,
+                    "data_size": 214,
+                    "completed": true
+                  },
+                  {
+                    "phase_name": "phase2_strategy",
+                    "processing_time_ms": 25.123119354248047,
+                    "data_size": 249,
+                    "completed": true
+                  }
+                ],
+                "final_data": {
+                  "symbol": "BTCUSDT",
+                  "price": 45000.0,
+                  "volume": 1500.0,
+                  "timestamp": 1754903390.9175198,
+                  "websocket_processed": true,
+                  "phase1a_signals": [
+                    "BREAKOUT",
+                    "MOMENTUM"
+                  ],
+                  "volatility_adapted": true,
+                  "standardized": true,
+                  "strategy_decision": "LONG_ENTRY"
+                },
+                "total_phases": 5,
+                "flow_complete": true
+              },
+              "integrity_check": {
+                "integrity_maintained": true,
+                "integrity_details": {
+                  "all_phases_completed": true,
+                  "data_preserved": true,
+                  "processing_flags_added": true,
+                  "flow_complete": true
+                },
+                "phases_completion_rate": 100.0
+              },
+              "phases_completed": 5,
+              "expected_phases": 5
+            },
+            {
+              "scenario_name": "高波動率數據流",
+              "total_latency_ms": 161.76605224609375,
+              "latency_target_ms": 100.0,
+              "latency_pass": false,
+              "flow_trace": {
+                "phases": [
+                  {
+                    "phase_name": "websocket",
+                    "processing_time_ms": 5.810737609863281,
+                    "data_size": 137,
+                    "completed": true
+                  },
+                  {
+                    "phase_name": "phase1a",
+                    "processing_time_ms": 16.09182357788086,
+                    "data_size": 182,
+                    "completed": true
+                  },
+                  {
+                    "phase_name": "phase1b",
+                    "processing_time_ms": 12.515068054199219,
+                    "data_size": 210,
+                    "completed": true
+                  },
+                  {
+                    "phase_name": "phase1c",
+                    "processing_time_ms": 9.135246276855469,
+                    "data_size": 232,
+                    "completed": true
+                  },
+                  {
+                    "phase_name": "phase2_strategy",
+                    "processing_time_ms": 26.144027709960938,
+                    "data_size": 267,
+                    "completed": true
+                  },
+                  {
+                    "phase_name": "risk_management",
+                    "processing_time_ms": 11.147022247314453,
+                    "data_size": 290,
+                    "completed": true
+                  }
+                ],
+                "final_data": {
+                  "symbol": "ETHUSDT",
+                  "price": 3200.0,
+                  "volume": 2800.0,
+                  "volatility": 0.08,
+                  "timestamp": 1754903390.917521,
+                  "websocket_processed": true,
+                  "phase1a_signals": [
+                    "BREAKOUT",
+                    "MOMENTUM"
+                  ],
+                  "volatility_adapted": true,
+                  "standardized": true,
+                  "strategy_decision": "LONG_ENTRY",
+                  "risk_assessed": true
+                },
+                "total_phases": 6,
+                "flow_complete": true
+              },
+              "integrity_check": {
+                "integrity_maintained": true,
+                "integrity_details": {
+                  "all_phases_completed": true,
+                  "data_preserved": true,
+                  "processing_flags_added": true,
+                  "flow_complete": true
+                },
+                "phases_completion_rate": 100.0
+              },
+              "phases_completed": 6,
+              "expected_phases": 6
+            },
+            {
+              "scenario_name": "多信號聚合流",
+              "total_latency_ms": 161.9110107421875,
+              "latency_target_ms": 100.0,
+              "latency_pass": false,
+              "flow_trace": {
+                "phases": [
+                  {
+                    "phase_name": "websocket",
+                    "processing_time_ms": 5.719900131225586,
+                    "data_size": 127,
+                    "completed": true
+                  },
+                  {
+                    "phase_name": "phase1a",
+                    "processing_time_ms": 16.14212989807129,
+                    "data_size": 172,
+                    "completed": true
+                  },
+                  {
+                    "phase_name": "phase1b",
+                    "processing_time_ms": 13.326168060302734,
+                    "data_size": 200,
+                    "completed": true
+                  },
+                  {
+                    "phase_name": "phase1c",
+                    "processing_time_ms": 9.157180786132812,
+                    "data_size": 222,
+                    "completed": true
+                  },
+                  {
+                    "phase_name": "unified_pool",
+                    "processing_time_ms": 10.060787200927734,
+                    "data_size": 250,
+                    "completed": true
+                  },
+                  {
+                    "phase_name": "phase2_strategy",
+                    "processing_time_ms": 26.22699737548828,
+                    "data_size": 285,
+                    "completed": true
+                  }
+                ],
+                "final_data": {
+                  "symbol": "ADAUSDT",
+                  "multiple_signals": true,
+                  "signal_count": 5,
+                  "timestamp": 1754903390.917521,
+                  "websocket_processed": true,
+                  "phase1a_signals": [
+                    "BREAKOUT",
+                    "MOMENTUM"
+                  ],
+                  "volatility_adapted": true,
+                  "standardized": true,
+                  "signals_aggregated": true,
+                  "strategy_decision": "LONG_ENTRY"
+                },
+                "total_phases": 6,
+                "flow_complete": true
+              },
+              "integrity_check": {
+                "integrity_maintained": true,
+                "integrity_details": {
+                  "all_phases_completed": true,
+                  "data_preserved": true,
+                  "processing_flags_added": true,
+                  "flow_complete": true
+                },
+                "phases_completion_rate": 100.0
+              },
+              "phases_completed": 6,
+              "expected_phases": 6
+            }
+          ],
+          "status": "❌ FAILED"
+        },
+        "test_cross_component_performance": {
+          "test_name": "跨組件性能測試",
+          "success": "True",
+          "overall_latency_compliance": 100.0,
+          "overall_throughput_compliance": 100.0,
+          "avg_performance_score": 125.5886937949108,
+          "interfaces_tested": 4,
+          "interface_results": [
+            {
+              "interface_name": "WebSocket → Phase1A",
+              "avg_latency_ms": 3.5046815872192383,
+              "max_latency_ms": 3.555774688720703,
+              "target_latency_ms": 5.0,
+              "latency_pass": "True",
+              "avg_throughput_msg_per_sec": 2853.709280031232,
+              "throughput_acceptable": "True",
+              "test_rounds": 10,
+              "performance_score": 142.6663129179507
+            },
+            {
+              "interface_name": "Phase1A → Phase1B",
+              "avg_latency_ms": 6.790757179260254,
+              "max_latency_ms": 6.87408447265625,
+              "target_latency_ms": 8.0,
+              "latency_pass": "True",
+              "avg_throughput_msg_per_sec": 736.7647665103025,
+              "throughput_acceptable": "True",
+              "test_rounds": 10,
+              "performance_score": 117.80718686913016
+            },
+            {
+              "interface_name": "Phase1C → Phase2",
+              "avg_latency_ms": 10.95890998840332,
+              "max_latency_ms": 11.118888854980469,
+              "target_latency_ms": 12.0,
+              "latency_pass": "True",
+              "avg_throughput_msg_per_sec": 273.9338587485317,
+              "throughput_acceptable": "True",
+              "test_rounds": 10,
+              "performance_score": 109.49994125965408
+            },
+            {
+              "interface_name": "Phase2 → 風險管理",
+              "avg_latency_ms": 4.532361030578613,
+              "max_latency_ms": 4.600048065185547,
+              "target_latency_ms": 6.0,
+              "latency_pass": "True",
+              "avg_throughput_msg_per_sec": 441.57327984804806,
+              "throughput_acceptable": "True",
+              "test_rounds": 10,
+              "performance_score": 132.38133413290828
+            }
+          ],
+          "status": "✅ PASSED"
+        },
+        "test_error_handling_recovery": {
+          "test_name": "錯誤處理和恢復測試",
+          "success": false,
+          "recovery_success_rate": 100.0,
+          "recovery_time_compliance": 100.0,
+          "stability_success_rate": 75.0,
+          "scenarios_tested": 4,
+          "recovery_results": [
+            {
+              "scenario_name": "WebSocket連接中斷",
+              "error_type": "connection_loss",
+              "recovery_time_ms": 1365.6204917214445,
+              "expected_recovery_time_ms": 2000.0,
+              "recovery_within_target": true,
+              "recovery_successful": true,
+              "post_recovery_stability": {
+                "component": "websocket_layer",
+                "stable": false,
+                "stability_metrics": {
+                  "response_time_normal": true,
+                  "error_rate_low": true,
+                  "throughput_maintained": false,
+                  "memory_usage_stable": true
+                },
+                "stability_score": 75.0
+              },
+              "recovery_strategy": "reconnect_with_backoff"
+            },
+            {
+              "scenario_name": "Phase1處理器異常",
+              "error_type": "processing_exception",
+              "recovery_time_ms": 292.6325009004424,
+              "expected_recovery_time_ms": 500.0,
+              "recovery_within_target": true,
+              "recovery_successful": true,
+              "post_recovery_stability": {
+                "component": "phase1a_processor",
+                "stable": true,
+                "stability_metrics": {
+                  "response_time_normal": true,
+                  "error_rate_low": true,
+                  "throughput_maintained": true,
+                  "memory_usage_stable": true
+                },
+                "stability_score": 100.0
+              },
+              "recovery_strategy": "restart_processor"
+            },
+            {
+              "scenario_name": "數據格式錯誤",
+              "error_type": "data_validation_error",
+              "recovery_time_ms": 93.83928185601485,
+              "expected_recovery_time_ms": 100.0,
+              "recovery_within_target": true,
+              "recovery_successful": true,
+              "post_recovery_stability": {
+                "component": "data_validator",
+                "stable": true,
+                "stability_metrics": {
+                  "response_time_normal": true,
+                  "error_rate_low": true,
+                  "throughput_maintained": true,
+                  "memory_usage_stable": true
+                },
+                "stability_score": 100.0
+              },
+              "recovery_strategy": "skip_and_continue"
+            },
+            {
+              "scenario_name": "策略引擎過載",
+              "error_type": "resource_exhaustion",
+              "recovery_time_ms": 800.7980230992962,
+              "expected_recovery_time_ms": 1000.0,
+              "recovery_within_target": true,
+              "recovery_successful": true,
+              "post_recovery_stability": {
+                "component": "phase2_strategy",
+                "stable": true,
+                "stability_metrics": {
+                  "response_time_normal": true,
+                  "error_rate_low": true,
+                  "throughput_maintained": true,
+                  "memory_usage_stable": true
+                },
+                "stability_score": 100.0
+              },
+              "recovery_strategy": "throttle_and_queue"
+            }
+          ],
+          "status": "❌ FAILED"
+        },
+        "test_load_stress_performance": {
+          "test_name": "負載壓力性能測試",
+          "success": false,
+          "overall_success_compliance": 33.33333333333333,
+          "overall_response_time_compliance": 100.0,
+          "max_resource_usage": 80.0,
+          "resource_usage_acceptable": false,
+          "scenarios_tested": 3,
+          "stress_results": [
+            {
+              "scenario_name": "正常負載",
+              "concurrent_requests": 50,
+              "duration_seconds": 30,
+              "total_requests": 69716,
+              "successful_requests": 66294,
+              "success_rate": 95.09151414309484,
+              "target_success_rate": 99.0,
+              "meets_success_target": false,
+              "avg_response_time_ms": 20.29056098061849,
+              "max_response_time_ms": 270.98584175109863,
+              "response_time_acceptable": "True",
+              "throughput_req_per_sec": 2323.866666666667,
+              "system_resource_usage": {
+                "cpu_percent": 35.0,
+                "memory_percent": 28.333333333333332
+              }
+            },
+            {
+              "scenario_name": "高負載",
+              "concurrent_requests": 200,
+              "duration_seconds": 60,
+              "total_requests": 567985,
+              "successful_requests": 539499,
+              "success_rate": 94.98472670933211,
+              "target_success_rate": 95.0,
+              "meets_success_target": false,
+              "avg_response_time_ms": 20.085326437159008,
+              "max_response_time_ms": 265.7599449157715,
+              "response_time_acceptable": "True",
+              "throughput_req_per_sec": 9466.416666666666,
+              "system_resource_usage": {
+                "cpu_percent": 50.0,
+                "memory_percent": 38.333333333333336
+              }
+            },
+            {
+              "scenario_name": "極限負載",
+              "concurrent_requests": 500,
+              "duration_seconds": 30,
+              "total_requests": 707062,
+              "successful_requests": 671886,
+              "success_rate": 95.02504730843971,
+              "target_success_rate": 80.0,
+              "meets_success_target": true,
+              "avg_response_time_ms": 20.118087143962224,
+              "max_response_time_ms": 397.74489402770996,
+              "response_time_acceptable": "True",
+              "throughput_req_per_sec": 23568.733333333334,
+              "system_resource_usage": {
+                "cpu_percent": 80.0,
+                "memory_percent": 58.333333333333336
+              }
+            }
+          ],
+          "status": "❌ FAILED"
+        },
+        "test_integration_signal_accuracy": {
+          "test_name": "整合信號生成準確性測試",
+          "success": "True",
+          "signal_accuracy_rate": 100.0,
+          "confidence_accuracy_rate": 100.0,
+          "processing_completeness": 100.0,
+          "avg_processing_time_ms": 70.60702641805013,
+          "scenarios_tested": 3,
+          "signal_accuracy_results": [
+            {
+              "scenario_name": "多頭突破確認",
+              "generated_signal": "LONG_ENTRY",
+              "expected_signal": "LONG_ENTRY",
+              "signal_correct": true,
+              "generated_confidence": 0.85,
+              "expected_confidence": 0.85,
+              "confidence_accurate": true,
+              "processing_path_complete": true,
+              "processing_time_ms": 71.90513610839844,
+              "processing_trace": [
+                {
+                  "stage": "websocket",
+                  "time_ms": 7.740020751953125
+                },
+                {
+                  "stage": "phase1a",
+                  "time_ms": 16.150951385498047
+                },
+                {
+                  "stage": "phase1b",
+                  "time_ms": 12.860774993896484
+                },
+                {
+                  "stage": "phase1c",
+                  "time_ms": 9.083986282348633
+                },
+                {
+                  "stage": "phase2_strategy",
+                  "time_ms": 26.061058044433594
+                }
+              ]
+            },
+            {
+              "scenario_name": "空頭反轉信號",
+              "generated_signal": "SHORT_ENTRY",
+              "expected_signal": "SHORT_ENTRY",
+              "signal_correct": true,
+              "generated_confidence": 0.75,
+              "expected_confidence": 0.75,
+              "confidence_accurate": true,
+              "processing_path_complete": true,
+              "processing_time_ms": 69.75007057189941,
+              "processing_trace": [
+                {
+                  "stage": "websocket",
+                  "time_ms": 5.6610107421875
+                },
+                {
+                  "stage": "phase1a",
+                  "time_ms": 16.047000885009766
+                },
+                {
+                  "stage": "phase1b",
+                  "time_ms": 13.064146041870117
+                },
+                {
+                  "stage": "phase1c",
+                  "time_ms": 8.87918472290039
+                },
+                {
+                  "stage": "phase2_strategy",
+                  "time_ms": 26.0927677154541
+                }
+              ]
+            },
+            {
+              "scenario_name": "盤整無操作",
+              "generated_signal": "WAIT",
+              "expected_signal": "WAIT",
+              "signal_correct": true,
+              "generated_confidence": 0.3,
+              "expected_confidence": 0.3,
+              "confidence_accurate": true,
+              "processing_path_complete": true,
+              "processing_time_ms": 70.16587257385254,
+              "processing_trace": [
+                {
+                  "stage": "websocket",
+                  "time_ms": 5.669832229614258
+                },
+                {
+                  "stage": "phase1a",
+                  "time_ms": 16.04318618774414
+                },
+                {
+                  "stage": "phase1b",
+                  "time_ms": 13.130903244018555
+                },
+                {
+                  "stage": "phase1c",
+                  "time_ms": 9.048938751220703
+                },
+                {
+                  "stage": "phase2_strategy",
+                  "time_ms": 26.259183883666992
+                }
+              ]
+            }
+          ],
+          "status": "✅ PASSED"
+        }
+      },
+      "phase_duration_s": 124.01587510108948
+    },
+    "phase4_frontend_e2e": {
+      "test_type": "Phase4前端整合端到端測試",
+      "start_time": "2025-08-11T17:11:54.933570",
+      "total_duration_s": 62.995786905288696,
+      "total_tests": 5,
+      "passed_tests": 4,
+      "failed_tests": 1,
+      "overall_success_rate": 80.0,
+      "performance_statistics": {
+        "full_pipeline_latency": {
+          "avg": 113.49725723266602,
+          "max": 119.74787712097168,
+          "min": 109.95888710021973,
+          "count": 3
+        },
+        "ui_update_latency": {
+          "avg": 33.92447517031715,
+          "max": 100.24118423461914,
+          "min": 7.496118545532227,
+          "count": 105
+        },
+        "user_interaction_latency": {
+          "avg": 88.01380793253581,
+          "max": 121.43731117248535,
+          "min": 61.379194259643555,
+          "count": 3
+        },
+        "data_sync_latency": {
+          "avg": 58.064642548561096,
+          "max": 381.0088634490967,
+          "min": 5.764961242675781,
+          "count": 80
+        }
+      },
+      "status": "✅ PASSED",
+      "detailed_results": {
+        "test_complete_pipeline_data_flow": {
+          "test_name": "完整管道數據流測試",
+          "success": true,
+          "avg_latency_ms": 113.49725723266602,
+          "latency_compliance": 100.0,
+          "frontend_update_success": 100.0,
+          "data_integrity_success": 100.0,
+          "scenarios_tested": 3,
+          "pipeline_results": [
+            {
+              "scenario_name": "單一交易信號完整流程",
+              "total_latency_ms": 119.74787712097168,
+              "latency_target_ms": 200.0,
+              "latency_pass": true,
+              "pipeline_stages": [
+                "websocket_reception",
+                "phase1_processing",
+                "phase2_strategy",
+                "phase3_integration"
+              ],
+              "frontend_updates": [
+                {
+                  "type": "price_chart_update",
+                  "timestamp": 1754903515.026082,
+                  "data": {
+                    "symbol": "BTCUSDT",
+                    "price": 45000.0,
+                    "volume": 1500.0,
+                    "timestamp": 1754903514.933627,
+                    "signal_strength": 0.85
+                  },
+                  "success": true
+                },
+                {
+                  "type": "signal_notification",
+                  "timestamp": 1754903515.035181,
+                  "data": {
+                    "symbol": "BTCUSDT",
+                    "price": 45000.0,
+                    "volume": 1500.0,
+                    "timestamp": 1754903514.933627,
+                    "signal_strength": 0.85
+                  },
+                  "success": true
+                },
+                {
+                  "type": "portfolio_update",
+                  "timestamp": 1754903515.044307,
+                  "data": {
+                    "symbol": "BTCUSDT",
+                    "price": 45000.0,
+                    "volume": 1500.0,
+                    "timestamp": 1754903514.933627,
+                    "signal_strength": 0.85
+                  },
+                  "success": true
+                },
+                {
+                  "type": "risk_indicator_update",
+                  "timestamp": 1754903515.05339,
+                  "data": {
+                    "symbol": "BTCUSDT",
+                    "price": 45000.0,
+                    "volume": 1500.0,
+                    "timestamp": 1754903514.933627,
+                    "signal_strength": 0.85
+                  },
+                  "success": true
+                }
+              ],
+              "frontend_validation": {
+                "all_updates_received": true,
+                "update_success_rate": 100.0,
+                "received_count": 4,
+                "expected_count": 4
+              },
+              "data_integrity_maintained": true
+            },
+            {
+              "scenario_name": "多交易對並行處理",
+              "total_latency_ms": 109.95888710021973,
+              "latency_target_ms": 200.0,
+              "latency_pass": true,
+              "pipeline_stages": [
+                "websocket_reception",
+                "phase1_processing",
+                "phase2_strategy",
+                "phase3_integration"
+              ],
+              "frontend_updates": [
+                {
+                  "type": "multi_chart_update",
+                  "timestamp": 1754903515.146993,
+                  "data": {
+                    "symbols": [
+                      "BTCUSDT",
+                      "ETHUSDT",
+                      "ADAUSDT"
+                    ],
+                    "concurrent_signals": 3,
+                    "timestamp": 1754903514.933643
+                  },
+                  "success": true
+                },
+                {
+                  "type": "signal_list_update",
+                  "timestamp": 1754903515.155477,
+                  "data": {
+                    "symbols": [
+                      "BTCUSDT",
+                      "ETHUSDT",
+                      "ADAUSDT"
+                    ],
+                    "concurrent_signals": 3,
+                    "timestamp": 1754903514.933643
+                  },
+                  "success": true
+                },
+                {
+                  "type": "portfolio_overview_update",
+                  "timestamp": 1754903515.164602,
+                  "data": {
+                    "symbols": [
+                      "BTCUSDT",
+                      "ETHUSDT",
+                      "ADAUSDT"
+                    ],
+                    "concurrent_signals": 3,
+                    "timestamp": 1754903514.933643
+                  },
+                  "success": true
+                }
+              ],
+              "frontend_validation": {
+                "all_updates_received": true,
+                "update_success_rate": 100.0,
+                "received_count": 3,
+                "expected_count": 3
+              },
+              "data_integrity_maintained": true
+            },
+            {
+              "scenario_name": "高頻數據流壓力測試",
+              "total_latency_ms": 110.78500747680664,
+              "latency_target_ms": 200.0,
+              "latency_pass": true,
+              "pipeline_stages": [
+                "websocket_reception",
+                "phase1_processing",
+                "phase2_strategy",
+                "phase3_integration"
+              ],
+              "frontend_updates": [
+                {
+                  "type": "real_time_price_stream",
+                  "timestamp": 1754903515.258132,
+                  "data": {
+                    "symbol": "BTCUSDT",
+                    "high_frequency": true,
+                    "update_interval_ms": 100,
+                    "duration_seconds": 10
+                  },
+                  "success": true
+                },
+                {
+                  "type": "volume_indicator_stream",
+                  "timestamp": 1754903515.267305,
+                  "data": {
+                    "symbol": "BTCUSDT",
+                    "high_frequency": true,
+                    "update_interval_ms": 100,
+                    "duration_seconds": 10
+                  },
+                  "success": true
+                },
+                {
+                  "type": "technical_indicators_stream",
+                  "timestamp": 1754903515.276622,
+                  "data": {
+                    "symbol": "BTCUSDT",
+                    "high_frequency": true,
+                    "update_interval_ms": 100,
+                    "duration_seconds": 10
+                  },
+                  "success": true
+                }
+              ],
+              "frontend_validation": {
+                "all_updates_received": true,
+                "update_success_rate": 100.0,
+                "received_count": 3,
+                "expected_count": 3
+              },
+              "data_integrity_maintained": true
+            }
+          ],
+          "status": "✅ PASSED"
+        },
+        "test_realtime_ui_responsiveness": {
+          "test_name": "實時UI響應性測試",
+          "success": true,
+          "target_compliance": 100.0,
+          "consistency_rate": 100.0,
+          "update_reliability": 100.0,
+          "components_tested": 4,
+          "ui_responsiveness_results": [
+            {
+              "scenario_name": "價格圖表實時更新",
+              "component": "price_chart",
+              "avg_response_time_ms": 12.737624499262596,
+              "max_response_time_ms": 18.934965133666992,
+              "p95_response_time_ms": 18.34244728088379,
+              "target_response_time_ms": 16.7,
+              "meets_target": "True",
+              "consistent_performance": "True",
+              "updates_processed": 49,
+              "missed_updates": 0
+            },
+            {
+              "scenario_name": "信號通知即時顯示",
+              "component": "signal_notifications",
+              "avg_response_time_ms": 39.0369176864624,
+              "max_response_time_ms": 44.78907585144043,
+              "p95_response_time_ms": 43.963706493377686,
+              "target_response_time_ms": 50.0,
+              "meets_target": "True",
+              "consistent_performance": "True",
+              "updates_processed": 10,
+              "missed_updates": 0
+            },
+            {
+              "scenario_name": "投資組合動態更新",
+              "component": "portfolio_display",
+              "avg_response_time_ms": 72.2925066947937,
+              "max_response_time_ms": 100.24118423461914,
+              "p95_response_time_ms": 90.45201539993286,
+              "target_response_time_ms": 100.0,
+              "meets_target": "True",
+              "consistent_performance": "True",
+              "updates_processed": 16,
+              "missed_updates": 0
+            },
+            {
+              "scenario_name": "技術指標實時計算",
+              "component": "technical_indicators",
+              "avg_response_time_ms": 46.36256694793701,
+              "max_response_time_ms": 80.0027847290039,
+              "p95_response_time_ms": 66.94427728652954,
+              "target_response_time_ms": 80.0,
+              "meets_target": "True",
+              "consistent_performance": "True",
+              "updates_processed": 30,
+              "missed_updates": 0
+            }
+          ],
+          "status": "✅ PASSED"
+        },
+        "test_user_interaction_signal_flow": {
+          "test_name": "用戶交互信號流測試",
+          "success": true,
+          "avg_interaction_latency_ms": 88.01380793253581,
+          "interaction_compliance": 100.0,
+          "response_completeness": 100.0,
+          "user_feedback_quality": 100.0,
+          "scenarios_tested": 3,
+          "interaction_results": [
+            {
+              "scenario_name": "手動交易信號觸發",
+              "action": "manual_trade_signal",
+              "interaction_latency_ms": 81.22491836547852,
+              "interaction_target_ms": 150.0,
+              "interaction_pass": true,
+              "responses_received": [
+                "signal_validation",
+                "risk_assessment",
+                "execution_confirmation"
+              ],
+              "response_validation": {
+                "all_responses_received": true,
+                "response_match_rate": 100.0,
+                "received_count": 3,
+                "expected_count": 3
+              },
+              "user_feedback_provided": true
+            },
+            {
+              "scenario_name": "參數調整實時反映",
+              "action": "parameter_adjustment",
+              "interaction_latency_ms": 121.43731117248535,
+              "interaction_target_ms": 150.0,
+              "interaction_pass": true,
+              "responses_received": [
+                "parameter_validation",
+                "strategy_recalculation",
+                "ui_update"
+              ],
+              "response_validation": {
+                "all_responses_received": true,
+                "response_match_rate": 100.0,
+                "received_count": 3,
+                "expected_count": 3
+              },
+              "user_feedback_provided": true
+            },
+            {
+              "scenario_name": "警告設定觸發測試",
+              "action": "alert_configuration",
+              "interaction_latency_ms": 61.379194259643555,
+              "interaction_target_ms": 150.0,
+              "interaction_pass": true,
+              "responses_received": [
+                "alert_registration",
+                "monitoring_activation",
+                "confirmation_display"
+              ],
+              "response_validation": {
+                "all_responses_received": true,
+                "response_match_rate": 100.0,
+                "received_count": 3,
+                "expected_count": 3
+              },
+              "user_feedback_provided": true
+            }
+          ],
+          "status": "✅ PASSED"
+        },
+        "test_frontend_backend_data_sync": {
+          "test_name": "前後端數據同步測試",
+          "success": "False",
+          "overall_acceptable_delay_rate": 41.5,
+          "consistency_rate": 100.0,
+          "data_integrity_rate": 100.0,
+          "avg_reliability": 100.0,
+          "scenarios_tested": 4,
+          "sync_results": [
+            {
+              "scenario_name": "交易信號狀態同步",
+              "data_type": "trading_signals",
+              "avg_sync_delay_ms": 142.72871017456055,
+              "max_sync_delay_ms": 215.66200256347656,
+              "acceptable_delay_ms": 100,
+              "acceptable_delay_rate": 10.0,
+              "data_consistency": true,
+              "no_data_loss": true,
+              "updates_processed": 10,
+              "sync_reliability": 100.0
+            },
+            {
+              "scenario_name": "投資組合餘額同步",
+              "data_type": "portfolio_balance",
+              "avg_sync_delay_ms": 248.6064910888672,
+              "max_sync_delay_ms": 381.0088634490967,
+              "acceptable_delay_ms": 200,
+              "acceptable_delay_rate": 20.0,
+              "data_consistency": true,
+              "no_data_loss": true,
+              "updates_processed": 5,
+              "sync_reliability": 100.0
+            },
+            {
+              "scenario_name": "風險指標實時同步",
+              "data_type": "risk_metrics",
+              "avg_sync_delay_ms": 45.01298268636068,
+              "max_sync_delay_ms": 81.79497718811035,
+              "acceptable_delay_ms": 50,
+              "acceptable_delay_rate": 60.0,
+              "data_consistency": true,
+              "no_data_loss": true,
+              "updates_processed": 15,
+              "sync_reliability": 100.0
+            },
+            {
+              "scenario_name": "市場數據流同步",
+              "data_type": "market_data",
+              "avg_sync_delay_ms": 25.993142127990723,
+              "max_sync_delay_ms": 58.953046798706055,
+              "acceptable_delay_ms": 30,
+              "acceptable_delay_rate": 76.0,
+              "data_consistency": true,
+              "no_data_loss": true,
+              "updates_processed": 50,
+              "sync_reliability": 100.0
+            }
+          ],
+          "status": "❌ FAILED"
+        },
+        "test_complete_user_experience_flow": {
+          "test_name": "完整用戶體驗流程測試",
+          "success": "True",
+          "time_compliance": 100.0,
+          "flow_completion_rate": 100.0,
+          "avg_satisfaction_score": 9.06818730130306,
+          "avg_smoothness": 97.45578575134277,
+          "scenarios_tested": 3,
+          "user_experience_results": [
+            {
+              "scenario_name": "新用戶首次使用流程",
+              "total_flow_time_s": 4.606136083602905,
+              "max_total_time_s": 10.0,
+              "time_target_met": true,
+              "flow_steps_completed": 5,
+              "expected_steps": 5,
+              "ux_evaluation": {
+                "satisfaction_score": 9.163785383898889,
+                "flow_smoothness": 95.78814268112183,
+                "avg_step_time_s": 0.9211857318878174,
+                "completion_rate": 1.0
+              },
+              "user_satisfaction_score": 9.163785383898889,
+              "flow_smoothness": 95.78814268112183
+            },
+            {
+              "scenario_name": "資深用戶日常交易流程",
+              "total_flow_time_s": 4.210466146469116,
+              "max_total_time_s": 15.0,
+              "time_target_met": true,
+              "flow_steps_completed": 5,
+              "expected_steps": 5,
+              "ux_evaluation": {
+                "satisfaction_score": 8.8996096816413,
+                "flow_smoothness": 96.5792145729065,
+                "avg_step_time_s": 0.8420785427093506,
+                "completion_rate": 1.0
+              },
+              "user_satisfaction_score": 8.8996096816413,
+              "flow_smoothness": 96.5792145729065
+            },
+            {
+              "scenario_name": "風險管理和監控流程",
+              "total_flow_time_s": 1.5058906078338623,
+              "max_total_time_s": 8.0,
+              "time_target_met": true,
+              "flow_steps_completed": 5,
+              "expected_steps": 5,
+              "ux_evaluation": {
+                "satisfaction_score": 9.141166838368992,
+                "flow_smoothness": 100,
+                "avg_step_time_s": 0.30116896629333495,
+                "completion_rate": 1.0
+              },
+              "user_satisfaction_score": 9.141166838368992,
+              "flow_smoothness": 100
+            }
+          ],
+          "status": "✅ PASSED"
+        }
+      },
+      "phase_duration_s": 62.99622678756714
+    }
+  },
+  "performance_analysis": {
+    "phase_performance": {
+      "websocket_data_layer": {
+        "duration_s": 5.1144702434539795,
+        "success_rate": 100.0,
+        "performance_stats": {}
+      },
+      "phase1_comprehensive": {
+        "duration_s": 0.21252775192260742,
+        "success_rate": 80.0,
+        "performance_stats": {
+          "phase1a_latency": {
+            "avg_ms": 21.152973175048828,
+            "max_ms": 21.152973175048828,
+            "min_ms": 21.152973175048828
+          },
+          "phase1b_latency": {
+            "avg_ms": 31.08326594034831,
+            "max_ms": 31.095027923583984,
+            "min_ms": 31.06999397277832
+          },
+          "phase1c_latency": {
+            "avg_ms": 20.816326141357422,
+            "max_ms": 20.816326141357422,
+            "min_ms": 20.816326141357422
+          },
+          "unified_pool_latency": {
+            "avg_ms": 26.149988174438477,
+            "max_ms": 26.149988174438477,
+            "min_ms": 26.149988174438477
+          },
+          "indicator_calculation_latency": {
+            "avg_ms": 41.38898849487305,
+            "max_ms": 41.38898849487305,
+            "min_ms": 41.38898849487305
+          }
+        },
+        "avg_component_latency_ms": 28.11830838521322
+      },
+      "phase2_strategy_level": {
+        "duration_s": 0.18952226638793945,
+        "success_rate": 100.0,
+        "performance_stats": {}
+      },
+      "phase4_frontend_e2e": {
+        "duration_s": 62.99622678756714,
+        "success_rate": 80.0,
+        "performance_stats": {
+          "full_pipeline_latency": {
+            "avg": 113.49725723266602,
+            "max": 119.74787712097168,
+            "min": 109.95888710021973,
+            "count": 3
+          },
+          "ui_update_latency": {
+            "avg": 33.92447517031715,
+            "max": 100.24118423461914,
+            "min": 7.496118545532227,
+            "count": 105
+          },
+          "user_interaction_latency": {
+            "avg": 88.01380793253581,
+            "max": 121.43731117248535,
+            "min": 61.379194259643555,
+            "count": 3
+          },
+          "data_sync_latency": {
+            "avg": 58.064642548561096,
+            "max": 381.0088634490967,
+            "min": 5.764961242675781,
+            "count": 80
+          }
+        },
+        "ui_response_time_ms": 33.92447517031715,
+        "user_interaction_latency_ms": 88.01380793253581
+      }
+    },
+    "overall_performance_score": 36.0,
+    "performance_trends": [
+      "phase3_cross_integration 階段延遲異常偏高",
+      "整體成功率良好，部分階段可優化"
+    ]
+  },
+  "error_analysis": {
+    "total_errors": 5,
+    "error_categories": {
+      "other_errors": 5
+    },
+    "critical_failures": [],
+    "failure_patterns": []
+  },
+  "benchmark_comparison": {},
+  "improvement_recommendations": [
+    {
+      "category": "跨階段整合",
+      "priority": "中",
+      "description": "跨組件整合存在問題，可能影響系統穩定性",
+      "action": "檢查組件間接口、錯誤處理機制、負載均衡"
+    },
+    {
+      "category": "性能優化",
+      "priority": "中",
+      "description": "整體性能分數偏低，建議進行系統性能調優",
+      "action": "分析性能瓶頸、優化算法效率、考慮硬體升級"
+    }
+  ],
+  "test_environment": {
+    "timestamp": "2025-08-11T17:12:57.930070",
+    "python_version": "3.9.6 (default, Nov 11 2024, 03:15:38) \n[Clang 16.0.0 (clang-1600.0.26.6)]",
+    "platform": "darwin"
+  }
+}
