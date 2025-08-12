@@ -7,6 +7,7 @@ WebSocket → Phase1A → Phase1B → Phase1C → 輸出
 
 import asyncio
 import logging
+import os
 from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta
@@ -23,11 +24,11 @@ from .indicator_dependency.indicator_dependency_graph import (
 from .phase1a_basic_signal_generation.phase1a_basic_signal_generation import (
     phase1a_signal_generator, start_phase1a_generator, stop_phase1a_generator
 )
-from .phase1b_signal_filtering_enhancement.phase1b_signal_filtering_enhancement import (
-    phase1b_filter_enhancer, start_phase1b_filter, stop_phase1b_filter
+from .phase1b_volatility_adaptation.phase1b_volatility_adaptation import (
+    phase1b_volatility_adapter, start_phase1b_adapter, stop_phase1b_adapter
 )
-from .phase1c_unified_signal_pool.unified_signal_pool_v3 import (
-    phase1c_unified_pool, start_phase1c_pool, stop_phase1c_pool
+from .unified_signal_pool.unified_signal_candidate_pool import (
+    unified_signal_pool, start_unified_pool, stop_unified_pool
 )
 from .intelligent_trigger_engine import (
     intelligent_trigger_engine, start_intelligent_trigger_engine, stop_intelligent_trigger_engine,
@@ -38,138 +39,123 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Phase1Performance:
-    """Phase1 性能統計"""
-    total_processing_time_ms: float
-    websocket_latency_ms: float
-    indicator_processing_ms: float
-    phase1a_processing_ms: float
-    phase1b_processing_ms: float
-    phase1c_processing_ms: float
-    end_to_end_latency_ms: float
-    throughput_signals_per_minute: float
-    success_rate: float
+    """Phase1 性能指標"""
+    total_signals_processed: int = 0
+    average_processing_time: float = 0.0
+    websocket_latency: float = 0.0
+    phase1a_throughput: float = 0.0
+    phase1b_filter_rate: float = 0.0
+    phase1c_pool_size: int = 0
+    last_update_time: Optional[datetime] = None
 
-@dataclass
+@dataclass  
 class Phase1Status:
-    """Phase1 運行狀態"""
-    is_running: bool
-    websocket_connected: bool
-    indicator_engine_active: bool
-    phase1a_active: bool
-    phase1b_active: bool
-    phase1c_active: bool
-    intelligent_trigger_active: bool  # 新增
-    total_signals_processed: int
-    error_count: int
-    last_signal_time: Optional[datetime]
-
-class Phase1Coordinator:
-    """Phase1 主協調器"""
+    """Phase1 狀態管理"""
+    websocket_active: bool = False
+    indicator_engine_active: bool = False
+    phase1a_active: bool = False
+    phase1b_active: bool = False
+    phase1c_active: bool = False
+    intelligent_trigger_active: bool = False
+    coordinator_running: bool = False
+    total_processed_signals: int = 0
+    last_signal_time: Optional[datetime] = None
+    error_count: int = 0
+    
+class Phase1MainCoordinator:
+    """Phase1 主協調器
+    
+    職責：
+    1. 統一管理 WebSocket → Phase1A → Phase1B → Phase1C → 智能觸發 流水線
+    2. 監控各組件健康狀態和性能指標
+    3. 處理組件間的信號傳遞和數據流
+    4. 提供統一的啟動、停止和配置接口
+    5. 實現 < 180ms 端到端處理延遲目標
+    """
     
     def __init__(self):
         self.config = self._load_config()
-        
-        # 性能監控
-        self.performance_stats = []
-        self.error_log = []
-        self.processing_chain_times = {}
-        
-        # 運行狀態
-        self.status = Phase1Status(
-            is_running=False,
-            websocket_connected=False,
-            indicator_engine_active=False,
-            phase1a_active=False,
-            phase1b_active=False,
-            phase1c_active=False,
-            intelligent_trigger_active=False,  # 新增
-            total_signals_processed=0,
-            error_count=0,
-            last_signal_time=None
-        )
-        
-        # 輸出訂閱者
-        self.phase1_output_subscribers = []
-        
-        # 內部任務
+        self.status = Phase1Status()
+        self.performance = Phase1Performance()
         self.coordinator_tasks = []
+        self.signal_subscribers = []
         
         logger.info("Phase1 主協調器初始化完成")
     
     def _load_config(self) -> Dict[str, Any]:
         """載入配置"""
         try:
-            config_path = "/Users/henrychang/Desktop/Trading-X/X/backend/phase1_signal_generation/phase1_main_coordinator_dependency.json"
-            with open(config_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+            config_path = os.path.join(os.path.dirname(__file__), "phase1_config.json")
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            else:
+                return self._get_default_config()
         except Exception as e:
-            logger.error(f"配置載入失敗: {e}")
+            logger.warning(f"載入配置失敗，使用預設配置: {e}")
             return self._get_default_config()
     
     def _get_default_config(self) -> Dict[str, Any]:
-        """預設配置"""
+        """獲取預設配置"""
         return {
-            "symbols": ["BTCUSDT", "ETHUSDT", "ADAUSDT", "BNBUSDT", "SOLUSDT"],
-            "performance_targets": {
-                "end_to_end_latency": "< 180ms",
-                "websocket_latency": "< 12ms",
-                "indicator_processing": "< 45ms",
-                "phase1a_processing": "< 45ms",
-                "phase1b_processing": "< 25ms",
-                "phase1c_processing": "< 15ms",
-                "throughput": "> 500 signals/min"
-            },
             "startup_sequence_delays": {
-                "websocket_to_indicators": 2.0,
-                "indicators_to_phase1a": 1.0,
-                "phase1a_to_phase1b": 0.5,
-                "phase1b_to_phase1c": 0.5
+                "websocket_to_indicator": 1.0,
+                "indicator_to_phase1a": 0.5,
+                "phase1a_to_phase1b": 0.3,
+                "phase1b_to_phase1c": 0.3,
+                "phase1c_to_trigger": 0.2
             },
-            "health_check_interval": 30,
-            "performance_monitoring_interval": 60
+            "performance_targets": {
+                "max_end_to_end_latency": 180,  # ms
+                "min_throughput": 100,  # signals/sec
+                "max_error_rate": 0.01  # 1%
+            },
+            "monitoring": {
+                "health_check_interval": 5,  # seconds
+                "performance_report_interval": 30,  # seconds
+                "log_level": "INFO"
+            }
         }
     
     async def start_phase1_pipeline(self, symbols: List[str] = None) -> bool:
-        """啟動完整的 Phase1 信號生成流水線"""
-        if self.status.is_running:
-            logger.warning("Phase1 流水線已在運行")
-            return True
+        """啟動完整的 Phase1 處理流水線"""
         
         try:
-            symbols = symbols or self.config.get("symbols", ["BTCUSDT"])
-            logger.info(f"啟動 Phase1 信號生成流水線: {symbols}")
+            logger.info("🚀 開始啟動 Phase1 處理流水線...")
+            logger.info("="*60)
             
-            # 1. 啟動 WebSocket 實時驅動器
-            logger.info("步驟 1/5: 啟動 WebSocket 實時驅動器")
+            # 1. 啟動 WebSocket 實時數據驅動器
+            logger.info("步驟 1/6: 啟動 WebSocket 實時數據驅動器")
+            symbols = symbols or ["BTCUSDT", "ETHUSDT", "BNBUSDT"]
             await start_realtime_driver(symbols)
-            await asyncio.sleep(self.config["startup_sequence_delays"]["websocket_to_indicators"])
-            self.status.websocket_connected = True
-            logger.info("✅ WebSocket 驅動器啟動完成")
+            await asyncio.sleep(self.config["startup_sequence_delays"]["websocket_to_indicator"])
+            self.status.websocket_active = True
+            logger.info("✅ WebSocket 實時數據驅動器啟動完成")
             
-            # 2. 啟動技術指標引擎
-            logger.info("步驟 2/5: 啟動技術指標引擎")
-            await start_indicator_engine()
-            await asyncio.sleep(self.config["startup_sequence_delays"]["indicators_to_phase1a"])
+            # 2. 啟動指標依賴引擎
+            logger.info("步驟 2/6: 啟動指標依賴引擎")
+            await start_indicator_engine(websocket_realtime_driver)
+            await asyncio.sleep(self.config["startup_sequence_delays"]["indicator_to_phase1a"])
             self.status.indicator_engine_active = True
-            logger.info("✅ 技術指標引擎啟動完成")
+            logger.info("✅ 指標依賴引擎啟動完成")
             
             # 3. 啟動 Phase1A 基礎信號生成器
-            logger.info("步驟 3/5: 啟動 Phase1A 基礎信號生成器")
-            await start_phase1a_generator(websocket_realtime_driver)
+            logger.info("步驟 3/6: 啟動 Phase1A 基礎信號生成器")
+            await start_phase1a_generator(indicator_dependency_graph)
             await asyncio.sleep(self.config["startup_sequence_delays"]["phase1a_to_phase1b"])
             self.status.phase1a_active = True
             logger.info("✅ Phase1A 基礎信號生成器啟動完成")
             
             # 4. 啟動 Phase1B 信號過濾增強器
-            logger.info("步驟 4/5: 啟動 Phase1B 信號過濾增強器")
-            await start_phase1b_filter()
+            logger.info("步驟 4/6: 啟動 Phase1B 信號過濾增強器")
+            await start_phase1b_adapter()
             await asyncio.sleep(self.config["startup_sequence_delays"]["phase1b_to_phase1c"])
             self.status.phase1b_active = True
             logger.info("✅ Phase1B 信號過濾增強器啟動完成")
             
             # 5. 啟動 Phase1C 統一信號池
             logger.info("步驟 5/6: 啟動 Phase1C 統一信號池")
-            await start_phase1c_pool()
+            await start_unified_pool()
             self.status.phase1c_active = True
             logger.info("✅ Phase1C 統一信號池啟動完成")
             
@@ -186,327 +172,272 @@ class Phase1Coordinator:
             self.coordinator_tasks = [
                 asyncio.create_task(self._health_monitor()),
                 asyncio.create_task(self._performance_monitor()),
-                asyncio.create_task(self._end_to_end_latency_tracker())
+                asyncio.create_task(self._signal_flow_coordinator())
             ]
             
-            self.status.is_running = True
-            logger.info("🎉 Phase1 信號生成流水線完全啟動成功!")
+            self.status.coordinator_running = True
+            
+            logger.info("="*60)
+            logger.info("🎉 Phase1 處理流水線啟動完成！")
+            logger.info(f"📊 目標延遲: < {self.config['performance_targets']['max_end_to_end_latency']}ms")
+            logger.info(f"📈 目標吞吐量: > {self.config['performance_targets']['min_throughput']} signals/sec")
             
             return True
             
         except Exception as e:
-            logger.error(f"Phase1 流水線啟動失敗: {e}")
-            await self.stop_phase1_pipeline()
+            logger.error(f"❌ Phase1 流水線啟動失敗: {e}")
+            await self._emergency_shutdown()
             return False
     
-    async def stop_phase1_pipeline(self):
-        """停止 Phase1 信號生成流水線"""
-        logger.info("停止 Phase1 信號生成流水線")
+    async def stop_phase1_pipeline(self) -> bool:
+        """停止 Phase1 處理流水線"""
         
         try:
-            # 取消協調器任務
-            for task in self.coordinator_tasks:
-                if not task.done():
-                    task.cancel()
-            self.coordinator_tasks.clear()
+            logger.info("🛑 開始停止 Phase1 處理流水線...")
             
-            # 反向順序停止組件
+            # 停止協調器任務
+            for task in self.coordinator_tasks:
+                task.cancel()
+            self.coordinator_tasks.clear()
+            self.status.coordinator_running = False
+            
             logger.info("停止智能觸發引擎")
             await stop_intelligent_trigger_engine()
             self.status.intelligent_trigger_active = False
             
             logger.info("停止 Phase1C 統一信號池")
-            await stop_phase1c_pool()
+            await stop_unified_pool()
             self.status.phase1c_active = False
             
             logger.info("停止 Phase1B 信號過濾增強器")
-            await stop_phase1b_filter()
+            await stop_phase1b_adapter()
             self.status.phase1b_active = False
             
             logger.info("停止 Phase1A 基礎信號生成器")
             await stop_phase1a_generator()
             self.status.phase1a_active = False
             
-            logger.info("停止技術指標引擎")
+            logger.info("停止指標依賴引擎")
             await stop_indicator_engine()
             self.status.indicator_engine_active = False
             
-            logger.info("停止 WebSocket 實時驅動器")
+            logger.info("停止 WebSocket 實時數據驅動器")
             await stop_realtime_driver()
-            self.status.websocket_connected = False
+            self.status.websocket_active = False
             
-            self.status.is_running = False
-            logger.info("✅ Phase1 信號生成流水線已完全停止")
+            logger.info("✅ Phase1 處理流水線停止完成")
+            return True
             
         except Exception as e:
-            logger.error(f"Phase1 流水線停止失敗: {e}")
+            logger.error(f"❌ Phase1 流水線停止失敗: {e}")
+            return False
     
     async def _setup_signal_processing_chain(self):
         """建立信號處理鏈"""
         try:
-            # Phase1A -> Phase1B 連接
-            phase1a_signal_generator.subscribe_to_signals(self._on_phase1a_signals)
-            
-            # Phase1C -> 外部輸出連接
-            phase1c_unified_pool.subscribe_to_unified_signals(self._on_phase1c_output)
-            
-            # WebSocket -> 智能觸發引擎連接
+            # 訂閱各組件的輸出
             websocket_realtime_driver.subscribe_to_price_updates(self._on_websocket_price_update)
+            intelligent_trigger_engine.subscribe_to_intelligent_signals(self._on_intelligent_trigger_signal)
+            phase1a_signal_generator.subscribe_to_basic_signals(self._on_phase1a_signals)
+            unified_signal_pool.subscribe_to_unified_signals(self._on_phase1c_output)
             
-            # 智能觸發引擎 -> Phase1C 連接
-            subscribe_to_intelligent_signals(self._on_intelligent_trigger_signal)
-            
-            logger.info("信號處理鏈建立完成 (包含智能觸發引擎)")
+            logger.info("✅ 信號處理鏈建立完成")
             
         except Exception as e:
-            logger.error(f"信號處理鏈建立失敗: {e}")
+            logger.error(f"❌ 信號處理鏈建立失敗: {e}")
+            raise
     
     async def _on_websocket_price_update(self, symbol: str, price_data: Dict[str, Any]):
-        """處理WebSocket價格更新"""
+        """處理 WebSocket 價格更新"""
         try:
-            # 轉發到智能觸發引擎
-            await process_realtime_price_update(
-                symbol=symbol,
-                price=price_data.get('price', 0),
-                volume=price_data.get('volume', 0)
-            )
+            # 更新性能指標
+            self.performance.last_update_time = datetime.now()
+            
+            # 傳遞給智能觸發引擎進行實時處理
+            await process_realtime_price_update(symbol, price_data)
+            
         except Exception as e:
-            logger.error(f"WebSocket價格更新處理失敗: {e}")
+            logger.error(f"❌ WebSocket 價格更新處理失敗: {e}")
+            self.status.error_count += 1
     
     async def _on_intelligent_trigger_signal(self, signal: Dict[str, Any]):
         """處理智能觸發信號"""
         try:
-            # 將智能觸發信號加入到Phase1C統一信號池
-            signal_id = await phase1c_unified_pool.add_intelligent_signal(signal)
+            # 添加到統一信號池
+            signal_id = await unified_signal_pool.add_intelligent_signal(signal)
             
-            if signal_id:
-                self.status.total_signals_processed += 1
-                self.status.last_signal_time = datetime.now()
-                
-                logger.info(f"🧠 智能觸發信號已加入信號池: {signal['symbol']} | 勝率: {signal.get('win_rate_prediction', 0):.2%}")
+            logger.debug(f"智能觸發信號已添加到統一池: {signal_id}")
             
         except Exception as e:
-            logger.error(f"智能觸發信號處理失敗: {e}")
+            logger.error(f"❌ 智能觸發信號處理失敗: {e}")
             self.status.error_count += 1
     
     async def _on_phase1a_signals(self, signals: List[Any]):
-        """處理 Phase1A 信號"""
+        """處理 Phase1A 基礎信號"""
         try:
-            start_time = time.time()
+            if not signals:
+                return
             
-            # Phase1A -> Phase1B
-            filtered_signals = await phase1b_filter_enhancer.process_signals(signals)
+            # 通過 Phase1B 過濾器處理
+            filtered_signals = await phase1b_volatility_adapter.process_signals(signals)
             
-            phase1b_time = time.time()
-            
-            # Phase1B -> Phase1C
             if filtered_signals:
-                added_signal_ids = await phase1c_unified_pool.add_signals(filtered_signals)
-                
-                phase1c_time = time.time()
-                
-                # 記錄處理時間
-                self.processing_chain_times.update({
-                    'phase1b_processing': (phase1b_time - start_time) * 1000,
-                    'phase1c_processing': (phase1c_time - phase1b_time) * 1000,
-                    'phase1bc_total': (phase1c_time - start_time) * 1000
-                })
-                
-                self.status.total_signals_processed += len(added_signal_ids)
-                self.status.last_signal_time = datetime.now()
-                
+                # 添加到 Phase1C 統一信號池
+                added_signal_ids = await unified_signal_pool.add_signals(filtered_signals)
+                logger.debug(f"Phase1A 信號已處理並添加到統一池: {len(added_signal_ids)} 個")
+            
+            # 更新統計
+            self.status.total_processed_signals += len(signals)
+            self.status.last_signal_time = datetime.now()
+            
         except Exception as e:
-            logger.error(f"Phase1A 信號處理失敗: {e}")
+            logger.error(f"❌ Phase1A 信號處理失敗: {e}")
             self.status.error_count += 1
     
     async def _on_phase1c_output(self, unified_signals: List[Any]):
-        """處理 Phase1C 輸出信號 - 最終輸出"""
+        """處理 Phase1C 統一輸出"""
         try:
-            # 記錄最終輸出性能
-            end_time = time.time()
+            if not unified_signals:
+                return
             
-            # 通知外部訂閱者
-            for subscriber in self.phase1_output_subscribers:
+            # 通知所有訂閱者
+            for subscriber in self.signal_subscribers:
                 try:
                     if asyncio.iscoroutinefunction(subscriber):
                         await subscriber(unified_signals)
                     else:
                         subscriber(unified_signals)
                 except Exception as e:
-                    logger.error(f"Phase1 輸出訂閱者通知失敗: {e}")
+                    logger.error(f"❌ 訂閱者通知失敗: {e}")
             
-            logger.info(f"🎯 Phase1 完成輸出: {len(unified_signals)} 個統一信號")
+            logger.info(f"📤 Phase1 最終輸出: {len(unified_signals)} 個統一信號")
             
         except Exception as e:
-            logger.error(f"Phase1C 輸出處理失敗: {e}")
+            logger.error(f"❌ Phase1C 輸出處理失敗: {e}")
             self.status.error_count += 1
     
     def subscribe_to_phase1_output(self, callback: Callable):
         """訂閱 Phase1 最終輸出"""
-        if callback not in self.phase1_output_subscribers:
-            self.phase1_output_subscribers.append(callback)
-            logger.info(f"新增 Phase1 輸出訂閱者: {callback.__name__}")
+        self.signal_subscribers.append(callback)
+        logger.info(f"新訂閱者已添加，當前訂閱者數量: {len(self.signal_subscribers)}")
     
     async def _health_monitor(self):
-        """健康監控器"""
-        while self.status.is_running:
+        """健康監控任務"""
+        while self.status.coordinator_running:
             try:
-                # 檢查各組件健康狀態
-                websocket_health = await self._check_websocket_health()
-                indicator_health = await self._check_indicator_health()
-                phase1a_health = await self._check_phase1a_health()
-                phase1b_health = await self._check_phase1b_health()
-                phase1c_health = await self._check_phase1c_health()
-                trigger_engine_health = await self._check_trigger_engine_health()
+                await asyncio.sleep(self.config["monitoring"]["health_check_interval"])
                 
-                # 更新狀態
-                overall_health = all([
-                    websocket_health, indicator_health, 
-                    phase1a_health, phase1b_health, phase1c_health, trigger_engine_health
-                ])
+                # 檢查各組件狀態
+                websocket_ok = websocket_realtime_driver.is_connected
+                indicator_ok = indicator_dependency_graph.is_running
+                phase1a_ok = phase1a_signal_generator.is_running
+                phase1b_ok = phase1b_volatility_adapter.is_running
+                phase1c_ok = unified_signal_pool.is_running
+                trigger_ok = get_intelligent_trigger_status()
                 
-                if not overall_health:
-                    logger.warning("檢測到組件健康問題")
-                    logger.info(f"WebSocket: {'✅' if websocket_health else '❌'}")
-                    logger.info(f"指標引擎: {'✅' if indicator_health else '❌'}")
-                    logger.info(f"Phase1A: {'✅' if phase1a_health else '❌'}")
-                    logger.info(f"Phase1B: {'✅' if phase1b_health else '❌'}")
-                    logger.info(f"Phase1C: {'✅' if phase1c_health else '❌'}")
-                    logger.info(f"智能觸發引擎: {'✅' if trigger_engine_health else '❌'}")
+                if not all([websocket_ok, indicator_ok, phase1a_ok, phase1b_ok, phase1c_ok, trigger_ok]):
+                    logger.warning("⚠️ 檢測到組件健康狀態異常")
+                    
+                    # 記錄詳細狀態
+                    status_details = {
+                        "websocket": websocket_ok,
+                        "indicator": indicator_ok, 
+                        "phase1a": phase1a_ok,
+                        "phase1b": phase1b_ok,
+                        "phase1c": phase1c_ok,
+                        "trigger": trigger_ok
+                    }
+                    
+                    for component, status in status_details.items():
+                        if not status:
+                            logger.error(f"❌ {component} 組件狀態異常")
                 
-                await asyncio.sleep(self.config["health_check_interval"])
-                
+            except asyncio.CancelledError:
+                break
             except Exception as e:
-                logger.error(f"健康監控失敗: {e}")
-                await asyncio.sleep(30)
-    
-    async def _check_websocket_health(self) -> bool:
-        """檢查 WebSocket 健康狀態"""
-        try:
-            stats = await websocket_realtime_driver.get_performance_stats()
-            return stats.get('active_connections', 0) > 0
-        except:
-            return False
-    
-    async def _check_indicator_health(self) -> bool:
-        """檢查指標引擎健康狀態"""
-        try:
-            return indicator_dependency_graph.is_running
-        except:
-            return False
-    
-    async def _check_phase1a_health(self) -> bool:
-        """檢查 Phase1A 健康狀態"""
-        try:
-            return phase1a_signal_generator.is_running
-        except:
-            return False
-    
-    async def _check_phase1b_health(self) -> bool:
-        """檢查 Phase1B 健康狀態"""
-        try:
-            return phase1b_filter_enhancer.is_running
-        except:
-            return False
-    
-    async def _check_phase1c_health(self) -> bool:
-        """檢查 Phase1C 健康狀態"""
-        try:
-            return phase1c_unified_pool.is_running
-        except:
-            return False
-    
-    async def _check_trigger_engine_health(self) -> bool:
-        """檢查智能觸發引擎健康狀態"""
-        try:
-            status = await get_intelligent_trigger_status()
-            return status.get('is_running', False)
-        except:
-            return False
+                logger.error(f"❌ 健康監控錯誤: {e}")
     
     async def _performance_monitor(self):
-        """性能監控器"""
-        while self.status.is_running:
+        """性能監控任務"""
+        while self.status.coordinator_running:
             try:
-                # 收集各組件性能數據
-                websocket_stats = await websocket_realtime_driver.get_performance_stats()
-                phase1a_stats = await phase1a_signal_generator.get_performance_summary()
-                phase1b_stats = await phase1b_filter_enhancer.get_filter_statistics()
-                phase1c_stats = await phase1c_unified_pool.get_pool_status()
+                await asyncio.sleep(self.config["monitoring"]["performance_report_interval"])
                 
-                # 計算整體性能
-                performance = Phase1Performance(
-                    total_processing_time_ms=sum(self.processing_chain_times.values()),
-                    websocket_latency_ms=websocket_stats.get('average_latencies', {}).get('binance_processing', 0),
-                    indicator_processing_ms=0,  # 需要從指標引擎獲取
-                    phase1a_processing_ms=phase1a_stats.get('average_processing_time_ms', 0),
-                    phase1b_processing_ms=self.processing_chain_times.get('phase1b_processing', 0),
-                    phase1c_processing_ms=self.processing_chain_times.get('phase1c_processing', 0),
-                    end_to_end_latency_ms=0,  # 將在延遲追蹤器中計算
-                    throughput_signals_per_minute=phase1c_stats.get('performance', {}).get('throughput_per_minute', 0),
-                    success_rate=max(0, 1 - self.status.error_count / max(self.status.total_signals_processed, 1))
-                )
+                # 收集性能數據
+                phase1b_stats = await phase1b_volatility_adapter.get_filter_statistics()
+                phase1c_stats = await unified_signal_pool.get_pool_status()
                 
-                self.performance_stats.append(performance)
+                # 更新性能指標
+                self.performance.phase1b_filter_rate = phase1b_stats.get("filter_rate", 0.0)
+                self.performance.phase1c_pool_size = phase1c_stats.get("pool_size", 0)
                 
-                # 限制歷史記錄
-                if len(self.performance_stats) > 100:
-                    self.performance_stats = self.performance_stats[-50:]
+                # 計算平均處理時間
+                if self.status.total_processed_signals > 0:
+                    total_time = (datetime.now() - self.performance.last_update_time).total_seconds()
+                    self.performance.average_processing_time = total_time / self.status.total_processed_signals
                 
-                logger.info(f"📊 Phase1 性能: {performance.total_processing_time_ms:.1f}ms 總處理時間, {performance.throughput_signals_per_minute:.0f} 信號/分鐘")
+                # 記錄性能報告
+                logger.info(f"📊 Phase1 性能報告:")
+                logger.info(f"   總處理信號: {self.status.total_processed_signals}")
+                logger.info(f"   平均處理時間: {self.performance.average_processing_time:.3f}ms")
+                logger.info(f"   Phase1B 過濾率: {self.performance.phase1b_filter_rate:.2%}")
+                logger.info(f"   Phase1C 池大小: {self.performance.phase1c_pool_size}")
+                logger.info(f"   錯誤計數: {self.status.error_count}")
                 
-                await asyncio.sleep(self.config["performance_monitoring_interval"])
-                
+            except asyncio.CancelledError:
+                break
             except Exception as e:
-                logger.error(f"性能監控失敗: {e}")
-                await asyncio.sleep(60)
+                logger.error(f"❌ 性能監控錯誤: {e}")
     
-    async def _end_to_end_latency_tracker(self):
-        """端到端延遲追蹤器"""
-        while self.status.is_running:
+    async def _signal_flow_coordinator(self):
+        """信號流協調任務"""
+        while self.status.coordinator_running:
             try:
-                # 實施端到端延遲測量
-                # 這裡可以添加更詳細的延遲追蹤邏輯
-                pass
+                await asyncio.sleep(1.0)  # 每秒檢查一次
                 
+                # 檢查信號流是否暢通
+                phase1c_stats = await unified_signal_pool.get_pool_status()
+                
+                # 如果池中積壓過多信號，觸發處理
+                if phase1c_stats.get("pool_size", 0) > 100:
+                    logger.warning("⚠️ Phase1C 信號池積壓過多，觸發緊急處理")
+                    # 可以在這裡實現緊急處理邏輯
+                
+            except asyncio.CancelledError:
+                break
             except Exception as e:
-                logger.error(f"延遲追蹤失敗: {e}")
-            
-            await asyncio.sleep(10)
+                logger.error(f"❌ 信號流協調錯誤: {e}")
     
     async def get_phase1_status(self) -> Dict[str, Any]:
-        """獲取 Phase1 完整狀態"""
-        try:
-            # 獲取各組件狀態
-            websocket_stats = await websocket_realtime_driver.get_performance_stats()
-            phase1a_stats = await phase1a_signal_generator.get_performance_summary()
-            phase1c_stats = await phase1c_unified_pool.get_pool_status()
-            
-            return {
-                'status': asdict(self.status),
-                'performance': asdict(self.performance_stats[-1]) if self.performance_stats else {},
-                'component_stats': {
-                    'websocket': websocket_stats,
-                    'phase1a': phase1a_stats,
-                    'phase1c': phase1c_stats
-                },
-                'processing_chain_times': self.processing_chain_times,
-                'configuration': self.config
+        """獲取 Phase1 系統狀態"""
+        return {
+            "status": asdict(self.status),
+            "performance": asdict(self.performance),
+            "config": self.config,
+            "component_status": {
+                "websocket": websocket_realtime_driver.is_connected if hasattr(websocket_realtime_driver, 'is_connected') else False,
+                "indicator": indicator_dependency_graph.is_running if hasattr(indicator_dependency_graph, 'is_running') else False,
+                "phase1a": phase1a_signal_generator.is_running if hasattr(phase1a_signal_generator, 'is_running') else False,
+                "phase1b": phase1b_volatility_adapter.is_running if hasattr(phase1b_volatility_adapter, 'is_running') else False,
+                "phase1c": unified_signal_pool.is_running if hasattr(unified_signal_pool, 'is_running') else False,
+                "trigger": get_intelligent_trigger_status() if callable(get_intelligent_trigger_status) else False
             }
-            
-        except Exception as e:
-            logger.error(f"狀態獲取失敗: {e}")
-            return {'error': str(e)}
+        }
     
     async def restart_component(self, component: str) -> bool:
         """重啟指定組件"""
         try:
-            logger.info(f"重啟組件: {component}")
+            logger.info(f"🔄 重啟組件: {component}")
             
             if component == 'websocket':
                 await stop_realtime_driver()
-                await start_realtime_driver(self.config.get("symbols", ["BTCUSDT"]))
-                self.status.websocket_connected = True
+                await start_realtime_driver()
+                self.status.websocket_active = True
+                
+            elif component == 'indicator':
+                await stop_indicator_engine()
+                await start_indicator_engine(websocket_realtime_driver)
+                self.status.indicator_engine_active = True
                 
             elif component == 'phase1a':
                 await stop_phase1a_generator()
@@ -514,51 +445,71 @@ class Phase1Coordinator:
                 self.status.phase1a_active = True
                 
             elif component == 'phase1b':
-                await stop_phase1b_filter()
-                await start_phase1b_filter()
+                await stop_phase1b_adapter()
+                await start_phase1b_adapter()
                 self.status.phase1b_active = True
                 
             elif component == 'phase1c':
-                await stop_phase1c_pool()
-                await start_phase1c_pool()
+                await stop_unified_pool()
+                await start_unified_pool()
                 self.status.phase1c_active = True
                 
-            elif component == 'intelligent_trigger':
+            elif component == 'trigger':
                 await stop_intelligent_trigger_engine()
                 await start_intelligent_trigger_engine()
                 self.status.intelligent_trigger_active = True
                 
             else:
-                logger.error(f"未知組件: {component}")
+                logger.error(f"❌ 未知組件: {component}")
                 return False
             
-            logger.info(f"✅ 組件 {component} 重啟成功")
+            logger.info(f"✅ 組件重啟成功: {component}")
             return True
             
         except Exception as e:
-            logger.error(f"組件 {component} 重啟失敗: {e}")
+            logger.error(f"❌ 組件重啟失敗: {component} - {e}")
             return False
+    
+    async def _emergency_shutdown(self):
+        """緊急關閉"""
+        logger.error("🚨 執行緊急關閉...")
+        try:
+            await self.stop_phase1_pipeline()
+        except Exception as e:
+            logger.error(f"❌ 緊急關閉失敗: {e}")
 
 # 全局實例
-phase1_coordinator = Phase1Coordinator()
+_phase1_coordinator = None
 
-# 便捷函數
 async def start_phase1_system(symbols: List[str] = None) -> bool:
-    """啟動完整 Phase1 系統"""
-    return await phase1_coordinator.start_phase1_pipeline(symbols)
+    """啟動 Phase1 系統"""
+    global _phase1_coordinator
+    _phase1_coordinator = Phase1MainCoordinator()
+    return await _phase1_coordinator.start_phase1_pipeline(symbols)
 
-async def stop_phase1_system():
+async def stop_phase1_system() -> bool:
     """停止 Phase1 系統"""
-    await phase1_coordinator.stop_phase1_pipeline()
+    global _phase1_coordinator
+    if _phase1_coordinator:
+        return await _phase1_coordinator.stop_phase1_pipeline()
+    return False
 
 def subscribe_to_phase1_output(callback: Callable):
-    """訂閱 Phase1 最終輸出"""
-    phase1_coordinator.subscribe_to_phase1_output(callback)
+    """訂閱 Phase1 輸出"""
+    global _phase1_coordinator
+    if _phase1_coordinator:
+        _phase1_coordinator.subscribe_to_phase1_output(callback)
 
 async def get_phase1_system_status() -> Dict[str, Any]:
     """獲取 Phase1 系統狀態"""
-    return await phase1_coordinator.get_phase1_status()
+    global _phase1_coordinator
+    if _phase1_coordinator:
+        return await _phase1_coordinator.get_phase1_status()
+    return {"error": "Phase1 coordinator not initialized"}
 
 async def restart_phase1_component(component: str) -> bool:
     """重啟 Phase1 組件"""
-    return await phase1_coordinator.restart_component(component)
+    global _phase1_coordinator
+    if _phase1_coordinator:
+        return await _phase1_coordinator.restart_component(component)
+    return False

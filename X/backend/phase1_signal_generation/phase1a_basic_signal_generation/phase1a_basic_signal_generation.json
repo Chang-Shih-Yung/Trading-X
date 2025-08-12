@@ -4,7 +4,7 @@
     "created_date": "2024-12-19",
     "description": "Phase1A basic signal generation technical configuration and dependencies",
     "module_type": "signal_generation_foundation",
-    
+
     "strategy_dependency_graph": {
       "core_dependencies": {
         "primary_input_sources": {
@@ -24,7 +24,7 @@
             "priority": "high"
           },
           "phase1b_volatility_adaptation": {
-            "type": "parallel_processing", 
+            "type": "parallel_processing",
             "data_format": "basic_signal_foundation",
             "transport_protocol": "async_queue",
             "priority": "high"
@@ -37,11 +37,11 @@
           }
         }
       },
-      
+
       "technical_dependencies": {
         "computation_libraries": {
           "pandas": ">=1.5.0",
-          "numpy": ">=1.21.0", 
+          "numpy": ">=1.21.0",
           "asyncio": "built_in",
           "aioredis": ">=2.0.0"
         },
@@ -72,21 +72,21 @@
       ],
       "downstream_modules": [
         {
-          "module": "indicator_dependency_graph", 
+          "module": "indicator_dependency_graph",
           "type": "parallel_consumer",
           "delivery_guarantee": "at_least_once",
           "max_queue_size": 1000
         },
         {
           "module": "phase1b_volatility_adaptation",
-          "type": "parallel_consumer", 
+          "type": "parallel_consumer",
           "delivery_guarantee": "at_least_once",
           "max_queue_size": 500
         },
         {
           "module": "phase1c_signal_standardization",
           "type": "sequential_consumer",
-          "delivery_guarantee": "exactly_once", 
+          "delivery_guarantee": "exactly_once",
           "max_queue_size": 200
         }
       ]
@@ -102,7 +102,7 @@
           "error_handling": "circuit_breaker_pattern"
         },
         "layer_1_basic_preprocessing": {
-          "input": "buffered_real_time_market_data", 
+          "input": "buffered_real_time_market_data",
           "processing": "basic_data_cleaning_and_validation",
           "output": "cleaned_market_data",
           "expected_processing_time": "8ms",
@@ -111,7 +111,7 @@
         "layer_2_signal_pregeneration": {
           "input": "cleaned_market_data",
           "processing": "basic_signal_pattern_detection",
-          "output": "basic_signal_candidates", 
+          "output": "basic_signal_candidates",
           "expected_processing_time": "7ms",
           "error_handling": "graceful_degradation"
         },
@@ -123,7 +123,7 @@
           "error_handling": "best_effort_delivery"
         }
       },
-      
+
       "total_expected_processing_time": "25ms",
       "extreme_market_processing_time": "<35ms",
       "concurrency_level": "single_threaded_async",
@@ -136,27 +136,69 @@
           "price_change_threshold": 0.001,
           "volume_change_threshold": 1.5,
           "signal_strength_range": [0.0, 1.0],
-          "confidence_calculation": "basic_statistical_model"
+          "confidence_calculation": "basic_statistical_model",
+          "confidence_threshold": {
+            "type": "dynamic_parameter",
+            "base_value": 0.75,
+            "parameter_id": "phase1_confidence_threshold",
+            "adaptation_source": "dynamic_parameter_system",
+            "market_regime_dependent": true,
+            "description": "基礎信號生成信心度閾值，根據牛熊市場自適應調整"
+          }
         },
         "extreme_market_mode": {
           "price_change_threshold": 0.005,
-          "volume_change_threshold": 3.0, 
+          "volume_change_threshold": 3.0,
           "signal_strength_boost": 1.2,
-          "priority_escalation": true
+          "priority_escalation": true,
+          "confidence_threshold": {
+            "type": "dynamic_parameter",
+            "base_value": 0.8,
+            "parameter_id": "phase1_confidence_threshold_extreme",
+            "adaptation_source": "dynamic_parameter_system",
+            "market_regime_dependent": true,
+            "extreme_mode_multiplier": 1.067,
+            "description": "極端市場模式信心度閾值，比基礎模式稍高要求"
+          }
         }
       },
-      
+
       "performance_targets": {
         "processing_latency_p99": "<30ms",
         "signal_generation_rate": "10-50 signals/minute",
         "accuracy_baseline": ">60%",
         "system_availability": ">99.5%"
       },
-      
+
+      "dynamic_parameter_integration": {
+        "enabled": true,
+        "parameter_system_path": "../dynamic_parameter_system/dynamic_parameter_engine.py",
+        "config_file": "../dynamic_parameter_system/dynamic_parameter_config.json",
+        "update_frequency": "real_time",
+        "supported_parameters": [
+          "confidence_threshold",
+          "price_change_threshold",
+          "volume_change_threshold"
+        ],
+        "market_regime_detection": {
+          "enabled": true,
+          "detection_interval": "5_minutes",
+          "regime_cache_ttl": "300_seconds"
+        },
+        "trading_session_detection": {
+          "enabled": true,
+          "timezone": "UTC",
+          "us_market_hours": "14:30-21:00",
+          "asia_market_hours": "01:00-08:00"
+        },
+        "parameter_override_policy": "dynamic_takes_priority",
+        "fallback_behavior": "use_base_values"
+      },
+
       "monitoring_config": {
         "metrics_collection": [
           "processing_latency",
-          "signal_generation_rate", 
+          "signal_generation_rate",
           "error_rate",
           "queue_depth"
         ],

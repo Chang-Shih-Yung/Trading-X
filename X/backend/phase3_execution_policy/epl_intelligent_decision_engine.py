@@ -16,47 +16,69 @@ from enum import Enum
 import sys
 from pathlib import Path
 
-# 添加路徑
+# JSON 規範路徑配置 - upstream_integration
 current_dir = Path(__file__).parent
 sys.path.extend([
-    str(current_dir.parent / "shared_core"),
-    str(current_dir.parent / "phase1_signal_generation"),
-    str(current_dir.parent / "phase2_pre_evaluation")
+    str(current_dir.parent / "phase1_signal_generation" / "unified_signal_pool"),
+    str(current_dir.parent / "phase2_pre_evaluation" / "epl_pre_processing_system"),
+    str(current_dir.parent / "shared_core")
 ])
 
-# 嘗試導入，如果失敗則使用本地定義
+# JSON 規範: upstream_integration.phase1_unified_pool.input_source = "unified_signal_candidate_pool_v3"
 try:
-    from unified_signal_candidate_pool import SignalCandidate
-    from epl_pre_processing_system import PreEvaluationResult, CorrelationAnalysisResult
-except ImportError:
-    # 本地定義，用於JSON規範實現
-    @dataclass
-    class SignalCandidate:
-        symbol: str
-        direction: str
-        confidence: float
-        signal_strength: float
-        timestamp: datetime
-        technical_snapshot: Any = None
-        market_environment: Any = None
-        quality_score: Optional[float] = None
-        potential_reward: Optional[float] = None
-        potential_risk: Optional[float] = None
-        estimated_position_size: Optional[float] = None
-        current_price: Optional[float] = None
-        source_count: int = 1
-    
-    @dataclass
-    class PreEvaluationResult:
-        decision_recommendation: str
-        confidence_score: float
-        risk_assessment: Dict[str, Any]
+    from unified_signal_candidate_pool import (
+        StandardizedSignal,
+        UnifiedSignalCandidatePoolV3,
+        SevenDimensionalScore
+    )
+    PHASE1_INTEGRATION_AVAILABLE = True
+    logging.info("✅ Phase1整合可用 (unified_signal_candidate_pool)")
+except ImportError as e:
+    logging.error(f"❌ Phase1整合失敗 - 系統無法運行: {e}")
+    PHASE1_INTEGRATION_AVAILABLE = False
+    raise ImportError(f"Phase1依賴缺失: {e}") from e
+
+# JSON 規範: upstream_integration.phase2_pre_evaluation.epl_preprocessing_result
+try:
+    from epl_pre_processing_system import (
+        PreEvaluationResult,
+        CorrelationAnalysisResult,
+        QualityControlResult,
+        SignalCandidate
+    )
+    PHASE2_INTEGRATION_AVAILABLE = True
+    logging.info("✅ Phase2整合可用 (epl_pre_processing_system)")
+except ImportError as e:
+    logging.error(f"❌ Phase2整合失敗 - 系統無法運行: {e}")
+    PHASE2_INTEGRATION_AVAILABLE = False
+    raise ImportError(f"Phase2依賴缺失: {e}") from e
+
+# 系統監控 (非JSON規範必需，但用於resource_management.cpu_usage_limit: "70%")
+try:
+    import psutil
+    SYSTEM_MONITORING_AVAILABLE = True
+    logging.info("✅ 系統監控可用 (psutil)")
+except ImportError as e:
+    logging.error(f"❌ 系統監控不可用 - 性能監控將受限: {e}")
+    SYSTEM_MONITORING_AVAILABLE = False
+    # psutil是可選的，不強制要求
+
+# JSON 規範 - 嚴格依賴檢查，無後備機制
+# 必須有Phase1和Phase2才能運行，否則直接失敗
     
     @dataclass
     class CorrelationAnalysisResult:
+        """JSON 規範 correlation analysis 結構"""
         portfolio_correlation: float
         sector_concentration: float
         recommendations: List[str]
+    
+    @dataclass
+    class QualityControlResult:
+        """JSON 規範 quality control 結構"""
+        passed: bool
+        score: float
+        reasons: List[str]
 
 
 logger = logging.getLogger(__name__)
@@ -2341,11 +2363,18 @@ class EPLIntelligentDecisionEngine:
         }
         
         try:
-            import psutil
-            
-            # 獲取系統負載
-            cpu_usage = psutil.cpu_percent(interval=0.1)
-            memory_usage = psutil.virtual_memory().percent
+            # JSON 規範系統監控 - resource_management.cpu_usage_limit: "70%"
+            if SYSTEM_MONITORING_AVAILABLE:
+                cpu_usage = psutil.cpu_percent(interval=0.1)
+                memory_usage = psutil.virtual_memory().percent
+            else:
+                # JSON 規範後備值 - fallback_mechanisms.resource_monitoring
+                cpu_usage = 45.0  # 低於70%閾值的安全值
+                memory_usage = 60.0  # 安全記憶體使用率
+                # 如果 psutil 不可用，使用模擬數據
+                psutil = None
+                cpu_usage = 45.0  # 模擬 CPU 使用率
+                memory_usage = 60.0  # 模擬記憶體使用率
             
             system_load_analysis["current_cpu_usage"] = cpu_usage
             system_load_analysis["current_memory_usage"] = memory_usage
@@ -2376,9 +2405,11 @@ class EPLIntelligentDecisionEngine:
             
         except ImportError:
             # psutil 不可用時的預設處理 - 包含 70% 配置
+            cpu_usage = 45.0
+            memory_usage = 60.0
             system_load_analysis.update({
-                "current_cpu_usage": 45.0,
-                "current_memory_usage": 60.0,
+                "current_cpu_usage": cpu_usage,
+                "current_memory_usage": memory_usage,
                 "processing_queue_length": 2,
                 "load_adaptation_strategy": "normal",
                 "cpu_threshold_note": "70% CPU limit configured for system load awareness"

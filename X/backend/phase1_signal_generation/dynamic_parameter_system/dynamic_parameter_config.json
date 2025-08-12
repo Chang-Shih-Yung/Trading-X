@@ -1,0 +1,587 @@
+{
+  "dynamic_parameter_system": {
+    "system_metadata": {
+      "version": "1.0.0",
+      "last_updated": "2025-08-12",
+      "description": "Phase1-5 Dynamic Parameter Configuration System - Market Adaptive Parameters",
+      "integration_status": "initial_implementation",
+      "compatibility": {
+        "phase1": "unified_signal_candidate_pool_v3",
+        "phase2": "epl_pre_processing_system_v2.1",
+        "phase3": "epl_intelligent_decision_engine_v2.1",
+        "phase5": "auto_backtest_validator"
+      }
+    },
+
+    "market_regime_detection": {
+      "regime_types": {
+        "BULL_TREND": {
+          "description": "上升趨勢市場",
+          "detection_criteria": {
+            "price_trend_slope": "> 0.02",
+            "volume_confirmation": "> 1.2",
+            "fear_greed_index": "> 60",
+            "moving_average_alignment": "bullish_stack"
+          },
+          "confidence_threshold": 0.8
+        },
+        "BEAR_TREND": {
+          "description": "下降趨勢市場", 
+          "detection_criteria": {
+            "price_trend_slope": "< -0.02",
+            "volume_confirmation": "> 1.1",
+            "fear_greed_index": "< 40",
+            "moving_average_alignment": "bearish_stack"
+          },
+          "confidence_threshold": 0.8
+        },
+        "SIDEWAYS": {
+          "description": "橫盤整理市場",
+          "detection_criteria": {
+            "price_trend_slope": "[-0.02, 0.02]",
+            "volatility": "< 0.05",
+            "volume_ratio": "[0.8, 1.2]",
+            "range_bound_confirmation": true
+          },
+          "confidence_threshold": 0.7
+        },
+        "VOLATILE": {
+          "description": "高波動市場",
+          "detection_criteria": {
+            "volatility": "> 0.08",
+            "price_gaps": "> 0.02",
+            "volume_spikes": "> 2.0",
+            "intraday_range": "> 0.05"
+          },
+          "confidence_threshold": 0.75
+        }
+      },
+      "detection_algorithm": {
+        "primary_indicators": [
+          "20_period_moving_average_slope",
+          "14_period_atr_volatility", 
+          "volume_sma_ratio",
+          "fear_greed_index"
+        ],
+        "confirmation_period": "3_candles",
+        "update_frequency": "every_new_candle",
+        "regime_persistence_requirement": "minimum_2_confirmations"
+      }
+    },
+
+    "trading_session_detection": {
+      "session_types": {
+        "US_MARKET": {
+          "description": "美股交易時段",
+          "time_range": "09:30-16:00 EST",
+          "characteristics": {
+            "high_liquidity": true,
+            "increased_volatility": true,
+            "news_impact_amplified": true
+          }
+        },
+        "ASIA_MARKET": {
+          "description": "亞洲市場時段",
+          "time_range": "09:00-15:00 JST",
+          "characteristics": {
+            "moderate_liquidity": true,
+            "regional_news_focus": true,
+            "crypto_correlation_higher": true
+          }
+        },
+        "EUROPE_MARKET": {
+          "description": "歐洲市場時段",
+          "time_range": "08:00-16:30 GMT",
+          "characteristics": {
+            "stable_liquidity": true,
+            "economic_data_sensitive": true
+          }
+        },
+        "OVERLAP_HOURS": {
+          "description": "重疊交易時段",
+          "time_ranges": [
+            "14:00-16:00 EST (US-Europe)",
+            "09:00-11:00 JST (Asia-Europe)"
+          ],
+          "characteristics": {
+            "maximum_liquidity": true,
+            "highest_volatility": true,
+            "cross_market_arbitrage": true
+          }
+        },
+        "OFF_HOURS": {
+          "description": "非活躍時段",
+          "characteristics": {
+            "reduced_liquidity": true,
+            "gap_risk_higher": true,
+            "algorithmic_trading_dominant": true
+          }
+        }
+      },
+      "timezone_handling": {
+        "primary_timezone": "UTC",
+        "dst_adjustment": true,
+        "holiday_calendar": "combined_major_markets"
+      }
+    },
+
+    "dynamic_parameters": {
+      "phase1_signal_generation": {
+        "confidence_threshold": {
+          "parameter_name": "confidence_threshold",
+          "base_value": 0.75,
+          "dynamic_type": "BULL_BEAR_ADAPTIVE",
+          "adaptation_rules": {
+            "BULL_TREND": {
+              "adjustment_factor": 0.85,
+              "description": "牛市降低信心度門檻，增加信號機會"
+            },
+            "BEAR_TREND": {
+              "adjustment_factor": 1.15,
+              "description": "熊市提高信心度門檻，加強風險控制"
+            },
+            "VOLATILE": {
+              "adjustment_factor": 1.1,
+              "description": "高波動市場提高要求"
+            },
+            "SIDEWAYS": {
+              "adjustment_factor": 1.0,
+              "description": "橫盤市場使用標準閾值"
+            }
+          },
+          "fear_greed_adjustment": {
+            "extreme_fear": {
+              "index_range": "[0, 20]",
+              "factor": 0.8,
+              "description": "極度恐懼時降低門檻，捕捉抄底機會"
+            },
+            "fear": {
+              "index_range": "[21, 40]",
+              "factor": 0.9,
+              "description": "恐懼時適度降低門檻"
+            },
+            "neutral": {
+              "index_range": "[41, 59]",
+              "factor": 1.0,
+              "description": "中性情緒使用標準值"
+            },
+            "greed": {
+              "index_range": "[60, 79]",
+              "factor": 1.1,
+              "description": "貪婪時適度提高門檻"
+            },
+            "extreme_greed": {
+              "index_range": "[80, 100]",
+              "factor": 1.2,
+              "description": "極度貪婪時提高門檻，風險控制"
+            }
+          },
+          "session_adjustment": {
+            "US_MARKET": {
+              "factor": 0.9,
+              "description": "美股時段提高敏感度"
+            },
+            "OVERLAP_HOURS": {
+              "factor": 0.85,
+              "description": "重疊時段最高敏感度"
+            },
+            "OFF_HOURS": {
+              "factor": 1.1,
+              "description": "非活躍時段降低敏感度"
+            },
+            "default": {
+              "factor": 1.0,
+              "description": "其他時段標準值"
+            }
+          },
+          "bounds": {
+            "minimum": 0.1,
+            "maximum": 0.95,
+            "description": "動態調整的安全邊界"
+          }
+        },
+
+        "volume_surge_multiplier": {
+          "parameter_name": "volume_surge_multiplier", 
+          "base_value": 1.0,
+          "dynamic_type": "LIQUIDITY_ADAPTIVE",
+          "adaptation_rules": {
+            "session_adjustment": {
+              "US_MARKET": {
+                "factor": 1.3,
+                "description": "美股時段成交量通常更高"
+              },
+              "ASIA_MARKET": {
+                "factor": 1.0,
+                "description": "亞洲時段標準要求"
+              },
+              "OFF_HOURS": {
+                "factor": 0.8,
+                "description": "非活躍時段降低要求"
+              }
+            },
+            "liquidity_adjustment": {
+              "high_liquidity": {
+                "threshold": "> 0.8",
+                "factor": 1.3,
+                "description": "高流動性時可提高要求"
+              },
+              "medium_liquidity": {
+                "threshold": "[0.5, 0.8]",
+                "factor": 1.0,
+                "description": "中等流動性標準要求"
+              },
+              "low_liquidity": {
+                "threshold": "< 0.5",
+                "factor": 0.7,
+                "description": "低流動性時降低要求"
+              }
+            },
+            "volatility_adjustment": {
+              "high_volatility": {
+                "threshold": "> 0.08",
+                "factor": 1.2,
+                "description": "高波動時提高成交量要求"
+              },
+              "normal_volatility": {
+                "threshold": "[0.02, 0.08]",
+                "factor": 1.0,
+                "description": "正常波動標準要求"
+              },
+              "low_volatility": {
+                "threshold": "< 0.02",
+                "factor": 0.9,
+                "description": "低波動時降低要求"
+              }
+            }
+          },
+          "bounds": {
+            "minimum": 0.5,
+            "maximum": 2.0,
+            "description": "成交量倍數安全範圍"
+          }
+        }
+      },
+
+      "phase2_pre_evaluation": {
+        "similarity_threshold": {
+          "parameter_name": "similarity_threshold",
+          "base_value": 0.85,
+          "dynamic_type": "VOLATILITY_ADAPTIVE",
+          "adaptation_rules": {
+            "volatility_adjustment": {
+              "high_volatility": {
+                "threshold": "> 0.08",
+                "factor": 0.9,
+                "description": "高波動時降低相似度要求，保留多樣性"
+              },
+              "normal_volatility": {
+                "threshold": "[0.02, 0.08]",
+                "factor": 1.0,
+                "description": "正常波動使用標準閾值"
+              },
+              "low_volatility": {
+                "threshold": "< 0.02",
+                "factor": 1.05,
+                "description": "低波動時提高相似度要求，過濾重複"
+              }
+            },
+            "market_regime_adjustment": {
+              "VOLATILE": {
+                "factor": 0.9,
+                "description": "高波動市場保留更多信號多樣性"
+              },
+              "SIDEWAYS": {
+                "factor": 1.1,
+                "description": "橫盤市場過濾更多相似信號"
+              },
+              "default": {
+                "factor": 1.0,
+                "description": "其他市場條件使用標準值"
+              }
+            }
+          },
+          "bounds": {
+            "minimum": 0.7,
+            "maximum": 0.95,
+            "description": "相似度閾值安全範圍"
+          }
+        },
+
+        "time_overlap_minutes": {
+          "parameter_name": "time_overlap_minutes",
+          "base_value": 15,
+          "dynamic_type": "TRADING_HOURS_ADAPTIVE",
+          "adaptation_rules": {
+            "session_adjustment": {
+              "US_MARKET": {
+                "factor": 0.7,
+                "description": "美股開盤縮短窗口，提高響應速度"
+              },
+              "OVERLAP_HOURS": {
+                "factor": 0.6,
+                "description": "重疊時段最短窗口"
+              },
+              "OFF_HOURS": {
+                "factor": 1.2,
+                "description": "非活躍時段延長窗口"
+              },
+              "default": {
+                "factor": 1.0,
+                "description": "其他時段標準窗口"
+              }
+            },
+            "market_activity_adjustment": {
+              "high_activity": {
+                "volume_ratio": "> 1.5",
+                "factor": 0.8,
+                "description": "高活躍度時縮短時間窗口"
+              },
+              "low_activity": {
+                "volume_ratio": "< 0.7",
+                "factor": 1.3,
+                "description": "低活躍度時延長時間窗口"
+              },
+              "normal_activity": {
+                "factor": 1.0,
+                "description": "正常活躍度標準窗口"
+              }
+            }
+          },
+          "bounds": {
+            "minimum": 5,
+            "maximum": 30,
+            "description": "時間重疊窗口安全範圍（分鐘）"
+          }
+        }
+      },
+
+      "phase3_execution_policy": {
+        "replacement_score_threshold": {
+          "parameter_name": "replacement_score_threshold",
+          "base_value": 0.75,
+          "dynamic_type": "BULL_BEAR_ADAPTIVE",
+          "adaptation_rules": {
+            "market_regime_adjustment": {
+              "BULL_TREND": {
+                "factor": 0.85,
+                "description": "牛市更積極的替換策略"
+              },
+              "BEAR_TREND": {
+                "factor": 1.1,
+                "description": "熊市更保守的替換策略"
+              },
+              "VOLATILE": {
+                "factor": 1.15,
+                "description": "高波動時提高替換門檻"
+              },
+              "SIDEWAYS": {
+                "factor": 1.0,
+                "description": "橫盤市場標準門檻"
+              }
+            },
+            "fear_greed_adjustment": {
+              "extreme_greed": {
+                "index_range": "[80, 100]",
+                "factor": 1.05,
+                "description": "極度貪婪時稍微提高標準"
+              },
+              "extreme_fear": {
+                "index_range": "[0, 20]",
+                "factor": 0.95,
+                "description": "極度恐懼時稍微降低標準"
+              },
+              "neutral": {
+                "factor": 1.0,
+                "description": "中性情緒標準值"
+              }
+            }
+          },
+          "bounds": {
+            "minimum": 0.5,
+            "maximum": 0.9,
+            "description": "替換評分閾值安全範圍"
+          }
+        },
+
+        "position_concentration_limit": {
+          "parameter_name": "position_concentration_limit",
+          "base_value": 0.30,
+          "dynamic_type": "RISK_ADAPTIVE",
+          "adaptation_rules": {
+            "market_regime_adjustment": {
+              "BULL_TREND": {
+                "factor": 1.2,
+                "description": "牛市可適度提高集中度至36%"
+              },
+              "BEAR_TREND": {
+                "factor": 0.8,
+                "description": "熊市降低集中度至24%"
+              },
+              "VOLATILE": {
+                "factor": 0.7,
+                "description": "高波動大幅降低集中度至21%"
+              },
+              "SIDEWAYS": {
+                "factor": 1.0,
+                "description": "橫盤市場標準集中度"
+              }
+            },
+            "portfolio_correlation_adjustment": {
+              "high_correlation": {
+                "threshold": "> 0.7",
+                "factor": 0.8,
+                "description": "高相關性時降低集中度限制"
+              },
+              "medium_correlation": {
+                "threshold": "[0.4, 0.7]",
+                "factor": 1.0,
+                "description": "中等相關性標準限制"
+              },
+              "low_correlation": {
+                "threshold": "< 0.4",
+                "factor": 1.1,
+                "description": "低相關性可適度放寬限制"
+              }
+            },
+            "volatility_adjustment": {
+              "high_volatility": {
+                "threshold": "> 0.08",
+                "factor": 0.8,
+                "description": "高波動時降低集中度"
+              },
+              "low_volatility": {
+                "threshold": "< 0.03",
+                "factor": 1.1,
+                "description": "低波動時可提高集中度"
+              }
+            }
+          },
+          "bounds": {
+            "minimum": 0.15,
+            "maximum": 0.4,
+            "description": "倉位集中度安全範圍"
+          }
+        }
+      },
+
+      "phase5_backtest_validation": {
+        "confidence_threshold": {
+          "parameter_name": "backtest_confidence_threshold",
+          "base_value": 0.8,
+          "dynamic_type": "PERFORMANCE_ADAPTIVE",
+          "adaptation_rules": {
+            "historical_performance_adjustment": {
+              "high_performance": {
+                "win_rate": "> 0.7",
+                "factor": 0.9,
+                "description": "策略表現好，可以降低閾值"
+              },
+              "medium_performance": {
+                "win_rate": "[0.5, 0.7]",
+                "factor": 1.0,
+                "description": "中等表現使用標準閾值"
+              },
+              "poor_performance": {
+                "win_rate": "< 0.5",
+                "factor": 1.1,
+                "description": "策略表現差，提高閾值"
+              }
+            },
+            "market_regime_adjustment": {
+              "BULL_TREND": {
+                "factor": 0.95,
+                "description": "牛市適度降低回測要求"
+              },
+              "BEAR_TREND": {
+                "factor": 1.05,
+                "description": "熊市提高回測標準"
+              },
+              "VOLATILE": {
+                "factor": 1.1,
+                "description": "高波動市場提高驗證標準"
+              }
+            }
+          },
+          "bounds": {
+            "minimum": 0.6,
+            "maximum": 0.95,
+            "description": "回測信心度閾值安全範圍"
+          }
+        }
+      }
+    },
+
+    "integration_requirements": {
+      "data_dependencies": {
+        "market_regime_detector": {
+          "required_inputs": [
+            "real_time_price_data",
+            "volume_data", 
+            "fear_greed_index",
+            "moving_averages"
+          ],
+          "update_frequency": "every_candle",
+          "cache_duration": "300s"
+        },
+        "trading_session_detector": {
+          "required_inputs": [
+            "current_utc_time",
+            "timezone_data",
+            "holiday_calendar"
+          ],
+          "update_frequency": "every_minute",
+          "cache_duration": "3600s"
+        },
+        "liquidity_analyzer": {
+          "required_inputs": [
+            "bid_ask_spread",
+            "volume_ratio",
+            "market_depth"
+          ],
+          "update_frequency": "real_time",
+          "cache_duration": "60s"
+        }
+      },
+      "output_format": {
+        "adapted_parameters": {
+          "format": "Dict[str, float]",
+          "validation": "bounds_checking",
+          "metadata": {
+            "adaptation_reasons": "List[str]",
+            "confidence_score": "float",
+            "timestamp": "ISO_8601_UTC"
+          }
+        }
+      }
+    },
+
+    "performance_monitoring": {
+      "effectiveness_metrics": [
+        "parameter_adaptation_frequency",
+        "signal_quality_improvement",
+        "risk_adjusted_performance",
+        "market_regime_detection_accuracy"
+      ],
+      "logging_requirements": {
+        "parameter_changes": "full_audit_trail",
+        "adaptation_reasoning": "detailed_explanation",
+        "performance_impact": "before_after_comparison"
+      }
+    },
+
+    "system_configuration": {
+      "update_frequency": {
+        "market_regime_check": "every_new_candle",
+        "session_detection": "every_minute", 
+        "parameter_recalculation": "on_regime_change",
+        "emergency_override": "immediate"
+      },
+      "failsafe_mechanisms": {
+        "regime_detection_failure": "use_last_known_regime",
+        "parameter_calculation_error": "fallback_to_base_values",
+        "extreme_parameter_values": "bound_enforcement"
+      }
+    }
+  }
+}
