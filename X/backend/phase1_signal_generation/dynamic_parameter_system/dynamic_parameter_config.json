@@ -13,6 +13,40 @@
       }
     },
 
+    "external_apis": {
+      "fear_greed_index": {
+        "provider": "alternative.me",
+        "api_endpoint": "https://api.alternative.me/fng/",
+        "method": "GET",
+        "response_format": "json",
+        "data_mapping": {
+          "value_field": "data[0].value",
+          "timestamp_field": "data[0].timestamp",
+          "classification_field": "data[0].value_classification"
+        },
+        "cache_settings": {
+          "cache_duration_minutes": 15,
+          "stale_data_threshold_minutes": 30,
+          "fallback_value": 50
+        },
+        "error_handling": {
+          "max_retries": 3,
+          "retry_delay_seconds": 2,
+          "timeout_seconds": 10,
+          "circuit_breaker_threshold": 5
+        },
+        "rate_limiting": {
+          "max_requests_per_minute": 60,
+          "burst_limit": 10
+        },
+        "data_validation": {
+          "value_range": [0, 100],
+          "required_fields": ["value", "timestamp"],
+          "data_freshness_hours": 24
+        }
+      }
+    },
+
     "market_regime_detection": {
       "regime_types": {
         "BULL_TREND": {

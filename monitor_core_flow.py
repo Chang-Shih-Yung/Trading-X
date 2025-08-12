@@ -8,8 +8,8 @@ import logging
 import sys
 sys.path.append('/Users/henrychang/Desktop/Trading-X')
 
-from app.services.market_data import MarketDataService
-from app.services.realtime_signal_engine import RealtimeSignalEngine
+from X.app.services.market_data import MarketDataService
+from X.app.services.realtime_signal_engine import RealtimeSignalEngine
 
 # 設置簡潔的日誌格式
 logging.basicConfig(

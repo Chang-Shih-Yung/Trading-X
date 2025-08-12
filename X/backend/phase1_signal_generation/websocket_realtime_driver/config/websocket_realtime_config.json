@@ -8,7 +8,7 @@
     "class_name": "WebSocketRealtimeDriver",
     "binance_config": {
       "base_url": "wss://stream.binance.com:9443/ws/",
-      "symbols": ["ethusdt", "btcusdt", "adausdt", "dotusdt", "linkusdt"],
+      "symbols": ["BTCUSDT", "ETHUSDT", "ADAUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT"],
       "stream_type": "ticker",
       "reconnect_interval": 5,
       "max_reconnect_attempts": 10,

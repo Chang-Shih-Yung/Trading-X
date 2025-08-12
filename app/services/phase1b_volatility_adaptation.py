@@ -353,7 +353,11 @@ class EnhancedSignalScoringEngine:
                 return base_result
             
             # 2. 獲取當前信號分數
-            current_signals = await self._get_mock_signal_scores()
+            # 獲取即時信號分數
+            current_signals = await self._get_realtime_signal_scores()
+            if not current_signals:
+                logger.error("無法獲取即時信號分數")
+                raise ValueError("即時信號數據不可用")
             
             # 3. 計算波動性指標
             volatility_metrics_by_symbol = {}
@@ -438,22 +442,10 @@ class EnhancedSignalScoringEngine:
             base_result['enhancement_error'] = str(e)
             return base_result
     
-    async def _get_mock_signal_scores(self) -> Dict[str, SignalModuleScore]:
-        """獲取模擬信號分數"""
-        return {
-            'technical_structure': SignalModuleScore(
-                SignalModuleType.TECHNICAL_STRUCTURE, 0.72, 0.85, 0.68, datetime.now(), {}
-            ),
-            'volume_microstructure': SignalModuleScore(
-                SignalModuleType.VOLUME_MICROSTRUCTURE, 0.65, 0.78, 0.71, datetime.now(), {}
-            ),
-            'sentiment_indicators': SignalModuleScore(
-                SignalModuleType.SENTIMENT_INDICATORS, 0.58, 0.63, 0.59, datetime.now(), {}
-            ),
-            'smart_money_detection': SignalModuleScore(
-                SignalModuleType.SMART_MONEY_DETECTION, 0.79, 0.88, 0.82, datetime.now(), {}
-            )
-        }
+    async def _get_realtime_signal_scores(self) -> Dict[str, SignalModuleScore]:
+        """獲取即時信號分數"""
+        # 這裡應該整合真實的信號評分系統
+        raise NotImplementedError("需要整合真實的即時信號評分系統")
     
     def get_performance_summary(self) -> Dict[str, Any]:
         """獲取階段1B性能總結"""

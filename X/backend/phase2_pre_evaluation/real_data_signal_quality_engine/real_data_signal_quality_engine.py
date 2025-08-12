@@ -22,7 +22,7 @@ from enum import Enum
 from concurrent.futures import ThreadPoolExecutor
 
 # 真實系統模組依賴 (JSON 規範要求)
-from app.services.phase1b_volatility_adaptation import (
+from X.app.services.phase1b_volatility_adaptation import (
     VolatilityAdaptiveEngine, 
     VolatilityMetrics, 
     SignalContinuityMetrics

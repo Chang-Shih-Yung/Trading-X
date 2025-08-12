@@ -12,7 +12,7 @@ from dataclasses import dataclass, asdict
 import pandas as pd
 import numpy as np
 
-from app.services.market_data import MarketDataService
+from X.app.services.market_data import MarketDataService
 from app.services.pandas_ta_indicators import PandasTAIndicators
 from app.services.pandas_ta_trading_signal_parser import PandasTATradingSignals
 from app.services.realtime_technical_analysis import RealTimeTechnicalAnalysis

@@ -32,6 +32,7 @@ class TradingSession(Enum):
     OFF_HOURS = "OFF_HOURS"
 
 @dataclass
+@dataclass
 class MarketData:
     """市場數據結構"""
     timestamp: datetime
@@ -45,6 +46,7 @@ class MarketData:
     bid_ask_spread: float
     market_depth: float
     moving_averages: Dict[str, float]
+    metadata: Optional[Dict[str, Any]] = None
 
 @dataclass
 class AdaptedParameter:
@@ -82,33 +84,114 @@ class MarketDataSource(ABC):
         """獲取恐懼貪婪指數"""
         pass
 
-class MockMarketDataSource(MarketDataSource):
-    """模擬市場數據源（用於測試）"""
+class RealTimeMarketDataSource(MarketDataSource):
+    """即時市場數據源（真實API集成）"""
+    
+    def __init__(self, config: Dict[str, Any]):
+        """初始化即時市場數據源"""
+        self.config = config
+        # 從config中提取API配置
+        if "dynamic_parameter_system" in config:
+            self.api_config = config["dynamic_parameter_system"]["external_apis"]["fear_greed_index"]
+        else:
+            self.api_config = config.get("external_apis", {}).get("fear_greed_index", {})
+        
+        self.logger = logging.getLogger(__name__)
+        self._cache = {}
+        self._last_fetch_time = None
     
     async def get_current_market_data(self) -> MarketData:
-        """返回模擬市場數據"""
+        """獲取即時市場數據 - 使用真實幣安API"""
+        # 整合真實的幣安 API
         now = datetime.now(timezone.utc)
+        
+        try:
+            # 獲取真實 BTC 價格和成交量
+            import aiohttp
+            async with aiohttp.ClientSession() as session:
+                # 幣安24小時價格統計API
+                async with session.get('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT', timeout=10) as response:
+                    if response.status == 200:
+                        btc_data = await response.json()
+                        
+                        # 獲取即時價格
+                        current_price = float(btc_data['lastPrice'])
+                        volume_24h = float(btc_data['volume'])
+                        price_change_24h = float(btc_data['priceChangePercent'])
+                        
+                        # 獲取更多即時數據
+                        async with session.get('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT', timeout=5) as price_response:
+                            if price_response.status == 200:
+                                price_data = await price_response.json()
+                                current_price = float(price_data['price'])  # 最新價格
+                        
+                        self.logger.info(f"幣安即時BTC價格: ${current_price:,.2f}")
+                        
+                    else:
+                        raise Exception(f"幣安API錯誤: {response.status}")
+                        
+        except Exception as e:
+            self.logger.error(f"獲取幣安數據失敗: {str(e)}")
+            # 使用備用值
+            current_price = 0.0
+            volume_24h = 0.0
+            price_change_24h = 0.0
+        
+        # 獲取 Fear & Greed Index
+        fear_greed = await self.get_fear_greed_index()
+        
         return MarketData(
             timestamp=now,
-            price=50000.0,
-            volume=1000000.0,
-            price_change_1h=0.02,
-            price_change_24h=0.05,
-            volume_ratio=1.2,
-            volatility=0.03,
-            fear_greed_index=65,
-            bid_ask_spread=0.001,
-            market_depth=0.8,
-            moving_averages={
-                "ma_20": 49800.0,
-                "ma_50": 49000.0,
-                "ma_200": 48000.0
+            price=current_price,  # 真實幣安BTC價格
+            volume=volume_24h,    # 真實24小時成交量
+            price_change_1h=0.0,  # 需要額外API調用獲取
+            price_change_24h=price_change_24h,  # 真實24小時變化
+            volume_ratio=1.0,
+            volatility=abs(price_change_24h) / 100,  # 基於24小時變化計算
+            fear_greed_index=fear_greed,
+            bid_ask_spread=0.0,   # 需要訂單簿數據
+            market_depth=0.0,     # 需要訂單簿數據
+            moving_averages={},   # 需要歷史數據計算
+            metadata={
+                'source': 'binance_api', 
+                'timestamp': now.isoformat(),
+                'api_endpoints': ['24hr_ticker', 'current_price']
             }
         )
     
     async def get_fear_greed_index(self) -> int:
-        """返回模擬恐懼貪婪指數"""
-        return 65
+        """獲取即時恐懼貪婪指數 - 使用 Alternative.me API"""
+        try:
+            # 檢查緩存
+            cache_key = "fear_greed_index"
+            current_time = datetime.now()
+            
+            if (cache_key in self._cache and 
+                self._last_fetch_time and 
+                (current_time - self._last_fetch_time).seconds < 900):  # 15分鐘緩存
+                return self._cache[cache_key]
+            
+            # 調用API
+            import aiohttp
+            async with aiohttp.ClientSession() as session:
+                async with session.get('https://api.alternative.me/fng/', timeout=10) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        fear_greed_value = int(data['data'][0]['value'])
+                        
+                        # 更新緩存
+                        self._cache[cache_key] = fear_greed_value
+                        self._last_fetch_time = current_time
+                        
+                        self.logger.info(f"Fear & Greed Index 更新: {fear_greed_value}")
+                        return fear_greed_value
+                    else:
+                        raise Exception(f"API 回應錯誤: {response.status}")
+                        
+        except Exception as e:
+            self.logger.error(f"獲取 Fear & Greed Index 失敗: {str(e)}")
+            # 返回預設值
+            return 50
 
 class MarketRegimeDetector:
     """市場制度檢測器 - 100%匹配JSON配置"""
@@ -563,7 +646,12 @@ class DynamicParameterEngine:
     def __init__(self, config_path: str, market_data_source: Optional[MarketDataSource] = None):
         self.config_path = config_path
         self.config = self._load_config()
-        self.market_data_source = market_data_source or MockMarketDataSource()
+        
+        # 如果沒有提供數據源，創建真實數據源
+        if market_data_source is None:
+            self.market_data_source = RealTimeMarketDataSource(self.config)
+        else:
+            self.market_data_source = market_data_source
         
         # 初始化組件
         self.regime_detector = MarketRegimeDetector(self.config)

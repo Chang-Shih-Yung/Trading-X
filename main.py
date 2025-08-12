@@ -7,9 +7,9 @@ from dotenv import load_dotenv
 from app.core.config import settings
 from app.api.v1.api import api_router
 from app.core.database import engine, create_tables
-from app.services.market_data import MarketDataService
+from X.app.services.market_data import MarketDataService
 from app.services.strategy_engine import StrategyEngine
-from app.services.realtime_signal_engine import RealtimeSignalEngine
+from X.app.services.realtime_signal_engine import RealtimeSignalEngine
 from app.services.sniper_email_manager import SniperEmailManager
 from app.utils.log_manager import start_log_management, stop_log_management
 from app.utils.realtime_log_filter import setup_realtime_logging, disable_noisy_loggers

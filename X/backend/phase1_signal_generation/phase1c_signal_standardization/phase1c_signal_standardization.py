@@ -273,6 +273,32 @@ class Phase1CSignalStandardizationEngine:
             logger.error(f"配置載入失敗: {e}")
             return {}
     
+    def _map_priority(self, priority_value) -> ExecutionPriority:
+        """映射優先級值到ExecutionPriority枚舉"""
+        if isinstance(priority_value, ExecutionPriority):
+            return priority_value
+        
+        # Phase1A的Priority枚舉包含CRITICAL，但Phase1C的ExecutionPriority沒有
+        priority_mapping = {
+            'CRITICAL': ExecutionPriority.HIGH,    # 映射CRITICAL到HIGH
+            'HIGH': ExecutionPriority.HIGH,
+            'MEDIUM': ExecutionPriority.MEDIUM,
+            'LOW': ExecutionPriority.LOW,
+            'critical': ExecutionPriority.HIGH,   # 映射critical到HIGH
+            'high': ExecutionPriority.HIGH,
+            'medium': ExecutionPriority.MEDIUM,
+            'low': ExecutionPriority.LOW
+        }
+        
+        if isinstance(priority_value, str):
+            return priority_mapping.get(priority_value.upper(), ExecutionPriority.MEDIUM)
+        
+        # 處理Phase1A的Priority枚舉對象
+        if hasattr(priority_value, 'value'):
+            return priority_mapping.get(priority_value.value.upper(), ExecutionPriority.MEDIUM)
+        
+        return ExecutionPriority.MEDIUM
+    
     async def standardize_signals(self, raw_signals: List[Dict[str, Any]]) -> List[StandardizedSignal]:
         """公開的信號標準化方法"""
         try:
@@ -283,24 +309,25 @@ class Phase1CSignalStandardizationEngine:
             
             for signal in raw_signals:
                 try:
-                    # 建立標準化信號
+                    # 建立標準化信號 - 修復字段映射問題
                     standardized_signal = StandardizedSignal(
                         signal_id=signal.get('signal_id', str(uuid.uuid4())),
+                        symbol=signal.get('symbol', 'UNKNOWN'),
+                        timeframe=signal.get('timeframe', '1m'),
+                        strategy=signal.get('strategy', 'phase1'),
                         signal_type=signal.get('signal_type', 'UNKNOWN'),
-                        signal_strength=float(signal.get('signal_strength', 0.5)),
-                        confidence_score=float(signal.get('confidence_score', 0.5)),
-                        signal_source=signal.get('signal_source', 'unknown'),
+                        signal_strength=float(signal.get('strength', signal.get('signal_strength', 0.5))),
+                        confidence_score=float(signal.get('confidence', signal.get('confidence_score', 0.5))),
+                        execution_priority=self._map_priority(signal.get('priority', signal.get('execution_priority', 'MEDIUM'))),
+                        original_value=float(signal.get('original_value', signal.get('price', 0.0))),
+                        standardized_value=float(signal.get('standardized_value', signal.get('strength', 0.5))),
                         quality_score=float(signal.get('quality_score', 0.5)),
-                        execution_priority=signal.get('execution_priority', ExecutionPriority.MEDIUM),
-                        market_context=signal.get('market_context', 'unknown'),
                         timestamp=signal.get('timestamp', datetime.now()),
-                        signal_expires=signal.get('signal_expires', datetime.now() + timedelta(minutes=5)),
-                        processing_metadata=signal.get('processing_metadata', {}),
-                        signal_metadata={
-                            'original_format': 'raw_signal',
-                            'standardization_version': '1.0',
-                            'processing_timestamp': datetime.now()
-                        }
+                        source=signal.get('layer_source', signal.get('signal_source', 'unknown')),  # 修復：使用layer_source
+                        tier=SignalTier.TIER_1,  # 默認值
+                        market_context=signal.get('market_context', signal.get('metadata', {})),
+                        risk_metrics=signal.get('risk_metrics', {}),
+                        execution_guidance=signal.get('execution_guidance', {})
                     )
                     
                     standardized_signals.append(standardized_signal)

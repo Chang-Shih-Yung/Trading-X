@@ -11,7 +11,7 @@ import getpass
 sys.path.append('/Users/henrychang/Desktop/Trading-X')
 
 from app.services.gmail_notification import GmailNotificationService
-from app.services.realtime_signal_engine import RealtimeSignalEngine, TradingSignalAlert
+from X.app.services.realtime_signal_engine import RealtimeSignalEngine, TradingSignalAlert
 from datetime import datetime
 
 def setup_environment_variables():

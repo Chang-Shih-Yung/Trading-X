@@ -429,9 +429,8 @@ class Phase3MarketAnalyzer:
             
         except Exception as e:
             logger.error(f"❌ Phase3 微結構信號生成失敗: {e}")
-            # 🛡️ 緊急降級處理
-            await self._emergency_fallback_mode(e)
-            return []
+            # 系統無法處理數據失敗，重新拋出錯誤
+            raise e
     
     async def _layer_0_phase1c_sync_integration(self):
         """Layer 0: Phase1C 同步整合 - 1ms 目標"""
@@ -465,7 +464,9 @@ class Phase3MarketAnalyzer:
                 # 故障轉移機制 - Binance → OKX/Bybit
                 if not real_time_orderbook_websocket:
                     logger.warning("Binance orderbook失敗，嘗試備援源")
-                    real_time_orderbook_websocket = await self._fallback_to_backup_sources(symbol, "orderbook")
+                    # 如果主要數據源失敗，拋出錯誤而不是使用備用
+                    logger.error(f"主要數據源失敗，無法獲取即時數據: {symbol}")
+                    raise ConnectionError(f"無法獲取 {symbol} 的即時數據")
                 
                 # 增量成交量分析
                 incremental_volume_profile = await self._process_incremental_volume_profile(tick_by_tick_trade_data)
@@ -722,36 +723,199 @@ class Phase3MarketAnalyzer:
             return {"bid_changes": [], "ask_changes": [], "timestamp": datetime.now()}
     
     async def _collect_funding_rate(self, symbol: str) -> Dict[str, Any]:
-        """核心方法: 收集資金費率數據"""
+        """增強版: 實時資金費率收集與分析"""
         try:
             async with binance_connector as connector:
+                # 獲取最新資金費率數據
                 funding_data = await connector.get_funding_rate(symbol)
                 
-                # 計算資金費率動態
-                current_rate = float(funding_data.get("fundingRate", 0))
+                if not funding_data:
+                    logger.warning(f"無法獲取 {symbol} 資金費率數據")
+                    raise ValueError(f"資金費率 API 調用失敗: {symbol}")
                 
-                # 與歷史資金費率比較
-                funding_trend = "neutral"
-                if self.funding_buffer.size() > 0:
-                    recent_rates = [float(f.get("fundingRate", 0)) for f in self.funding_buffer.get_recent(5)]
-                    avg_recent = np.mean(recent_rates) if recent_rates else current_rate
-                    
-                    if current_rate > avg_recent * 1.1:
-                        funding_trend = "increasing"
-                    elif current_rate < avg_recent * 0.9:
-                        funding_trend = "decreasing"
+                # 解析資金費率信息
+                current_rate = float(funding_data.get("fundingRate", 0))
+                funding_time = funding_data.get("fundingTime", int(time.time() * 1000))
+                next_funding_time = funding_data.get("nextFundingTime", funding_time + 8 * 3600 * 1000)
+                
+                # 計算資金費率動態趨勢
+                funding_analysis = await self._analyze_funding_rate_trend(current_rate, funding_data)
+                
+                # 生成資金費率情緒指標
+                sentiment_score = self._calculate_funding_sentiment(current_rate, funding_analysis)
+                
+                # 檢查是否需要生成基於資金費率的信號
+                await self._check_funding_rate_signals(symbol, current_rate, funding_analysis, sentiment_score)
                 
                 return {
                     "funding_rate_data": funding_data,
                     "current_rate": current_rate,
-                    "funding_trend": funding_trend,
-                    "collection_timestamp": datetime.now()
+                    "funding_trend": funding_analysis.get("trend", "neutral"),
+                    "sentiment_score": sentiment_score,
+                    "rate_volatility": funding_analysis.get("volatility", 0.0),
+                    "extreme_level": funding_analysis.get("extreme_level", "normal"),
+                    "collection_timestamp": datetime.now(),
+                    "next_funding_time": datetime.fromtimestamp(next_funding_time / 1000),
+                    "time_to_next_funding": (next_funding_time - int(time.time() * 1000)) / 1000 / 3600  # 小時
                 }
                 
         except Exception as e:
-            logger.error(f"❌ 資金費率收集失敗: {e}")
-            return {}
+            logger.error(f"❌ 資金費率收集失敗 {symbol}: {e}")
+            # 不提供默認值，確保系統知道數據獲取失敗
+            raise e
     
+    async def _analyze_funding_rate_trend(self, current_rate: float, funding_data: Dict[str, Any]) -> Dict[str, Any]:
+        """分析資金費率趨勢 - 保持現有數據結構"""
+        try:
+            analysis = {
+                "trend": "neutral",
+                "volatility": 0.0,
+                "extreme_level": "normal",
+                "rate_momentum": 0.0,
+                "historical_percentile": 0.5
+            }
+            
+            # 歷史趨勢分析
+            if self.funding_buffer.size() > 0:
+                recent_rates = [float(f.get("fundingRate", 0)) for f in self.funding_buffer.get_recent(24)]  # 最近24次（3天）
+                
+                if len(recent_rates) >= 2:
+                    avg_recent = np.mean(recent_rates)
+                    std_recent = np.std(recent_rates)
+                    
+                    # 趨勢判斷
+                    if current_rate > avg_recent + std_recent:
+                        analysis["trend"] = "strongly_positive"
+                    elif current_rate > avg_recent + 0.5 * std_recent:
+                        analysis["trend"] = "positive"
+                    elif current_rate < avg_recent - std_recent:
+                        analysis["trend"] = "strongly_negative"
+                    elif current_rate < avg_recent - 0.5 * std_recent:
+                        analysis["trend"] = "negative"
+                    
+                    # 波動性
+                    analysis["volatility"] = std_recent
+                    
+                    # 極端程度
+                    if abs(current_rate) > 0.0005:  # 0.05%
+                        analysis["extreme_level"] = "high"
+                    elif abs(current_rate) > 0.0001:  # 0.01%
+                        analysis["extreme_level"] = "moderate"
+                    
+                    # 動量計算
+                    if len(recent_rates) >= 5:
+                        recent_5 = recent_rates[-5:]
+                        slope = np.polyfit(range(len(recent_5)), recent_5, 1)[0]
+                        analysis["rate_momentum"] = slope
+                    
+                    # 歷史百分位
+                    if len(recent_rates) >= 10:
+                        sorted_rates = sorted(recent_rates)
+                        rank = sum(1 for r in sorted_rates if r <= current_rate)
+                        analysis["historical_percentile"] = rank / len(sorted_rates)
+            
+            return analysis
+            
+        except Exception as e:
+            logger.error(f"資金費率趨勢分析失敗: {e}")
+            return {"trend": "neutral", "volatility": 0.0, "extreme_level": "normal", "rate_momentum": 0.0, "historical_percentile": 0.5}
+    
+    def _calculate_funding_sentiment(self, current_rate: float, funding_analysis: Dict[str, Any]) -> float:
+        """計算基於資金費率的市場情緒分數 - 輸出標準化分數"""
+        try:
+            # 基於資金費率計算情緒分數 (0.0 = 極度看空, 1.0 = 極度看多)
+            base_score = 0.5  # 中性基準
+            
+            # 根據資金費率絕對值調整
+            rate_impact = min(abs(current_rate) * 2000, 0.4)  # 最大影響 40%
+            
+            if current_rate > 0:
+                sentiment_score = base_score + rate_impact  # 正資金費率 = 看多情緒
+            else:
+                sentiment_score = base_score - rate_impact  # 負資金費率 = 看空情緒
+            
+            # 根據趨勢調整
+            trend = funding_analysis.get("trend", "neutral")
+            trend_adjustments = {
+                "strongly_positive": 0.1,
+                "positive": 0.05,
+                "neutral": 0.0,
+                "negative": -0.05,
+                "strongly_negative": -0.1
+            }
+            sentiment_score += trend_adjustments.get(trend, 0.0)
+            
+            # 根據波動性調整（高波動性降低信心）
+            volatility = funding_analysis.get("volatility", 0.0)
+            if volatility > 0.0002:  # 高波動
+                sentiment_score *= 0.9  # 降低 10%
+            
+            return max(0.0, min(1.0, sentiment_score))  # 確保在 0-1 範圍內
+            
+        except Exception as e:
+            logger.error(f"資金費率情緒計算失敗: {e}")
+            return 0.5  # 返回中性值
+    
+    async def _check_funding_rate_signals(self, symbol: str, current_rate: float, funding_analysis: Dict[str, Any], sentiment_score: float):
+        """基於資金費率生成信號 - 保持現有信號格式"""
+        try:
+            # 極端資金費率信號
+            extreme_level = funding_analysis.get("extreme_level", "normal")
+            
+            if extreme_level in ["high", "moderate"]:
+                signal_strength = 0.8 if extreme_level == "high" else 0.6
+                
+                # 判斷方向
+                if current_rate > 0.0002:  # 高正資金費率，可能反轉
+                    direction = "SELL"  # 市場過度看多，可能反轉
+                    signal_type = "SENTIMENT_DIVERGENCE"
+                elif current_rate < -0.0002:  # 高負資金費率，可能反轉
+                    direction = "BUY"   # 市場過度看空，可能反轉
+                    signal_type = "SENTIMENT_DIVERGENCE"
+                else:
+                    return  # 不在信號範圍內
+                
+                # 生成微結構信號（保持現有格式）
+                signal = MarketMicrostructureSignal(
+                    signal_id=f"funding_rate_{symbol}_{int(time.time())}",
+                    signal_type=signal_type,
+                    signal_strength=signal_strength,
+                    signal_confidence=min(0.9, abs(current_rate) * 5000),  # 費率越極端，信心越高
+                    tier_assignment="tier_2_important",
+                    processing_priority="batch_5s",
+                    bid_ask_imbalance=0.0,  # 由於不是訂單簿信號，設為0
+                    liquidity_shock_magnitude=abs(current_rate) * 1000,  # 將費率轉換為流動性衝擊程度
+                    institutional_flow_direction=direction,
+                    funding_sentiment=self._map_sentiment_to_category(sentiment_score),
+                    timestamp=datetime.now()
+                )
+                
+                # 記錄到適當的緩衝區（保持現有數據流）
+                logger.info(f"🎯 生成資金費率信號: {signal.signal_id} | 方向: {direction} | 強度: {signal_strength:.2f} | 費率: {current_rate:.6f}")
+                
+                # 這裡可以將信號發送到 Phase1C 或其他下游模塊
+                # 保持現有的信號分發機制
+                
+        except Exception as e:
+            logger.error(f"資金費率信號生成失敗 {symbol}: {e}")
+    
+    def _map_sentiment_to_category(self, sentiment_score: float) -> str:
+        """將情緒分數映射到類別 - 保持現有枚舉格式"""
+        if sentiment_score >= 0.8:
+            return "extreme_bullish"
+        elif sentiment_score >= 0.65:
+            return "bullish"
+        elif sentiment_score >= 0.55:
+            return "mild_bullish"
+        elif sentiment_score <= 0.2:
+            return "extreme_bearish"
+        elif sentiment_score <= 0.35:
+            return "bearish"
+        elif sentiment_score <= 0.45:
+            return "mild_bearish"
+        else:
+            return "neutral"
+
     async def _process_bid_ask_spread_analysis(self, orderbook: Dict[str, Any]) -> Dict[str, Any]:
         """核心方法: 買賣價差深度分析"""
         try:
@@ -934,33 +1098,6 @@ class Phase3MarketAnalyzer:
         else:
             return "low"
     
-    async def _fallback_to_backup_sources(self, symbol: str, data_type: str) -> Dict[str, Any]:
-        """故障轉移到備援數據源"""
-        try:
-            logger.info(f"啟動備援源獲取 {data_type} 數據")
-            
-            # 簡化實現 - 實際應該連接到OKX/Bybit
-            fallback_data = {
-                "source": "fallback",
-                "data_type": data_type,
-                "symbol": symbol,
-                "timestamp": datetime.now(),
-                "status": "backup_source_activated"
-            }
-            
-            if data_type == "orderbook":
-                # 使用最近的緩存數據作為備援
-                if self.orderbook_buffer.size() > 0:
-                    recent_data = self.orderbook_buffer.get_recent(1)[0]
-                    fallback_data.update(recent_data)
-                    fallback_data["source"] = "cache_fallback"
-            
-            return fallback_data
-            
-        except Exception as e:
-            logger.error(f"❌ 備援源獲取失敗: {e}")
-            return {}
-    
     async def _adaptive_performance_adjustment(self, current_time_ms: float):
         """🎯 自適應性能調整 - Tier1超時觸發"""
         try:
@@ -1029,31 +1166,6 @@ class Phase3MarketAnalyzer:
             
         except Exception as e:
             logger.debug(f"性能統計記錄失敗: {e}")
-    
-    async def _emergency_fallback_mode(self, error: Exception):
-        """🛡️ 緊急降級處理模式"""
-        try:
-            logger.error(f"🛡️ 啟動緊急降級模式: {error}")
-            
-            # 重置所有緩衝區
-            self.orderbook_buffer.data.clear()
-            self.trade_buffer.data.clear()
-            self.double_buffer = DoubleBuffer()  # 重新初始化
-            
-            # 重置性能控制器
-            self.performance_controller = AdaptivePerformanceController()
-            
-            # 重置權重
-            self.adaptive_weights = {
-                "microstructure": 1.0,
-                "technical": 1.0, 
-                "sentiment": 1.0
-            }
-            
-            logger.info("✅ 緊急降級模式完成，系統已重置")
-            
-        except Exception as e:
-            logger.critical(f"🔥 緊急降級模式失敗: {e}")
     
     def _get_default_sentiment_metrics(self) -> SentimentMetrics:
         """獲取默認情緒指標"""

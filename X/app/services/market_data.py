@@ -7,7 +7,16 @@ from typing import Dict, List, Optional, Union, Callable
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.models.models import MarketData
-from app.services.binance_websocket import BinanceDataCollector, TickerData, KlineData, DepthData
+import asyncio
+from typing import List, Dict, Any, Optional, Callable
+from datetime import datetime, timedelta
+import logging
+from dataclasses import dataclass
+from concurrent.futures import ThreadPoolExecutor
+import threading
+
+# 導入 WebSocket 數據結構
+from X.app.services.binance_websocket import BinanceDataCollector, TickerData, KlineData, DepthData
 from sqlalchemy import desc, select
 import logging
 import json

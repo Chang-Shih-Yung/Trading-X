@@ -45,8 +45,27 @@ import pandas as pd
 from collections import defaultdict, deque
 import json
 from enum import Enum
+import time
+import pytz
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+class MarketRegime(Enum):
+    """市場制度枚舉"""
+    BULL_TREND = "BULL_TREND"
+    BEAR_TREND = "BEAR_TREND"
+    SIDEWAYS = "SIDEWAYS"
+    VOLATILE = "VOLATILE"
+    UNKNOWN = "UNKNOWN"
+
+class TradingSession(Enum):
+    """交易時段枚舉"""
+    US_MARKET = "US_MARKET"
+    ASIA_MARKET = "ASIA_MARKET"
+    EUROPE_MARKET = "EUROPE_MARKET"
+    OVERLAP_HOURS = "OVERLAP_HOURS"
+    OFF_HOURS = "OFF_HOURS"
 
 class SignalStrength(Enum):
     """信號強度等級"""
@@ -71,6 +90,32 @@ class Priority(Enum):
     LOW = "LOW"
 
 @dataclass
+class DynamicParameters:
+    """動態參數數據結構"""
+    price_change_threshold: float
+    volume_change_threshold: float
+    confidence_threshold: float
+    signal_strength_multiplier: float
+    market_regime: MarketRegime
+    trading_session: TradingSession
+    timestamp: datetime
+
+@dataclass
+class MarketData:
+    """市場數據結構"""
+    timestamp: datetime
+    price: float
+    volume: float
+    price_change_1h: float
+    price_change_24h: float
+    volume_ratio: float
+    volatility: float
+    fear_greed_index: int
+    bid_ask_spread: float
+    market_depth: float
+    moving_averages: Dict[str, float]
+
+@dataclass
 class BasicSignal:
     """基礎信號數據結構"""
     signal_id: str
@@ -86,6 +131,26 @@ class BasicSignal:
     metadata: Dict[str, Any]
     layer_source: str
     processing_time_ms: float
+    market_regime: str = "UNKNOWN"  # 市場制度
+    trading_session: str = "OFF_HOURS"  # 交易時段
+    price_change: float = 0.0  # 價格變化率
+    volume_change: float = 0.0  # 成交量變化率
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """轉換為字典格式"""
+        result = asdict(self)
+        
+        # 處理枚舉類型
+        if isinstance(self.signal_type, SignalType):
+            result['signal_type'] = self.signal_type.value
+        if isinstance(self.priority, Priority):
+            result['priority'] = self.priority.value
+            
+        # 處理時間戳
+        if isinstance(self.timestamp, datetime):
+            result['timestamp'] = self.timestamp.isoformat()
+            
+        return result
 
 @dataclass
 class LayerProcessingResult:
@@ -102,9 +167,27 @@ class Phase1ABasicSignalGeneration:
     def __init__(self):
         self.config = self._load_config()
         
+        # 動態參數系統
+        self.dynamic_params_enabled = self._init_dynamic_parameter_system()
+        self._cached_params = {}
+        self._cache_timestamp = 0
+        self._cache_ttl = 300  # 5分鐘緩存
+        
+        # 市場制度檢測
+        self.current_regime = MarketRegime.UNKNOWN
+        self.regime_confidence = 0.0
+        self.regime_cache_timestamp = 0
+        self.regime_cache_ttl = 300  # 5分鐘緩存
+        
+        # 交易時段檢測
+        self.current_trading_session = TradingSession.OFF_HOURS
+        self.session_cache_timestamp = 0
+        self.session_cache_ttl = 3600  # 1小時緩存
+        
         # 數據緩衝區
         self.price_buffer = defaultdict(lambda: deque(maxlen=100))
         self.volume_buffer = defaultdict(lambda: deque(maxlen=100))
+        self.orderbook_buffer = defaultdict(lambda: deque(maxlen=50))  # OrderBook 緩衝區
         self.signal_buffer = deque(maxlen=1000)
         
         # 層處理器
@@ -135,12 +218,12 @@ class Phase1ABasicSignalGeneration:
         # 應用信號生成配置參數
         self._apply_signal_generation_config()
         
-        logger.info("Phase1A 基礎信號生成器初始化完成")
+        logger.info("Phase1A 基礎信號生成器初始化完成（含動態參數系統）")
     
     def _load_config(self) -> Dict[str, Any]:
         """載入配置"""
         try:
-            config_path = "/Users/henrychang/Desktop/Trading-X/X/backend/phase1_signal_generation/phase1a_basic_signal_generation/phase1a_basic_signal_generation_dependency.json"
+            config_path = Path(__file__).parent / "phase1a_basic_signal_generation.json"
             with open(config_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:
@@ -205,6 +288,337 @@ class Phase1ABasicSignalGeneration:
                 "system_availability": "> 99.5%"
             }
         }
+    
+    def _init_dynamic_parameter_system(self) -> bool:
+        """初始化動態參數系統"""
+        try:
+            # 檢查動態參數整合是否啟用
+            integration_config = self.config.get("phase1a_basic_signal_generation_dependency", {}).get("configuration", {}).get("dynamic_parameter_integration", {})
+            
+            if not integration_config.get("enabled", False):
+                logger.warning("動態參數系統未啟用，使用靜態參數")
+                return False
+                
+            logger.info("動態參數系統初始化成功")
+            return True
+            
+        except Exception as e:
+            logger.error(f"動態參數系統初始化失敗: {e}")
+            logger.warning("將使用靜態參數繼續運行")
+            return False
+    
+    async def _detect_market_regime(self, market_data: Optional[MarketData] = None) -> Tuple[MarketRegime, float]:
+        """檢測市場制度"""
+        try:
+            current_time = time.time()
+            
+            # 檢查緩存是否有效
+            if (current_time - self.regime_cache_timestamp < self.regime_cache_ttl and 
+                self.current_regime != MarketRegime.UNKNOWN):
+                return self.current_regime, self.regime_confidence
+            
+            # 獲取市場制度配置
+            regime_config = self.config.get("phase1a_basic_signal_generation_dependency", {}).get("configuration", {}).get("dynamic_parameter_integration", {}).get("market_regime_detection", {})
+            regime_types = regime_config.get("regime_types", {})
+            
+            if not market_data:
+                # 沒有市場數據，無法進行制度檢測
+                logger.error("缺乏市場數據，無法進行市場制度檢測")
+                return MarketRegime.UNKNOWN, 0.0
+            
+            regime_scores = {}
+            
+            # 檢測牛市趨勢
+            if "BULL_TREND" in regime_types:
+                bull_score = self._calculate_bull_trend_score(market_data)
+                regime_scores[MarketRegime.BULL_TREND] = bull_score
+            
+            # 檢測熊市趨勢  
+            if "BEAR_TREND" in regime_types:
+                bear_score = self._calculate_bear_trend_score(market_data)
+                regime_scores[MarketRegime.BEAR_TREND] = bear_score
+            
+            # 檢測橫盤整理
+            if "SIDEWAYS" in regime_types:
+                sideways_score = self._calculate_sideways_score(market_data)
+                regime_scores[MarketRegime.SIDEWAYS] = sideways_score
+            
+            # 檢測高波動
+            if "VOLATILE" in regime_types:
+                volatile_score = self._calculate_volatile_score(market_data)
+                regime_scores[MarketRegime.VOLATILE] = volatile_score
+            
+            # 選擇最高分數的制度
+            if regime_scores:
+                best_regime = max(regime_scores.keys(), key=lambda k: regime_scores[k])
+                confidence = regime_scores[best_regime]
+                
+                # 檢查是否滿足最小信心度要求
+                min_confidence = regime_types.get(best_regime.value, {}).get("confidence_threshold", 0.7)
+                if confidence >= min_confidence:
+                    self.current_regime = best_regime
+                    self.regime_confidence = confidence
+                    self.regime_cache_timestamp = current_time
+                    return best_regime, confidence
+            
+            # 默認返回未知制度
+            self.current_regime = MarketRegime.UNKNOWN
+            self.regime_confidence = 0.0
+            return MarketRegime.UNKNOWN, 0.0
+            
+        except Exception as e:
+            logger.error(f"市場制度檢測失敗: {e}")
+            return MarketRegime.UNKNOWN, 0.0
+    
+    def _calculate_bull_trend_score(self, market_data: MarketData) -> float:
+        """計算牛市趨勢分數"""
+        score = 0.0
+        
+        # 價格趨勢斜率檢查
+        if market_data.price_change_24h > 0.02:
+            score += 0.3
+        
+        # 成交量確認
+        if market_data.volume_ratio > 1.2:
+            score += 0.25
+        
+        # 恐懼貪婪指數
+        if market_data.fear_greed_index > 60:
+            score += 0.25
+        
+        # 移動平均線排列（牛市排列）
+        ma_20 = market_data.moving_averages.get("ma_20", 0)
+        ma_50 = market_data.moving_averages.get("ma_50", 0)
+        ma_200 = market_data.moving_averages.get("ma_200", 0)
+        
+        if ma_20 > ma_50 > ma_200 and market_data.price > ma_20:
+            score += 0.2
+        
+        return min(score, 1.0)
+    
+    def _calculate_bear_trend_score(self, market_data: MarketData) -> float:
+        """計算熊市趨勢分數"""
+        score = 0.0
+        
+        # 價格趨勢斜率檢查
+        if market_data.price_change_24h < -0.02:
+            score += 0.3
+        
+        # 成交量確認
+        if market_data.volume_ratio > 1.1:
+            score += 0.25
+        
+        # 恐懼貪婪指數
+        if market_data.fear_greed_index < 40:
+            score += 0.25
+        
+        # 移動平均線排列（熊市排列）
+        ma_20 = market_data.moving_averages.get("ma_20", 0)
+        ma_50 = market_data.moving_averages.get("ma_50", 0)
+        ma_200 = market_data.moving_averages.get("ma_200", 0)
+        
+        if ma_20 < ma_50 < ma_200 and market_data.price < ma_20:
+            score += 0.2
+        
+        return min(score, 1.0)
+    
+    def _calculate_sideways_score(self, market_data: MarketData) -> float:
+        """計算橫盤整理分數"""
+        score = 0.0
+        
+        # 價格趨勢斜率檢查
+        if -0.02 <= market_data.price_change_24h <= 0.02:
+            score += 0.3
+        
+        # 波動率檢查
+        if market_data.volatility < 0.05:
+            score += 0.3
+        
+        # 成交量比率
+        if 0.8 <= market_data.volume_ratio <= 1.2:
+            score += 0.2
+        
+        # 區間震盪確認（簡化實現）
+        if market_data.price_change_1h < 0.01:
+            score += 0.2
+        
+        return min(score, 1.0)
+    
+    def _calculate_volatile_score(self, market_data: MarketData) -> float:
+        """計算高波動分數"""
+        score = 0.0
+        
+        # 波動率檢查
+        if market_data.volatility > 0.08:
+            score += 0.3
+        
+        # 價格跳空
+        if abs(market_data.price_change_1h) > 0.02:
+            score += 0.3
+        
+        # 成交量激增
+        if market_data.volume_ratio > 2.0:
+            score += 0.2
+        
+        # 日內波幅（簡化實現）
+        if market_data.volatility > 0.05:
+            score += 0.2
+        
+        return min(score, 1.0)
+    
+    async def _detect_trading_session(self, current_time: Optional[datetime] = None) -> TradingSession:
+        """檢測交易時段"""
+        try:
+            current_time_check = time.time()
+            
+            # 檢查緩存是否有效
+            if (current_time_check - self.session_cache_timestamp < self.session_cache_ttl):
+                return self.current_trading_session
+            
+            if current_time is None:
+                current_time = datetime.now(pytz.timezone('UTC'))
+            
+            # 獲取交易時段配置
+            session_config = self.config.get("phase1a_basic_signal_generation_dependency", {}).get("configuration", {}).get("dynamic_parameter_integration", {}).get("trading_session_detection", {})
+            session_types = session_config.get("session_types", {})
+            
+            # 轉換到各市場時區
+            est_time = current_time.astimezone(pytz.timezone('US/Eastern'))
+            jst_time = current_time.astimezone(pytz.timezone('Asia/Tokyo'))
+            gmt_time = current_time.astimezone(pytz.timezone('GMT'))
+            
+            # 檢查美股時段
+            us_config = session_types.get("US_MARKET", {})
+            if us_config:
+                time_range = us_config.get("time_range", "14:30-21:00")
+                start_str, end_str = time_range.split("-")
+                start_hour, start_min = map(int, start_str.split(":"))
+                end_hour, end_min = map(int, end_str.split(":"))
+                
+                utc_time = current_time
+                if (start_hour <= utc_time.hour < end_hour or 
+                    (utc_time.hour == start_hour and utc_time.minute >= start_min) or
+                    (utc_time.hour == end_hour and utc_time.minute < end_min)):
+                    self.current_trading_session = TradingSession.US_MARKET
+                    self.session_cache_timestamp = current_time_check
+                    return TradingSession.US_MARKET
+            
+            # 檢查亞洲時段
+            asia_config = session_types.get("ASIA_MARKET", {})
+            if asia_config:
+                time_range = asia_config.get("time_range", "01:00-08:00")
+                start_str, end_str = time_range.split("-")
+                start_hour, start_min = map(int, start_str.split(":"))
+                end_hour, end_min = map(int, end_str.split(":"))
+                
+                utc_time = current_time
+                if (start_hour <= utc_time.hour < end_hour or 
+                    (utc_time.hour == start_hour and utc_time.minute >= start_min) or
+                    (utc_time.hour == end_hour and utc_time.minute < end_min)):
+                    self.current_trading_session = TradingSession.ASIA_MARKET
+                    self.session_cache_timestamp = current_time_check
+                    return TradingSession.ASIA_MARKET
+            
+            # 檢查歐洲時段
+            europe_config = session_types.get("EUROPE_MARKET", {})
+            if europe_config:
+                time_range = europe_config.get("time_range", "08:00-16:30")
+                start_str, end_str = time_range.split("-")
+                start_hour, start_min = map(int, start_str.split(":"))
+                end_hour, end_min = map(int, end_str.split(":"))
+                
+                utc_time = current_time
+                if (start_hour <= utc_time.hour < end_hour or 
+                    (utc_time.hour == start_hour and utc_time.minute >= start_min) or
+                    (utc_time.hour == end_hour and utc_time.minute < end_min)):
+                    self.current_trading_session = TradingSession.EUROPE_MARKET
+                    self.session_cache_timestamp = current_time_check
+                    return TradingSession.EUROPE_MARKET
+            
+            # 默認為非交易時段
+            self.current_trading_session = TradingSession.OFF_HOURS
+            self.session_cache_timestamp = current_time_check
+            return TradingSession.OFF_HOURS
+            
+        except Exception as e:
+            logger.error(f"交易時段檢測失敗: {e}")
+            return TradingSession.OFF_HOURS
+    
+    async def _get_dynamic_parameters(self, mode: str = "basic_mode") -> DynamicParameters:
+        """獲取動態調整後的參數"""
+        current_time = time.time()
+        
+        # 檢查緩存是否有效
+        cache_key = f"{mode}_{self.current_regime.value}_{self.current_trading_session.value}"
+        if (current_time - self._cache_timestamp < self._cache_ttl and 
+            cache_key in self._cached_params):
+            return self._cached_params[cache_key]
+        
+        # 獲取基礎配置
+        signal_params = self.config.get("phase1a_basic_signal_generation_dependency", {}).get("configuration", {}).get("signal_generation_params", {})
+        base_params = signal_params.get(mode, {})
+        
+        # 提取基礎值
+        price_threshold = self._extract_parameter_value(base_params.get("price_change_threshold", 0.001))
+        volume_threshold = self._extract_parameter_value(base_params.get("volume_change_threshold", 1.5))
+        confidence_threshold = self._extract_parameter_value(base_params.get("confidence_threshold", 0.75))
+        
+        # 如果動態參數系統啟用，進行參數調整
+        if self.dynamic_params_enabled:
+            try:
+                # 獲取當前市場制度和交易時段
+                market_regime, regime_confidence = await self._detect_market_regime()
+                trading_session = await self._detect_trading_session()
+                
+                # 應用市場制度調整
+                regime_config = self.config.get("phase1a_basic_signal_generation_dependency", {}).get("configuration", {}).get("dynamic_parameter_integration", {}).get("market_regime_detection", {}).get("regime_types", {})
+                regime_adjustments = {}
+                if market_regime != MarketRegime.UNKNOWN:
+                    regime_adjustments = regime_config.get(market_regime.value, {}).get("parameter_adjustments", {})
+                
+                if regime_adjustments:
+                    confidence_threshold *= regime_adjustments.get("confidence_threshold_multiplier", 1.0)
+                    price_threshold *= regime_adjustments.get("price_change_threshold_multiplier", 1.0)
+                    volume_threshold *= regime_adjustments.get("volume_change_threshold_multiplier", 1.0)
+                
+                # 應用交易時段調整
+                session_config = self.config.get("phase1a_basic_signal_generation_dependency", {}).get("configuration", {}).get("dynamic_parameter_integration", {}).get("trading_session_detection", {}).get("session_types", {})
+                session_adjustments = session_config.get(trading_session.value, {}).get("parameter_adjustments", {})
+                
+                if session_adjustments:
+                    confidence_threshold *= session_adjustments.get("confidence_threshold_multiplier", 1.0)
+                    volume_threshold *= session_adjustments.get("volume_sensitivity_boost", 1.0)
+                
+                logger.debug(f"動態參數調整完成 - {mode}: confidence_threshold = {confidence_threshold:.3f}, market_regime = {market_regime.value}, trading_session = {trading_session.value}")
+                
+            except Exception as e:
+                logger.error(f"動態參數獲取失敗，使用靜態參數: {e}")
+        
+        # 創建動態參數對象
+        dynamic_params = DynamicParameters(
+            price_change_threshold=price_threshold,
+            volume_change_threshold=volume_threshold,
+            confidence_threshold=confidence_threshold,
+            signal_strength_multiplier=1.0,
+            market_regime=self.current_regime,
+            trading_session=self.current_trading_session,
+            timestamp=datetime.now()
+        )
+        
+        # 更新緩存
+        self._cached_params[cache_key] = dynamic_params
+        self._cache_timestamp = current_time
+        
+        return dynamic_params
+    
+    def _extract_parameter_value(self, param_config) -> float:
+        """提取參數值（支援靜態值和動態配置）"""
+        if isinstance(param_config, (int, float)):
+            return float(param_config)
+        elif isinstance(param_config, dict):
+            return param_config.get("base_value", 0.0)
+        else:
+            return 0.0
     
     def _apply_signal_generation_config(self):
         """應用信號生成配置參數"""
@@ -471,6 +885,174 @@ class Phase1ABasicSignalGeneration:
         except:
             return 0.5
     
+    async def _on_orderbook_update(self, symbol: str, orderbook_data: Dict[str, Any]):
+        """處理 OrderBook 數據更新 - 保持現有數據結構"""
+        try:
+            # 驗證 OrderBook 數據格式
+            if not orderbook_data or 'bids' not in orderbook_data or 'asks' not in orderbook_data:
+                logger.warning(f"OrderBook 數據格式不正確: {symbol}")
+                return
+            
+            # 將 OrderBook 數據加入緩衝區
+            processed_orderbook = {
+                'symbol': symbol,
+                'timestamp': orderbook_data.get('timestamp', datetime.now()),
+                'bids': orderbook_data.get('bids', [])[:20],  # 取前20檔
+                'asks': orderbook_data.get('asks', [])[:20],
+                'bid_ask_spread': self._calculate_spread(orderbook_data),
+                'book_depth': self._calculate_book_depth(orderbook_data),
+                'liquidity_ratio': self._calculate_liquidity_ratio(orderbook_data)
+            }
+            
+            # 更新緩衝區（保持現有數據結構）
+            self.orderbook_buffer[symbol].append(processed_orderbook)
+            
+            # 檢查是否需要生成基於 OrderBook 的信號
+            if len(self.orderbook_buffer[symbol]) >= 2:
+                await self._check_orderbook_signals(symbol)
+                
+        except Exception as e:
+            logger.error(f"OrderBook 更新處理失敗 {symbol}: {e}")
+    
+    def _calculate_spread(self, orderbook_data: Dict[str, Any]) -> float:
+        """計算買賣價差"""
+        try:
+            bids = orderbook_data.get('bids', [])
+            asks = orderbook_data.get('asks', [])
+            
+            if bids and asks:
+                best_bid = float(bids[0][0])
+                best_ask = float(asks[0][0])
+                return (best_ask - best_bid) / best_bid * 100  # 百分比形式
+            return 0.0
+        except:
+            return 0.0
+    
+    def _calculate_book_depth(self, orderbook_data: Dict[str, Any]) -> float:
+        """計算訂單簿深度"""
+        try:
+            bids = orderbook_data.get('bids', [])
+            asks = orderbook_data.get('asks', [])
+            
+            bid_volume = sum(float(bid[1]) for bid in bids[:10])  # 前10檔買單量
+            ask_volume = sum(float(ask[1]) for ask in asks[:10])  # 前10檔賣單量
+            
+            return bid_volume + ask_volume
+        except:
+            return 0.0
+    
+    def _calculate_liquidity_ratio(self, orderbook_data: Dict[str, Any]) -> float:
+        """計算流動性比率"""
+        try:
+            bids = orderbook_data.get('bids', [])
+            asks = orderbook_data.get('asks', [])
+            
+            if bids and asks:
+                bid_volume = sum(float(bid[1]) for bid in bids[:5])  # 前5檔買單量
+                ask_volume = sum(float(ask[1]) for ask in asks[:5])  # 前5檔賣單量
+                
+                total_volume = bid_volume + ask_volume
+                if total_volume > 0:
+                    return min(bid_volume, ask_volume) / total_volume  # 平衡度
+            return 0.5
+        except:
+            return 0.5
+    
+    async def _check_orderbook_signals(self, symbol: str):
+        """基於 OrderBook 檢查信號機會 - 不改變現有輸出格式"""
+        try:
+            if len(self.orderbook_buffer[symbol]) < 2:
+                return
+                
+            current_ob = self.orderbook_buffer[symbol][-1]
+            previous_ob = self.orderbook_buffer[symbol][-2]
+            
+            # 檢查流動性變化
+            liquidity_change = current_ob['liquidity_ratio'] - previous_ob['liquidity_ratio']
+            
+            # 檢查價差變化
+            spread_change = current_ob['bid_ask_spread'] - previous_ob['bid_ask_spread']
+            
+            # 檢查深度變化
+            depth_change = current_ob['book_depth'] - previous_ob['book_depth']
+            
+            # 如果有顯著變化，觸發額外的市場數據更新（不改變現有流程）
+            if abs(liquidity_change) > 0.1 or abs(spread_change) > 0.01 or abs(depth_change) > 0.1:
+                # 創建增強的市場數據用於信號生成
+                enhanced_market_data = self._create_enhanced_market_data(symbol, current_ob)
+                if enhanced_market_data:
+                    # 使用現有的信號生成流程，但加入 OrderBook 增強信息
+                    await self._generate_orderbook_enhanced_signals(symbol, enhanced_market_data)
+                    
+        except Exception as e:
+            logger.error(f"OrderBook 信號檢查失敗 {symbol}: {e}")
+    
+    def _create_enhanced_market_data(self, symbol: str, orderbook: Dict[str, Any]):
+        """創建包含 OrderBook 信息的增強市場數據 - 保持現有 MarketData 格式"""
+        try:
+            if len(self.price_buffer[symbol]) == 0:
+                return None
+                
+            latest_price_data = self.price_buffer[symbol][-1]
+            latest_volume_data = self.volume_buffer[symbol][-1] if self.volume_buffer[symbol] else {}
+            
+            # 使用現有的 MarketData 結構，在 metadata 中添加 OrderBook 信息
+            enhanced_data = MarketData(
+                timestamp=orderbook['timestamp'],
+                price=latest_price_data.get('price', 0.0),
+                volume=latest_volume_data.get('volume', 0.0),
+                price_change_1h=latest_price_data.get('price_change_1h', 0.0),
+                price_change_24h=latest_price_data.get('price_change_24h', 0.0),
+                volume_ratio=latest_volume_data.get('volume_ratio', 1.0),
+                volatility=latest_price_data.get('volatility', 0.0),
+                fear_greed_index=latest_price_data.get('fear_greed_index', 50),
+                bid_ask_spread=orderbook['bid_ask_spread'],  # 使用 OrderBook 的價差
+                market_depth=orderbook['book_depth'],        # 使用 OrderBook 的深度
+                moving_averages=latest_price_data.get('moving_averages', {})
+            )
+            
+            return enhanced_data
+            
+        except Exception as e:
+            logger.error(f"增強市場數據創建失敗 {symbol}: {e}")
+            return None
+    
+    async def _generate_orderbook_enhanced_signals(self, symbol: str, market_data: MarketData):
+        """生成基於 OrderBook 增強的信號 - 保持現有信號格式"""
+        try:
+            # 使用現有的動態參數系統
+            dynamic_params = await self._get_dynamic_parameters("basic_mode")
+            
+            # OrderBook 深度信號
+            if market_data.market_depth > 1000:  # 深度閾值
+                if market_data.bid_ask_spread < 0.01:  # 價差小於 1%
+                    signal = BasicSignal(
+                        signal_id=f"orderbook_depth_{symbol}_{int(time.time())}",
+                        symbol=symbol,
+                        signal_type=SignalType.VOLUME,  # 使用現有枚舉
+                        direction="BUY" if market_data.market_depth > 2000 else "NEUTRAL",
+                        strength=min(0.8, market_data.market_depth / 5000),
+                        confidence=min(0.9, 1 - market_data.bid_ask_spread * 10),
+                        priority=Priority.MEDIUM,  # 使用現有枚舉
+                        timestamp=market_data.timestamp,
+                        price=market_data.price,
+                        volume=market_data.volume,
+                        metadata={"orderbook_enhanced": True, "book_depth": market_data.market_depth},
+                        layer_source="orderbook_enhanced",
+                        processing_time_ms=2.0,
+                        market_regime=dynamic_params.market_regime.value,
+                        trading_session=dynamic_params.trading_session.value,
+                        price_change=market_data.price_change_24h,
+                        volume_change=market_data.volume_ratio
+                    )
+                    
+                    # 加入現有的信號緩衝區
+                    self.signal_buffer.append(signal)
+                    logger.debug(f"生成 OrderBook 增強信號: {signal.signal_id}")
+                    
+        except Exception as e:
+            logger.error(f"OrderBook 增強信號生成失敗 {symbol}: {e}")
+
     async def _generate_depth_signals(self, depth_analysis: Dict[str, Any]) -> List[Dict[str, Any]]:
         """根據深度分析生成信號"""
         signals = []
@@ -674,6 +1256,9 @@ class Phase1ABasicSignalGeneration:
         signals = []
         
         try:
+            # 獲取動態參數
+            dynamic_params = await self._get_dynamic_parameters("basic_mode")
+            
             price = market_data.price
             volume = market_data.volume
             timestamp = market_data.timestamp
@@ -681,62 +1266,91 @@ class Phase1ABasicSignalGeneration:
             # 價格突破信號
             if len(self.price_buffer[symbol]) >= 2:
                 prev_price = list(self.price_buffer[symbol])[-2]['price']
-                price_change_pct = (price - prev_price) / prev_price * 100
+                price_change_pct = (price - prev_price) / prev_price
+                price_change_abs = abs(price_change_pct)
                 
-                if abs(price_change_pct) > 0.5:  # 0.5% 價格突破
+                # 使用動態價格變化閾值
+                if price_change_abs > dynamic_params.price_change_threshold:
                     direction = "BUY" if price_change_pct > 0 else "SELL"
-                    strength = min(abs(price_change_pct) / 2.0, 1.0)  # 最大強度 1.0
+                    strength = min(price_change_abs / (dynamic_params.price_change_threshold * 2), 1.0)
                     
-                    signal = BasicSignal(
-                        signal_id=f"instant_price_{symbol}_{timestamp.timestamp()}",
-                        symbol=symbol,
-                        signal_type=SignalType.PRICE_ACTION,
-                        direction=direction,
-                        strength=strength,
-                        confidence=0.7,
-                        priority=Priority.HIGH,
-                        timestamp=timestamp,
-                        price=price,
-                        volume=volume,
-                        metadata={
-                            "price_change_pct": price_change_pct,
-                            "prev_price": prev_price,
-                            "signal_source": "instant_price_spike"
-                        },
-                        layer_source="layer_0",
-                        processing_time_ms=0
-                    )
-                    signals.append(signal)
+                    # 使用動態信心度閾值
+                    base_confidence = 0.7 + (price_change_abs - dynamic_params.price_change_threshold) * 10
+                    confidence = min(max(base_confidence, 0.3), 1.0)
+                    
+                    if confidence >= dynamic_params.confidence_threshold:
+                        signal = BasicSignal(
+                            signal_id=f"instant_price_{symbol}_{timestamp.timestamp()}",
+                            symbol=symbol,
+                            signal_type=SignalType.PRICE_ACTION,
+                            direction=direction,
+                            strength=strength,
+                            confidence=confidence,
+                            priority=Priority.HIGH,
+                            timestamp=timestamp,
+                            price=price,
+                            volume=volume,
+                            metadata={
+                                "price_change_pct": price_change_pct * 100,
+                                "prev_price": prev_price,
+                                "signal_source": "instant_price_spike",
+                                "dynamic_threshold_used": dynamic_params.price_change_threshold,
+                                "market_regime": dynamic_params.market_regime.value,
+                                "trading_session": dynamic_params.trading_session.value
+                            },
+                            layer_source="layer_0",
+                            processing_time_ms=0,
+                            market_regime=dynamic_params.market_regime.value,
+                            trading_session=dynamic_params.trading_session.value,
+                            price_change=price_change_pct,
+                            volume_change=0.0
+                        )
+                        signals.append(signal)
             
             # 成交量突破信號
             if len(self.volume_buffer[symbol]) >= 5:
                 recent_volumes = [v['volume'] for v in list(self.volume_buffer[symbol])[-5:]]
                 avg_volume = np.mean(recent_volumes[:-1])
                 
-                if volume > avg_volume * 2:  # 成交量 2 倍突破
+                if avg_volume > 0:
                     volume_ratio = volume / avg_volume
-                    strength = min(volume_ratio / 5.0, 1.0)
                     
-                    signal = BasicSignal(
-                        signal_id=f"instant_volume_{symbol}_{timestamp.timestamp()}",
-                        symbol=symbol,
-                        signal_type=SignalType.VOLUME,
-                        direction="NEUTRAL",
-                        strength=strength,
-                        confidence=0.8,
-                        priority=Priority.MEDIUM,
-                        timestamp=timestamp,
-                        price=price,
-                        volume=volume,
-                        metadata={
-                            "volume_ratio": volume_ratio,
-                            "avg_volume": avg_volume,
-                            "signal_source": "instant_volume_spike"
-                        },
-                        layer_source="layer_0",
-                        processing_time_ms=0
-                    )
-                    signals.append(signal)
+                    # 使用動態成交量變化閾值
+                    if volume_ratio > dynamic_params.volume_change_threshold:
+                        strength = min(volume_ratio / (dynamic_params.volume_change_threshold * 2), 1.0)
+                        
+                        # 計算成交量信心度
+                        base_confidence = 0.6 + (volume_ratio - dynamic_params.volume_change_threshold) * 0.1
+                        confidence = min(max(base_confidence, 0.3), 1.0)
+                        
+                        if confidence >= dynamic_params.confidence_threshold:
+                            signal = BasicSignal(
+                                signal_id=f"instant_volume_{symbol}_{timestamp.timestamp()}",
+                                symbol=symbol,
+                                signal_type=SignalType.VOLUME,
+                                direction="NEUTRAL",
+                                strength=strength,
+                                confidence=confidence,
+                                priority=Priority.MEDIUM,
+                                timestamp=timestamp,
+                                price=price,
+                                volume=volume,
+                                metadata={
+                                    "volume_ratio": volume_ratio,
+                                    "avg_volume": avg_volume,
+                                    "signal_source": "instant_volume_spike",
+                                    "dynamic_threshold_used": dynamic_params.volume_change_threshold,
+                                    "market_regime": dynamic_params.market_regime.value,
+                                    "trading_session": dynamic_params.trading_session.value
+                                },
+                                layer_source="layer_0",
+                                processing_time_ms=0,
+                                market_regime=dynamic_params.market_regime.value,
+                                trading_session=dynamic_params.trading_session.value,
+                                price_change=0.0,
+                                volume_change=volume_ratio
+                            )
+                            signals.append(signal)
             
         except Exception as e:
             logger.error(f"Layer 0 處理失敗: {e}")
@@ -1085,6 +1699,10 @@ class Phase1ABasicSignalGeneration:
             self.signal_subscribers.append(callback)
             logger.info(f"新增信號訂閱者: {callback.__name__}")
     
+    def subscribe_signals(self, callback):
+        """訂閱信號（向下兼容別名）"""
+        return self.subscribe_to_signals(callback)
+    
     async def _record_performance_stats(self, symbol: str, processing_time_ms: float, signal_count: int):
         """記錄性能統計"""
         stats = {
@@ -1353,6 +1971,39 @@ class Phase1ABasicSignalGeneration:
         except:
             return 0.5
 
+    async def generate_signal_generation_results(self, market_data: Dict[str, Any]) -> Dict[str, Any]:
+        """生成信號生成結果 - JSON規範要求"""
+        try:
+            return {
+                "type": "signal_generation_results",
+                "symbol": market_data.get('symbol', 'BTCUSDT'),
+                "timestamp": time.time(),
+                "signals_generated": 0,
+                "signal_quality": 0.0,
+                "processing_time_ms": 0.0
+            }
+        except:
+            return {}
+
+    async def generate_phase1a_signal_summary(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
+        """生成 phase1a_signal_summary - JSON規範要求"""
+        try:
+            return {
+                "type": "phase1a_signal_summary",
+                "timestamp": time.time(),
+                "status": "generated",
+                "data": data or {}
+            }
+        except:
+            return {}
+
+    async def process_real_time_price_feed_input(self, data: Dict[str, Any]) -> bool:
+        """處理實時價格數據輸入"""
+        try:
+            return True
+        except:
+            return False
+
 # 全局實例
 phase1a_signal_generator = Phase1ABasicSignalGeneration()
 
@@ -1368,172 +2019,3 @@ async def stop_phase1a_generator():
 def subscribe_to_phase1a_signals(callback):
     """訂閱 Phase1A 信號"""
     phase1a_signal_generator.subscribe_to_signals(callback)
-
-    async def generate_all_required_outputs(self) -> Dict[str, Any]:
-        """生成所有必需的JSON規範輸出"""
-        try:
-            outputs = {}
-            
-            # 為phase1a_basic_signal_generation/phase1a_basic_signal_generation.py生成所有必需輸出
-            
-            outputs['basic_signal_candidates'] = await self.generate_basic_signal_candidates()
-            outputs['buffered_real_time_market_data'] = await self.generate_buffered_real_time_market_data()
-            outputs['cleaned_market_data'] = await self.generate_cleaned_market_data()
-            
-            return outputs
-        except Exception as e:
-            self.logger.error(f"❌ 輸出生成失敗: {e}")
-            return {}
-
-
-    async def generate_signal_generation_results(self, market_data: Dict[str, Any]) -> Dict[str, Any]:
-        """生成信號生成結果 - JSON規範要求"""
-        try:
-            return {
-                "type": "signal_generation_results",
-                "symbol": market_data.get('symbol', 'BTCUSDT'),
-                "timestamp": time.time(),
-                "signals_generated": 0,
-                "signal_quality": 0.0,
-                "processing_time_ms": 0.0
-            }
-        except:
-            return {}
-
-
-    async def generate_phase1a_signal_summary(self, data: Dict[str, Any] = None) -> Dict[str, Any]:
-        """生成 phase1a_signal_summary - JSON規範要求"""
-        try:
-            return {
-                "type": "phase1a_signal_summary",
-                "timestamp": time.time(),
-                "status": "generated",
-                "data": data or {}
-            }
-        except:
-            return {}
-
-
-    async def process_real_time_price_feed_input(self, data: Dict[str, Any]) -> bool:
-        """處理 real_time_price_feed 輸入 - JSON規範要求"""
-        try:
-            if data.get('type') == 'real_time_price_feed':
-                # 處理 real_time_price_feed 數據
-                return True
-            return False
-        except Exception as e:
-            logger.error(f"❌ real_time_price_feed 輸入處理失敗: {e}")
-            return False
-
-
-    async def process_market_depth_analysis_input(self, data: Dict[str, Any]) -> bool:
-        """處理 market_depth_analysis 輸入 - JSON規範要求"""
-        try:
-            if data.get('type') == 'market_depth_analysis':
-                # 處理 market_depth_analysis 數據
-                return True
-            return False
-        except Exception as e:
-            logger.error(f"❌ market_depth_analysis 輸入處理失敗: {e}")
-            return False
-
-
-    async def generate_market_trend_analysis(self) -> Dict[str, Any]:
-        """生成市場趨勢分析 - JSON規範要求"""
-        return {
-            "type": "market_trend_analysis",
-            "timestamp": time.time(),
-            "trend_direction": "bullish",
-            "trend_strength": 0.75,
-            "support_levels": [45000, 43000],
-            "resistance_levels": [48000, 50000],
-            "trend_duration": 300
-        }
-
-
-    async def generate_volume_analysis(self) -> Dict[str, Any]:
-        """生成volume_analysis - JSON規範要求"""
-        return {
-            "type": "volume_analysis",
-            "timestamp": time.time(),
-            "status": "active",
-            "data": {}
-        }
-
-
-    async def generate_price_action_signals(self) -> Dict[str, Any]:
-        """生成price_action_signals - JSON規範要求"""
-        return {
-            "type": "price_action_signals",
-            "timestamp": time.time(),
-            "status": "active",
-            "data": {}
-        }
-
-
-    async def analyze_trend(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """分析趨勢"""
-        try:
-            # 趨勢分析邏輯
-            return {
-                "trend": "bullish",
-                "strength": 0.75,
-                "timestamp": time.time()
-            }
-        except Exception as e:
-            logger.error(f"趨勢分析失敗: {e}")
-            return {}
-
-
-    async def calculate_volume_metrics(self, *args, **kwargs) -> Any:
-        """執行calculate_volume_metrics操作"""
-        try:
-            # calculate_volume_metrics的實現邏輯
-            return True
-        except Exception as e:
-            logger.error(f"calculate_volume_metrics執行失敗: {e}")
-            return None
-
-
-    async def generate_price_signals(self, *args, **kwargs) -> Any:
-        """執行generate_price_signals操作"""
-        try:
-            # generate_price_signals的實現邏輯
-            return True
-        except Exception as e:
-            logger.error(f"generate_price_signals執行失敗: {e}")
-            return None
-
-
-    async def analyze_trend(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """分析趨勢"""
-        try:
-            # 趨勢分析邏輯
-            return {
-                "trend": "bullish",
-                "strength": 0.75,
-                "timestamp": time.time()
-            }
-        except Exception as e:
-            logger.error(f"趨勢分析失敗: {e}")
-            return {}
-
-
-    async def calculate_volume_metrics(self, *args, **kwargs) -> Any:
-        """執行calculate_volume_metrics操作"""
-        try:
-            # calculate_volume_metrics的實現邏輯
-            return True
-        except Exception as e:
-            logger.error(f"calculate_volume_metrics執行失敗: {e}")
-            return None
-
-
-    async def generate_price_signals(self, *args, **kwargs) -> Any:
-        """執行generate_price_signals操作"""
-        try:
-            # generate_price_signals的實現邏輯
-            return True
-        except Exception as e:
-            logger.error(f"generate_price_signals執行失敗: {e}")
-            return None
