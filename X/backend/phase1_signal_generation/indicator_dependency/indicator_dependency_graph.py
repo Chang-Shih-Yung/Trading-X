@@ -1428,6 +1428,46 @@ class IndicatorDependencyGraph:
             self.logger.error(f"❌ 指標輸出生成失敗: {e}")
             return {}
 
+    async def initialize(self):
+        """初始化指標依賴引擎"""
+        try:
+            self.logger.info("🚀 初始化指標依賴引擎...")
+            
+            # 初始化快取系統
+            self.cache.clear()
+            self.cache_ttl.clear()
+            
+            # 重置性能統計
+            self.performance_history.clear()
+            self.layer_timings.clear()
+            
+            # 載入配置
+            self.config = self._load_config()
+            
+            self.logger.info("✅ 指標依賴引擎初始化完成")
+            
+        except Exception as e:
+            self.logger.error(f"❌ 指標依賴引擎初始化失敗: {e}")
+            raise
+
+    async def cleanup(self):
+        """清理引擎資源"""
+        try:
+            self.logger.info("🧹 清理指標依賴引擎資源...")
+            
+            # 清理快取
+            self.cache.clear()
+            self.cache_ttl.clear()
+            
+            # 保存最終統計
+            if self.performance_history:
+                self.logger.info(f"📊 處理了 {len(self.performance_history)} 次計算")
+            
+            self.logger.info("✅ 指標依賴引擎清理完成")
+            
+        except Exception as e:
+            self.logger.error(f"❌ 指標依賴引擎清理失敗: {e}")
+
 # 全局實例
 indicator_dependency_graph = IndicatorDependencyGraph()
 
@@ -1440,3 +1480,45 @@ async def calculate_technical_indicators(symbol: str = "BTCUSDT",
 async def get_indicator_performance() -> Dict[str, Any]:
     """便捷函數：獲取性能統計"""
     return await indicator_dependency_graph.get_performance_stats()
+
+# 🎯 引擎啟動/停止函數
+async def start_indicator_engine(websocket_driver=None):
+    """啟動指標依賴引擎"""
+    try:
+        await indicator_dependency_graph.initialize()
+        if websocket_driver:
+            # 連接WebSocket驅動器 (如果提供)
+            pass
+        indicator_dependency_graph.logger.info("✅ 指標依賴引擎啟動成功")
+        return True
+    except Exception as e:
+        indicator_dependency_graph.logger.error(f"❌ 指標依賴引擎啟動失敗: {e}")
+        return False
+
+async def stop_indicator_engine():
+    """停止指標依賴引擎"""
+    try:
+        # 清理資源
+        await indicator_dependency_graph.cleanup()
+        indicator_dependency_graph.logger.info("✅ 指標依賴引擎已停止")
+        return True
+    except Exception as e:
+        indicator_dependency_graph.logger.error(f"❌ 指標依賴引擎停止失敗: {e}")
+        return False
+
+# 🎯 引擎健康檢查
+async def get_engine_status() -> Dict[str, Any]:
+    """獲取引擎狀態"""
+    try:
+        stats = await indicator_dependency_graph.get_performance_stats()
+        return {
+            'status': 'running',
+            'performance': stats,
+            'timestamp': indicator_dependency_graph.config_system.get('last_updated', 'unknown')
+        }
+    except Exception as e:
+        return {
+            'status': 'error',
+            'error': str(e),
+            'timestamp': 'unknown'
+        }

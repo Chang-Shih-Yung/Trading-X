@@ -21,7 +21,14 @@ class WebSocketRealtimeConfig:
         
     def _get_default_config_path(self) -> str:
         """獲取預設配置路徑"""
-        return str(Path(__file__).parent.parent / "websocket_realtime_config.json")
+        # 優先使用同目錄下的配置文件
+        config_file = Path(__file__).parent / "websocket_realtime_config.json"
+        if config_file.exists():
+            return str(config_file)
+        
+        # 回退到父目錄
+        fallback_path = Path(__file__).parent.parent / "websocket_realtime_config.json"
+        return str(fallback_path)
     
     def _load_config(self) -> Dict[str, Any]:
         """載入配置文件"""

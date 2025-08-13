@@ -3,7 +3,7 @@
     "real_time_data_sources": {
       "binance_websocket": {
         "price_stream": "real_time",
-        "volume_stream": "real_time", 
+        "volume_stream": "real_time",
         "orderbook_stream": "real_time",
         "funding_rate_api": "periodic"
       },
@@ -14,20 +14,36 @@
     },
     "required_parameters": {
       "dynamic_parameters": ["market_regime", "trading_session"],
-      "orderbook_integration": ["spread_calculation", "depth_analysis", "liquidity_ratio"],
+      "orderbook_integration": [
+        "spread_calculation",
+        "depth_analysis",
+        "liquidity_ratio"
+      ],
       "signal_thresholds": ["strength_minimum", "confidence_threshold"]
     }
   },
   "output_specifications": {
     "signal_format": "BasicSignal",
-    "market_data_format": "MarketData", 
-    "output_channels": ["phase1b_volatility", "phase1c_coordination", "phase2_pre_evaluation"],
-    "processing_metadata": ["orderbook_enhanced", "dynamic_parameters", "timing_info"]
+    "market_data_format": "MarketData",
+    "output_channels": [
+      "phase1b_volatility",
+      "phase1c_coordination",
+      "phase2_pre_evaluation"
+    ],
+    "processing_metadata": [
+      "orderbook_enhanced",
+      "dynamic_parameters",
+      "timing_info"
+    ]
   },
   "processing_pipeline": {
     "layer_1_data_ingestion": {
       "websocket_handlers": ["price", "volume", "orderbook"],
-      "buffer_management": ["price_buffer", "volume_buffer", "orderbook_buffer"],
+      "buffer_management": [
+        "price_buffer",
+        "volume_buffer",
+        "orderbook_buffer"
+      ],
       "real_time_processing": true
     },
     "layer_2_indicator_calculation": {
@@ -195,7 +211,7 @@
           },
           "volume_change_threshold": {
             "base_value": 1.5,
-            "type": "dynamic_parameter", 
+            "type": "dynamic_parameter",
             "parameter_id": "phase1_volume_change_threshold",
             "market_regime_dependent": true,
             "description": "成交量變化閾值，根據市場制度動態調整"
@@ -223,7 +239,7 @@
           "volume_change_threshold": {
             "base_value": 3.0,
             "type": "dynamic_parameter",
-            "parameter_id": "phase1_volume_change_threshold_extreme", 
+            "parameter_id": "phase1_volume_change_threshold_extreme",
             "market_regime_dependent": true,
             "extreme_mode_multiplier": 2.0,
             "description": "極端市場模式成交量變化閾值"

@@ -42,6 +42,21 @@ from app.utils.timezone_utils import get_taiwan_now
 
 logger = logging.getLogger(__name__)
 
+# 🎯 Phase1 整合模組
+try:
+    from X.backend.phase1_signal_generation.phase1_main_coordinator import Phase1MainCoordinator
+    from X.backend.phase1_signal_generation.phase1a_basic_signal_generation.phase1a_basic_signal_generation import Phase1ABasicSignalGeneration
+    from X.backend.phase1_signal_generation.phase1b_volatility_adaptation.phase1b_volatility_adaptation import Phase1BVolatilityAdaptationEngine
+    from X.backend.phase1_signal_generation.phase1c_signal_standardization.phase1c_signal_standardization import Phase1CSignalStandardizationEngine
+    PHASE1_AVAILABLE = True
+    logger.info("✅ Phase1 信號生成模組載入成功")
+except ImportError as e:
+    PHASE1_AVAILABLE = False
+    logger.warning(f"⚠️ Phase1 模組載入失敗: {e}")
+    logger.warning("🔄 將使用傳統技術分析作為後備方案")
+
+logger = logging.getLogger(__name__)
+
 @dataclass
 class TradingSignalAlert:
     """交易信號警報"""
@@ -75,178 +90,468 @@ class RealtimeSignalEngine:
         self.pandas_ta_indicators = PandasTAIndicators()
         self.signal_parser = PandasTATradingSignals()
         self.technical_analysis: Optional[RealTimeTechnicalAnalysis] = None
-        
         # 配置參數
-        self.min_history_points = 200  # 最少歷史數據點
-        self.signal_cooldown = 60  # 信號冷卻時間(秒) - 改為1分鐘
-        self.confidence_threshold = 0.65  # 信號信心度閾值
-        
+        self.min_history_points = 200
+        self.signal_cooldown = 60
+        self.confidence_threshold = 0.65
         # 運行狀態
         self.running = False
         self.monitored_symbols = []
-        self.tracked_symbols = []  # 當前追蹤的交易對
+        self.tracked_symbols = []
         self.monitored_timeframes = ['1m', '5m', '15m', '1h']
-        
         # 快取和狀態
-        self.last_signals = {}  # 最後信號快取
-        self.price_buffers = {}  # 價格緩衝區
-        self.signal_history = []  # 信號歷史
-        self.latest_prices = {}  # 最新價格
-        
-        # 事件和同步
+        self.last_signals = {}
+        self.price_buffers = {}
+        self.signal_history = []
+        self.latest_prices = {}
+        # 事件與同步
         self.data_initialized_event = asyncio.Event()
-        
-        # 回調函數
+        self.config_lock = asyncio.Lock()  # 新增
+        # 任務管理
+        self.tasks: List[asyncio.Task] = []  # 新增統一管理
+        # 回調
         self.signal_callbacks: List[Callable] = []
         self.notification_callbacks: List[Callable] = []
-        
-        # Gmail 通知服務
+        # Gmail
         self.gmail_service: Optional[GmailNotificationService] = None
         self.gmail_enabled = False
-        
+        # 多時間框架歷史需求與緩存
+        self.timeframe_history_requirements: Dict[str, int] = {}
+        self.historical_cache: Dict[str, Dict[str, pd.DataFrame]] = {}
+        # 🎯 Phase1 信號生成協調器
+        self.phase1_coordinator: Optional[Phase1MainCoordinator] = None
+        self.phase1_enabled = PHASE1_AVAILABLE
+
     async def initialize(self, market_service: MarketDataService):
-        """初始化引擎"""
+        """初始化引擎 (恢復遺漏的方法)"""
         try:
             self.market_service = market_service
             self.technical_analysis = RealTimeTechnicalAnalysis(market_service)
-            
-            # 初始化動態時間分類器
             self.timeframe_classifier = IntelligentTimeframeClassifier()
             
-            # 設置默認監控的交易對
-            self.monitored_symbols = [
-                'BTCUSDT', 'ETHUSDT', 'ADAUSDT', 
-                'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT'
-            ]
+            # 🎯 初始化 Phase1 協調器
+            if self.phase1_enabled:
+                try:
+                    self.phase1_coordinator = Phase1MainCoordinator()
+                    await self.phase1_coordinator.initialize()
+                    logger.info("✅ Phase1 主協調器初始化完成")
+                except Exception as e:
+                    logger.error(f"❌ Phase1 協調器初始化失敗: {e}")
+                    self.phase1_enabled = False
+                    logger.warning("🔄 回退到傳統技術分析模式")
             
-            # 初始化追蹤的交易對（與監控的交易對相同）
+            if not self.monitored_symbols:
+                self.monitored_symbols = [
+                    'BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT'
+                ]
             self.tracked_symbols = self.monitored_symbols.copy()
-            
-            # 🔧 關鍵修復：啟動WebSocket數據收集
-            if market_service.binance_collector and market_service.websocket_enabled:
+            if market_service and getattr(market_service, 'binance_collector', None) and getattr(market_service, 'websocket_enabled', False):
                 await market_service.binance_collector.start_collecting(
                     symbols=self.monitored_symbols,
-                    intervals=['1m', '5m', '15m', '1h']
+                    intervals=self.monitored_timeframes
                 )
                 logger.info(f"🌐 WebSocket數據收集已啟動: {self.monitored_symbols}")
             else:
-                logger.warning("⚠️ WebSocket數據收集器未可用")
-            
-            logger.info(f"🚀 實時信號引擎初始化完成")
-            logger.info(f"📊 監控交易對: {self.monitored_symbols}")
-            logger.info(f"🎯 追蹤交易對: {self.tracked_symbols}")
-            logger.info(f"⏰ 監控時間框架: {self.monitored_timeframes}")
-            logger.info(f"🎯 信心度閾值: {self.confidence_threshold}")
-            logger.info(f"❄️ 信號冷卻時間: {self.signal_cooldown}秒")
-            
+                logger.warning("⚠️ WebSocket數據收集器未可用或未啟用")
+            logger.info("🚀 RealtimeSignalEngine 初始化完成")
         except Exception as e:
             logger.error(f"❌ 初始化實時信號引擎失敗: {e}")
             raise
-    
-    def setup_gmail_notification(self, sender_email: str, sender_password: str, recipient_email: str):
-        """設置Gmail通知服務"""
-        try:
-            self.gmail_service = GmailNotificationService(
-                sender_email=sender_email,
-                sender_password=sender_password, 
-                recipient_email=recipient_email
-            )
-            self.gmail_enabled = True
-            logger.info("📧 Gmail通知服務設置完成")
-            
-        except Exception as e:
-            logger.error(f"❌ 設置Gmail通知服務失敗: {e}")
-            self.gmail_enabled = False
-    
-    async def test_gmail_notification(self) -> bool:
-        """測試Gmail通知功能"""
-        if not self.gmail_service:
-            logger.warning("📧 Gmail服務未設置")
-            return False
-            
-        return await self.gmail_service.test_notification()
-    
+
+    async def update_config(self, new_config: Dict[str, Any]):
+        """安全更新配置，必要時重啟。"""
+        async with self.config_lock:
+            logger.info(f"⚙️ 更新引擎配置: {new_config}")
+            restart_required = False
+            if "monitored_symbols" in new_config and set(new_config["monitored_symbols"]) != set(self.monitored_symbols):
+                self.monitored_symbols = new_config["monitored_symbols"]
+                self.tracked_symbols = self.monitored_symbols.copy()
+                restart_required = True
+            if "monitored_timeframes" in new_config and set(new_config["monitored_timeframes"]) != set(self.monitored_timeframes):
+                self.monitored_timeframes = new_config["monitored_timeframes"]
+                restart_required = True
+            if "confidence_threshold" in new_config:
+                self.confidence_threshold = new_config["confidence_threshold"]
+            if "signal_cooldown" in new_config:
+                self.signal_cooldown = new_config["signal_cooldown"]
+            if restart_required and self.running:
+                logger.info("配置變更需要重啟即時信號引擎...")
+                await self.stop()
+                await self.start()
+                logger.info("✅ 重啟完成並套用新配置")
+            else:
+                logger.info("✅ 配置更新完成")
+
     async def start(self):
-        """啟動即時信號引擎"""
+        """啟動即時信號引擎（加入預加載 gating）"""
         if self.running:
             logger.warning("即時信號引擎已在運行中")
             return
-            
+        # 預加載
+        success = await self.prefill_data_buffers()
+        if not success:
+            logger.critical("🔥 歷史數據預加載失敗，引擎放棄啟動")
+            return
         self.running = True
         logger.info("🚀 啟動即時信號引擎...")
-        
-        # 啟動各種監控任務
-        tasks = [
-            asyncio.create_task(self._price_monitor_loop()),
-            asyncio.create_task(self._signal_generation_loop()),
-            asyncio.create_task(self._data_cleanup_loop()),
-            asyncio.create_task(self._health_check_loop())
+        self.tasks = [
+            asyncio.create_task(self._price_monitor_loop(), name="price_monitor"),
+            asyncio.create_task(self._signal_generation_loop(), name="signal_generation"),
+            asyncio.create_task(self._data_cleanup_loop(), name="data_cleanup"),
+            asyncio.create_task(self._health_check_loop(), name="health_check")
         ]
-        
         try:
-            await asyncio.gather(*tasks, return_exceptions=True)
-        except Exception as e:
-            logger.error(f"即時信號引擎運行錯誤: {e}")
+            results = await asyncio.gather(*self.tasks, return_exceptions=True)
+            for r in results:
+                if isinstance(r, Exception) and not isinstance(r, asyncio.CancelledError):
+                    logger.error(f"背景任務異常終止: {r}")
         finally:
             self.running = False
-    
+            logger.info("信號引擎已結束運行循環")
+
     async def stop(self):
-        """停止即時信號引擎"""
-        logger.info("⏹️ 正在停止實時信號引擎...")
+        """優雅停止"""
+        if not self.running:
+            logger.warning("信號引擎未在運行")
+            return
+        logger.info("⏹️ 正在停止即時信號引擎...")
         self.running = False
-        
-        # 等待所有任務完成
-        if hasattr(self, 'tasks'):
-            for task in self.tasks:
-                task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
-        
-        logger.info("✅ 實時信號引擎已停止")
-    
-    async def handle_market_data_update(self, update):
-        """處理市場數據更新 - WebSocket事件處理"""
+        for t in self.tasks:
+            if not t.done():
+                t.cancel()
+        if self.tasks:
+            await asyncio.gather(*self.tasks, return_exceptions=True)
+        self.tasks.clear()
+        self.data_initialized_event.clear()
+        logger.info("✅ 即時信號引擎已停止")
+
+    async def _determine_required_points_per_timeframe(self) -> Dict[str, int]:
+        """計算每個時間框架需要的歷史點數 (指標最大週期 * 1.2 與 >=200)"""
         try:
-            # 記錄WebSocket數據接收
-            logger.info(f"📡 WebSocket數據: {update.get('symbol', 'UNKNOWN')} - 價格: {update.get('price', 0):.6f}, 成交量: {update.get('volume', 0):.2f}")
+            base = self.pandas_ta_indicators.get_max_period()
+        except Exception:
+            base = 200
+        requirements = {}
+        for tf in self.monitored_timeframes:
+            req = int(base * 1.2)
+            requirements[tf] = max(req, 200)
+        logger.info(f"📊 多時間框架歷史需求: {requirements}")
+        return requirements
+
+    async def prefill_data_buffers(self) -> bool:
+        """多時間框架歷史數據預加載"""
+        if not self.market_service:
+            logger.error("❌ 市場服務未初始化，無法預加載")
+            return False
+        logger.info("⏳ 開始預加載所有 (symbol,timeframe) 歷史數據...")
+        self.timeframe_history_requirements = await self._determine_required_points_per_timeframe()
+        max_required = max(self.timeframe_history_requirements.values()) if self.timeframe_history_requirements else self.min_history_points
+        self.min_history_points = max_required
+        self.historical_cache.clear()
+        tasks = []
+        meta = []
+        for symbol in self.monitored_symbols:
+            for tf in self.monitored_timeframes:
+                limit = self.timeframe_history_requirements.get(tf, max_required)
+                tasks.append(self.market_service.get_historical_data(symbol=symbol, timeframe=tf, limit=limit))
+                meta.append((symbol, tf, limit))
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        all_ok = True
+        import pandas as _pd
+        for (symbol, tf, limit), res in zip(meta, results):
+            if isinstance(res, Exception):
+                logger.error(f"❌ 預加載失敗 {symbol} {tf}: {res}")
+                all_ok = False
+                continue
+            if not isinstance(res, _pd.DataFrame) or res.empty or len(res) < limit:
+                logger.warning(f"⚠️ 數據不足 {symbol} {tf}: {len(res) if isinstance(res, _pd.DataFrame) else 0}/{limit}")
+                all_ok = False
+                continue
+            self.historical_cache.setdefault(symbol, {})[tf] = res.copy()
+        if all_ok:
+            logger.info("✅ 預加載完成，設定 data_initialized_event")
+            self.data_initialized_event.set()
+            return True
+        logger.error("🔥 預加載未全部成功，阻止啟動")
+        return False
+
+    async def _prepare_phase1_data(self, symbol: str, timeframe: str, df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        準備Phase1所需的數據格式
+        """
+        try:
+            # 確保數據格式符合Phase1要求
+            if df.empty or len(df) < 50:
+                logger.warning(f"❌ Phase1數據不足: {symbol} {len(df)} < 50")
+                return {}
             
-            symbol = update.get('symbol')
-            price = update.get('price', 0)
-            volume = update.get('volume', 0)
+            # 標準化列名 (確保包含OHLCV)
+            required_columns = ['open', 'high', 'low', 'close', 'volume']
+            for col in required_columns:
+                if col not in df.columns:
+                    logger.error(f"❌ 缺少必要欄位 {col} in {df.columns.tolist()}")
+                    return {}
             
-            if not symbol or price <= 0:
-                logger.warning(f"⚠️ 無效的WebSocket數據: {update}")
-                return
+            # 準備Phase1標準格式
+            phase1_data = {
+                'symbol': symbol,
+                'timeframe': timeframe,
+                'timestamp': get_taiwan_now().isoformat(),
+                'data_points': len(df),
+                
+                # OHLCV 數據
+                'ohlcv': {
+                    'open': df['open'].tolist(),
+                    'high': df['high'].tolist(), 
+                    'low': df['low'].tolist(),
+                    'close': df['close'].tolist(),
+                    'volume': df['volume'].tolist()
+                },
+                
+                # 當前價格信息
+                'current_price': float(df['close'].iloc[-1]),
+                'previous_close': float(df['close'].iloc[-2]) if len(df) > 1 else float(df['close'].iloc[-1]),
+                'price_change': float(df['close'].iloc[-1] - df['close'].iloc[-2]) if len(df) > 1 else 0.0,
+                'price_change_pct': float((df['close'].iloc[-1] - df['close'].iloc[-2]) / df['close'].iloc[-2] * 100) if len(df) > 1 and df['close'].iloc[-2] != 0 else 0.0,
+                
+                # 成交量信息
+                'current_volume': float(df['volume'].iloc[-1]),
+                'avg_volume_20': float(df['volume'].rolling(20).mean().iloc[-1]) if len(df) >= 20 else float(df['volume'].mean()),
+                'volume_ratio': float(df['volume'].iloc[-1] / df['volume'].rolling(20).mean().iloc[-1]) if len(df) >= 20 and df['volume'].rolling(20).mean().iloc[-1] > 0 else 1.0,
+                
+                # 基礎技術指標 (Phase1可能需要)
+                'rsi_14': None,  # 將由Phase1計算
+                'sma_20': None,  # 將由Phase1計算
+                'ema_12': None,  # 將由Phase1計算
+                'ema_26': None,  # 將由Phase1計算
+                
+                # 市場條件
+                'market_condition': 'NORMAL',  # 可以後續增強
+                'volatility': float(df['close'].pct_change().std() * 100) if len(df) > 1 else 0.0,
+                
+                # 數據品質檢查
+                'data_quality': {
+                    'completeness': 1.0 if not df.isnull().any().any() else (1.0 - df.isnull().sum().sum() / (len(df) * len(df.columns))),
+                    'continuity': True,  # 假設數據連續
+                    'freshness_seconds': 60  # 假設數據是最近60秒內的
+                }
+            }
             
-            # 更新價格緩衝區
-            await self._update_price_buffer_from_websocket(symbol, price, volume)
-            
-            # 更新最新價格
-            old_price = self.latest_prices.get(symbol, 0)
-            self.latest_prices[symbol] = price
-            
-            # 計算價格變化並記錄
-            if old_price > 0:
-                price_change = ((price - old_price) / old_price) * 100
-                if abs(price_change) > 0.05:  # 變化超過0.05%才記錄
-                    logger.info(f"📈 {symbol} 價格變化: {price_change:+.3f}% (WebSocket更新)")
-            
-            # 檢查是否觸發新信號
-            await self._handle_new_signal_trigger_from_websocket(symbol, price)
+            logger.debug(f"✅ Phase1數據準備完成: {symbol} {timeframe}, {len(df)}個數據點")
+            return phase1_data
             
         except Exception as e:
-            logger.error(f"❌ 處理WebSocket數據更新失敗: {e}")
-        
-    def add_signal_callback(self, callback: Callable):
-        """添加信號回調函數"""
-        self.signal_callbacks.append(callback)
-        
-    def add_notification_callback(self, callback: Callable):
-        """添加通知回調函數"""
-        self.notification_callbacks.append(callback)
-    
+            logger.error(f"❌ Phase1數據準備失敗 {symbol}: {e}")
+            return {}
+
+    async def _should_generate_signal(self, symbol: str, timeframe: str) -> bool:
+        """覆寫加入動態歷史需求"""
+        # 檢查服務
+        if not self.market_service:
+            return False
+        # 冷卻檢查
+        try:
+            cooldown_time = datetime.now() - timedelta(seconds=self.signal_cooldown)
+            async with AsyncSessionLocal() as session:
+                recent_signal = await session.execute(
+                    select(SniperSignalDetails).where(
+                        and_(
+                            SniperSignalDetails.symbol == symbol,
+                            SniperSignalDetails.created_at >= cooldown_time
+                        )
+                    ).order_by(SniperSignalDetails.created_at.desc()).limit(1)
+                )
+                if recent_signal.scalar_one_or_none():
+                    return False
+        except Exception as e:
+            logger.warning(f"冷卻檢查失敗 {symbol}: {e}")
+        # 歷史數據充分性
+        try:
+            required = self.timeframe_history_requirements.get(timeframe, self.min_history_points)
+            df = self.historical_cache.get(symbol, {}).get(timeframe)
+            if df is None or len(df) < required:
+                df = await self.market_service.get_historical_data(symbol=symbol, timeframe=timeframe, limit=required)
+            return df is not None and len(df) >= required
+        except Exception as e:
+            logger.warning(f"數據充足性檢查失敗 {symbol} {timeframe}: {e}")
+            return False
+
+    async def _generate_comprehensive_signal(self, symbol: str, timeframe: str) -> Optional[TradingSignalAlert]:
+        """
+        🎯 增強版統一信號生成 (Phase1 + 傳統技術分析整合)
+        加權方案：形態30% + 技術30% + 趨勢20% + Phase1 20%
+        """
+        try:
+            if not self.market_service:
+                return None
+            
+            required = self.timeframe_history_requirements.get(timeframe, self.min_history_points)
+            df = self.historical_cache.get(symbol, {}).get(timeframe)
+            if df is None or len(df) < required:
+                df = await self.market_service.get_historical_data(symbol=symbol, timeframe=timeframe, limit=required)
+            if df is None or len(df) < required:
+                return None
+                
+            current_price = float(df['close'].iloc[-1])
+            
+            # ==================== Phase1 信號分析 ====================
+            phase1_weight = 0.0
+            phase1_signals = []
+            phase1_confidence = 0.0
+            
+            if self.phase1_enabled and self.phase1_coordinator:
+                try:
+                    logger.info(f"🎯 啟動 {symbol} Phase1 信號生成流程...")
+                    
+                    # 準備 Phase1 數據格式
+                    phase1_data = await self._prepare_phase1_data(symbol, timeframe, df)
+                    
+                    if phase1_data:
+                        # Phase1A: 基礎信號生成
+                        phase1a_result = await self.phase1_coordinator.process_phase1a(phase1_data)
+                        if phase1a_result and phase1a_result.get('signals'):
+                            phase1_signals.extend(phase1a_result['signals'])
+                            logger.info(f"📊 Phase1A 生成 {len(phase1a_result['signals'])} 個信號")
+                        
+                        # Phase1B: 波動性適應 (如果有Phase1A信號)
+                        if phase1_signals:
+                            phase1b_result = await self.phase1_coordinator.process_phase1b({
+                                'symbol': symbol,
+                                'timeframe': timeframe,
+                                'signals': phase1_signals,
+                                'market_data': phase1_data
+                            })
+                            if phase1b_result and phase1b_result.get('adapted_signals'):
+                                phase1_signals = phase1b_result['adapted_signals']
+                                logger.info(f"📈 Phase1B 適應處理完成: {len(phase1_signals)} 個信號")
+                        
+                        # Phase1C: 信號標準化 (如果有適應後信號)
+                        if phase1_signals:
+                            phase1c_result = await self.phase1_coordinator.process_phase1c({
+                                'symbol': symbol,
+                                'timeframe': timeframe,
+                                'signals': phase1_signals,
+                                'market_data': phase1_data
+                            })
+                            if phase1c_result and phase1c_result.get('standardized_signals'):
+                                phase1_signals = phase1c_result['standardized_signals']
+                                # 計算 Phase1 加權信心度
+                                if phase1_signals:
+                                    confidences = [s.get('confidence', 0.0) for s in phase1_signals]
+                                    phase1_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+                                    phase1_weight = min(phase1_confidence * 0.2, 0.2)  # 最大20%權重
+                                    logger.info(f"✅ Phase1C 標準化完成: 平均信心度={phase1_confidence:.3f}, 權重={phase1_weight:.3f}")
+                        
+                except Exception as e:
+                    logger.error(f"❌ Phase1 處理失敗 {symbol}: {e}")
+                    # 不影響整體流程，繼續使用傳統方法
+            
+            # ==================== 傳統技術分析 ====================
+            # K線形態 (40% → 30% 讓位給Phase1)
+            pattern_analysis = analyze_candlestick_patterns(df, timeframe)
+            pattern_conf = float(pattern_analysis.get('confidence', 0.0))
+            primary = pattern_analysis.get('primary_signal') or pattern_analysis.get('signal_type') or pattern_analysis.get('signal')
+            pattern_weight = min(pattern_conf, 1.0) * 0.3  # 降低到30%
+            
+            signal_type = "HOLD"
+            if primary in ["BULLISH", "BUY", "STRONG_BUY"]:
+                signal_type = "BUY"
+            elif primary in ["BEARISH", "SELL", "STRONG_SELL"]:
+                signal_type = "SELL"
+            
+            # 技術指標信號解析 (40% → 30%)
+            signals = await self.signal_parser.parse_signals(df, symbol)
+            buy_cnt = sell_cnt = 0
+            tech_weight = 0.0
+            indicators_used: List[str] = []
+            reasoning: List[str] = []
+            
+            for s in signals:
+                if hasattr(s, 'signal_type') and hasattr(s, 'confidence'):
+                    st = getattr(s, 'signal_type')
+                    conf = float(getattr(s, 'confidence', 0.0))
+                    if st.value in ["BUY", "STRONG_BUY"]:
+                        buy_cnt += 1
+                        tech_weight += conf * 0.075  # 降低每個指標權重
+                    elif st.value in ["SELL", "STRONG_SELL"]:
+                        sell_cnt += 1
+                        tech_weight += conf * 0.075
+                    indicators_used.append(getattr(s, 'indicator', 'IND'))
+                    reasoning.append(f"{getattr(s,'indicator','IND')}:{st.value}")
+            
+            tech_weight = min(tech_weight, 0.3)  # 最大30%
+            
+            # 趨勢一致性 (20%)
+            trend_weight = 0.0
+            if buy_cnt > sell_cnt:
+                trend_weight = 0.2
+                if signal_type != "SELL":
+                    signal_type = "BUY"
+            elif sell_cnt > buy_cnt:
+                trend_weight = 0.2
+                if signal_type != "BUY":
+                    signal_type = "SELL"
+            
+            # ==================== Phase1 信號影響 ====================
+            if phase1_signals:
+                # Phase1信號對最終信號類型的影響
+                phase1_buy_count = sum(1 for s in phase1_signals if s.get('signal_type', '').upper() in ['BUY', 'STRONG_BUY'])
+                phase1_sell_count = sum(1 for s in phase1_signals if s.get('signal_type', '').upper() in ['SELL', 'STRONG_SELL'])
+                
+                if phase1_buy_count > phase1_sell_count and signal_type != "SELL":
+                    signal_type = "BUY"
+                    reasoning.append(f"Phase1: {phase1_buy_count}買入信號")
+                elif phase1_sell_count > phase1_buy_count and signal_type != "BUY":
+                    signal_type = "SELL"
+                    reasoning.append(f"Phase1: {phase1_sell_count}賣出信號")
+                
+                indicators_used.append("Phase1")
+            
+            # ==================== 總信心度計算 ====================
+            total_conf = min(pattern_weight + tech_weight + trend_weight + phase1_weight, 1.0)
+            
+            if total_conf < self.confidence_threshold:
+                logger.debug(f"📊 {symbol} 信心度不足: {total_conf:.3f} < {self.confidence_threshold}")
+                return None
+            
+            # ==================== 進出場點計算 ====================
+            entry, sl, tp = self._calculate_entry_exit(current_price, signal_type, df)
+            risk = abs(entry - sl)
+            reward = abs(tp - entry)
+            rr = reward / risk if risk > 0 else 0
+            urgency = self._determine_urgency(total_conf, pattern_analysis)
+            
+            # ==================== 增強推理說明 ====================
+            enhanced_reasoning = []
+            enhanced_reasoning.append(f"形態分析:{pattern_weight:.2f}")
+            enhanced_reasoning.append(f"技術指標:{tech_weight:.2f}")
+            enhanced_reasoning.append(f"趨勢一致:{trend_weight:.2f}")
+            if phase1_weight > 0:
+                enhanced_reasoning.append(f"Phase1:{phase1_weight:.2f}")
+            if reasoning:
+                enhanced_reasoning.extend(reasoning)
+            
+            logger.info(f"🎯 {symbol} 信號生成完成: {signal_type} (信心度:{total_conf:.3f}, Phase1權重:{phase1_weight:.3f})")
+            
+            return TradingSignalAlert(
+                symbol=symbol,
+                signal_type=signal_type,
+                confidence=total_conf,
+                entry_price=entry,
+                stop_loss=sl,
+                take_profit=tp,
+                risk_reward_ratio=rr,
+                indicators_used=indicators_used,
+                reasoning=" | ".join(enhanced_reasoning),
+                timeframe=timeframe,
+                timestamp=get_taiwan_now(),
+                urgency=urgency
+            )
+            
+        except Exception as e:
+            logger.error(f"❌ 生成信號錯誤 {symbol} {timeframe}: {e}")
+            return None
+
     async def _price_monitor_loop(self):
         """價格監控循環"""
         logger.info("💰 價格監控循環已啟動 - 開始實時價格追蹤")
@@ -573,139 +878,7 @@ class RealtimeSignalEngine:
             logger.warning(f"檢查數據充足性失敗 {symbol} {timeframe}: {e}")
             return False
     
-    async def _generate_comprehensive_signal(self, symbol: str, timeframe: str) -> Optional[TradingSignalAlert]:
-        """生成綜合交易信號"""
-        try:
-            # 檢查服務是否已初始化
-            if not self.market_service:
-                logger.warning(f"market_service 未初始化，無法生成信號 {symbol} {timeframe}")
-                return None
-            
-            # 1. 獲取歷史數據
-            df = await self.market_service.get_historical_data(
-                symbol=symbol, 
-                timeframe=timeframe, 
-                limit=self.min_history_points
-            )
-            
-            if df is None or len(df) < self.min_history_points:
-                logger.warning(f"數據不足 {symbol} {timeframe}: {len(df) if df is not None else 0} < {self.min_history_points}")
-                return None
-            
-            # 2. K線形態分析（最高優先級）
-            pattern_analysis = analyze_candlestick_patterns(df, timeframe)
-            
-            # 3. 技術指標分析
-            indicators = self.pandas_ta_indicators.calculate_all_indicators(df)
-            
-            # 4. 信號解析
-            signals = self.signal_parser.analyze_signals(df, strategy="realtime")
-            
-            # 5. 綜合判斷
-            return await self._synthesize_signal(
-                symbol, timeframe, pattern_analysis, indicators, signals, df
-            )
-            
-        except Exception as e:
-            logger.error(f"生成綜合信號失敗 {symbol} {timeframe}: {e}")
-            return None
-    
-    async def _synthesize_signal(
-        self, 
-        symbol: str, 
-        timeframe: str, 
-        pattern_analysis: dict,
-        indicators: dict,
-        signals: list,
-        df: pd.DataFrame
-    ) -> Optional[TradingSignalAlert]:
-        """綜合分析結果生成最終信號"""
-        
-        current_price = float(df['close'].iloc[-1])
-        indicators_used = []
-        total_confidence = 0.0
-        signal_count = 0
-        signal_type = "HOLD"
-        reasoning_parts = []
-        
-        # 1. K線形態權重（40%）
-        pattern_weight = 0.0
-        if pattern_analysis.get('has_pattern') and pattern_analysis.get('primary_pattern'):
-            pattern = pattern_analysis['primary_pattern']
-            pattern_weight = pattern.confidence * 0.4
-            indicators_used.append(f"K線形態: {pattern.pattern_name}")
-            reasoning_parts.append(f"檢測到{pattern.pattern_name}形態(信心度:{pattern.confidence:.2f})")
-            
-            if pattern.pattern_type.value == "bullish":
-                signal_type = "BUY"
-            elif pattern.pattern_type.value == "bearish":
-                signal_type = "SELL"
-        
-        # 2. 技術指標權重（40%）
-        technical_weight = 0.0
-        buy_signals = 0
-        sell_signals = 0
-        
-        for signal in signals:
-            if hasattr(signal, 'signal_type') and hasattr(signal, 'confidence'):
-                signal_count += 1
-                if signal.signal_type.value in ["BUY", "STRONG_BUY"]:
-                    buy_signals += 1
-                    technical_weight += signal.confidence * 0.1
-                elif signal.signal_type.value in ["SELL", "STRONG_SELL"]:
-                    sell_signals += 1
-                    technical_weight += signal.confidence * 0.1
-                
-                indicators_used.append(f"{signal.indicator}")
-                reasoning_parts.append(f"{signal.indicator}:{signal.signal_type.value}")
-        
-        # 3. 趨勢一致性權重（20%）
-        trend_weight = 0.0
-        if buy_signals > sell_signals:
-            trend_weight = 0.2
-            if signal_type != "SELL":  # 不與K線形態衝突
-                signal_type = "BUY"
-        elif sell_signals > buy_signals:
-            trend_weight = 0.2
-            if signal_type != "BUY":  # 不與K線形態衝突  
-                signal_type = "SELL"
-        
-        # 計算總信心度
-        total_confidence = min(pattern_weight + technical_weight + trend_weight, 1.0)
-        
-        # 信心度太低則不生成信號
-        if total_confidence < self.confidence_threshold:
-            return None
-        
-        # 計算進出場點位
-        entry_price, stop_loss, take_profit = self._calculate_entry_exit(
-            current_price, signal_type, df
-        )
-        
-        # 計算風險回報比
-        risk = abs(entry_price - stop_loss)
-        reward = abs(take_profit - entry_price)
-        risk_reward_ratio = reward / risk if risk > 0 else 0
-        
-        # 判斷緊急程度
-        urgency = self._determine_urgency(total_confidence, pattern_analysis)
-        
-        return TradingSignalAlert(
-            symbol=symbol,
-            signal_type=signal_type,
-            confidence=total_confidence,
-            entry_price=entry_price,
-            stop_loss=stop_loss,
-            take_profit=take_profit,
-            risk_reward_ratio=risk_reward_ratio,
-            indicators_used=indicators_used,
-            reasoning=" | ".join(reasoning_parts) if reasoning_parts else "技術指標綜合分析",
-            timeframe=timeframe,
-            timestamp=get_taiwan_now(),
-            urgency=urgency
-        )
-    
-    def _calculate_entry_exit(self, current_price: float, signal_type: str, df: pd.DataFrame) -> tuple:
+    async def _calculate_entry_exit(self, current_price: float, signal_type: str, df: pd.DataFrame) -> tuple:
         """計算進出場點位 - 修復版：正確的做多做空邏輯"""
         
         # 🎯 使用真實的 ATR 計算動態止損止盈 - 禁止後備值

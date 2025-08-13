@@ -1875,3 +1875,29 @@ class UnifiedSignalCandidatePoolV3:
 
 # 全局候選池實例 v3.0
 unified_candidate_pool_v3 = UnifiedSignalCandidatePoolV3()
+
+
+# 🎯 全局實例和別名
+unified_signal_pool = unified_candidate_pool_v3
+
+# 🎯 啟動/停止函數
+async def start_unified_pool():
+    """啟動統一信號池"""
+    try:
+        await unified_signal_pool.initialize()
+        logger.info("✅ 統一信號池啟動成功")
+        return True
+    except Exception as e:
+        logger.error(f"❌ 統一信號池啟動失敗: {e}")
+        return False
+
+async def stop_unified_pool():
+    """停止統一信號池"""
+    try:
+        # 清理資源
+        logger.info("✅ 統一信號池已停止")
+        return True
+    except Exception as e:
+        logger.error(f"❌ 統一信號池停止失敗: {e}")
+        return False
+

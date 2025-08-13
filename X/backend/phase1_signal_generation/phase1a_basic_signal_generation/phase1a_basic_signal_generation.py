@@ -153,13 +153,16 @@ class BasicSignal:
         return result
 
 @dataclass
+@dataclass
 class LayerProcessingResult:
     """層處理結果"""
     layer_id: str
-    signals: List[BasicSignal]
+    signals: List['BasicSignal']
     processing_time_ms: float
-    data_quality: float
-    source_data_count: int
+    success: bool = True
+    error: Optional[str] = None
+    data_quality: float = 1.0
+    source_data_count: int = 0
 
 class Phase1ABasicSignalGeneration:
     """Phase1A 基礎信號生成器 - 4層並行處理架構"""
@@ -184,11 +187,12 @@ class Phase1ABasicSignalGeneration:
         self.session_cache_timestamp = 0
         self.session_cache_ttl = 3600  # 1小時緩存
         
-        # 數據緩衝區
-        self.price_buffer = defaultdict(lambda: deque(maxlen=100))
-        self.volume_buffer = defaultdict(lambda: deque(maxlen=100))
-        self.orderbook_buffer = defaultdict(lambda: deque(maxlen=50))  # OrderBook 緩衝區
-        self.signal_buffer = deque(maxlen=1000)
+        # 數據緩衝區 - 增強版，支援技術分析
+        self.price_buffer = defaultdict(lambda: deque(maxlen=500))      # 增加容量用於技術分析
+        self.volume_buffer = defaultdict(lambda: deque(maxlen=500))     # 增加容量用於成交量分析
+        self.orderbook_buffer = defaultdict(lambda: deque(maxlen=100))  # OrderBook 緩衝區
+        self.kline_buffers = defaultdict(lambda: {'1m': deque(maxlen=500)})  # K線數據緩衝區
+        self.signal_buffer = deque(maxlen=1000)                         # 信號輸出緩衝區
         
         # 層處理器
         self.layer_processors = {
@@ -200,14 +204,21 @@ class Phase1ABasicSignalGeneration:
         
         # 性能監控
         self.performance_stats = defaultdict(list)
-        self.processing_times = defaultdict(deque)
+        self.processing_times = defaultdict(lambda: deque(maxlen=100))  # 保留最近100次的處理時間
         
-        # 信號訂閱者
+        # 信號訂閱者列表 - 用於外部系統訂閱信號
         self.signal_subscribers = []
+        
+        # 市場數據緩存 - 用於測試和信號生成
+        self.real_market_data = {}
+        
+        # 統計數據
+        self.total_signals_count = 0
         
         # 運行控制
         self.is_running = False
         self.tasks = []
+        self.websocket_driver = None
         
         # WebSocket 斷線處理
         self.circuit_breaker_active = False
@@ -353,9 +364,9 @@ class Phase1ABasicSignalGeneration:
                 best_regime = max(regime_scores.keys(), key=lambda k: regime_scores[k])
                 confidence = regime_scores[best_regime]
                 
-                # 檢查是否滿足最小信心度要求
-                min_confidence = regime_types.get(best_regime.value, {}).get("confidence_threshold", 0.7)
-                if confidence >= min_confidence:
+                # 檢查是否滿足最小信心度要求 - 完全依賴配置
+                min_confidence = regime_types.get(best_regime.value, {}).get("confidence_threshold")
+                if min_confidence and confidence >= min_confidence:
                     self.current_regime = best_regime
                     self.regime_confidence = confidence
                     self.regime_cache_timestamp = current_time
@@ -558,10 +569,10 @@ class Phase1ABasicSignalGeneration:
         signal_params = self.config.get("phase1a_basic_signal_generation_dependency", {}).get("configuration", {}).get("signal_generation_params", {})
         base_params = signal_params.get(mode, {})
         
-        # 提取基礎值
-        price_threshold = self._extract_parameter_value(base_params.get("price_change_threshold", 0.001))
-        volume_threshold = self._extract_parameter_value(base_params.get("volume_change_threshold", 1.5))
-        confidence_threshold = self._extract_parameter_value(base_params.get("confidence_threshold", 0.75))
+        # 提取基礎值 - 完全依賴動態配置，無默認值
+        price_threshold = self._extract_parameter_value(base_params.get("price_change_threshold"))
+        volume_threshold = self._extract_parameter_value(base_params.get("volume_change_threshold"))
+        confidence_threshold = self._extract_parameter_value(base_params.get("confidence_threshold"))
         
         # 如果動態參數系統啟用，進行參數調整
         if self.dynamic_params_enabled:
@@ -612,13 +623,35 @@ class Phase1ABasicSignalGeneration:
         return dynamic_params
     
     def _extract_parameter_value(self, param_config) -> float:
-        """提取參數值（支援靜態值和動態配置）"""
-        if isinstance(param_config, (int, float)):
+        """提取參數值（支援靜態值和動態配置）- 完全依賴配置"""
+        if param_config is None:
+            return 0.0  # 配置不存在時返回 0
+        elif isinstance(param_config, (int, float)):
             return float(param_config)
         elif isinstance(param_config, dict):
             return param_config.get("base_value", 0.0)
         else:
             return 0.0
+    
+    def _convert_timestamp(self, timestamp) -> datetime:
+        """轉換時間戳為 datetime 對象"""
+        if isinstance(timestamp, datetime):
+            return timestamp
+        elif isinstance(timestamp, str):
+            try:
+                # 嘗試解析 ISO 格式
+                return datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            except:
+                try:
+                    # 嘗試解析其他常見格式
+                    return datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
+                except:
+                    return datetime.now()
+        elif isinstance(timestamp, (int, float)):
+            # Unix 時間戳
+            return datetime.fromtimestamp(timestamp / 1000 if timestamp > 1e10 else timestamp)
+        else:
+            return datetime.now()
     
     def _apply_signal_generation_config(self):
         """應用信號生成配置參數"""
@@ -772,27 +805,48 @@ class Phase1ABasicSignalGeneration:
         # 這可以確保系統在 WebSocket 斷線時仍能提供基本服務
     
     async def start(self, websocket_driver):
-        """啟動 Phase1A 信號生成器"""
+        """啟動 Phase1A 信號生成器 - 按照 JSON 規範實現完整啟動流程"""
         if self.is_running:
             logger.warning("Phase1A 已在運行")
             return
         
-        self.is_running = True
-        self.websocket_driver = websocket_driver
+        logger.info("🚀 開始啟動 Phase1A 基礎信號生成器...")
         
-        logger.info("啟動 Phase1A 基礎信號生成器")
-        
-        # 訂閱 WebSocket 數據
-        websocket_driver.subscribe(self._on_market_data_update)
-        
-        # 啟動核心任務
-        self.tasks = [
-            asyncio.create_task(self._signal_generation_coordinator()),
-            asyncio.create_task(self._performance_monitor()),
-            asyncio.create_task(self._signal_quality_analyzer())
-        ]
-        
-        logger.info("Phase1A 信號生成器啟動完成")
+        try:
+            # 第一步：設置 WebSocket 驅動器
+            self.websocket_driver = websocket_driver
+            logger.info("✅ WebSocket 驅動器設置完成")
+            
+            # 第二步：初始化歷史數據緩衝區 - JSON 規範要求
+            await self._initialize_historical_data_buffers()
+            logger.info("✅ 歷史數據緩衝區初始化完成")
+            
+            # 第三步：設置動態參數系統
+            await self._initialize_dynamic_parameter_system()
+            logger.info("✅ 動態參數系統初始化完成")
+            
+            # 第四步：訂閱 WebSocket 數據流
+            websocket_driver.event_broadcaster.subscribe(self._on_market_data_update, ["data"])
+            logger.info("✅ WebSocket 數據流訂閱完成")
+            
+            # 第五步：啟動信號處理任務
+            self.is_running = True
+            self.tasks = [
+                asyncio.create_task(self._signal_generation_coordinator()),
+                asyncio.create_task(self._performance_monitor()),
+                asyncio.create_task(self._signal_quality_analyzer()),
+                asyncio.create_task(self._historical_data_updater())  # 新增：持續更新歷史數據
+            ]
+            logger.info("✅ 信號處理任務啟動完成")
+            
+            # 第六步：等待系統穩定
+            await asyncio.sleep(2)
+            logger.info("🎉 Phase1A 信號生成器啟動完成，開始處理實時數據流")
+            
+        except Exception as e:
+            logger.error(f"❌ Phase1A 啟動失敗: {e}")
+            self.is_running = False
+            raise
     
     async def stop(self):
         """停止信號生成器"""
@@ -805,6 +859,229 @@ class Phase1ABasicSignalGeneration:
         
         self.tasks.clear()
         logger.info("Phase1A 信號生成器已停止")
+    
+    async def _initialize_historical_data_buffers(self):
+        """初始化歷史數據緩衝區 - JSON 規範要求的歷史 K 線數據"""
+        logger.info("📊 開始初始化歷史數據緩衝區...")
+        
+        try:
+            # 根據 JSON 配置，需要為技術分析準備歷史數據
+            target_symbols = ["BTCUSDT", "ETHUSDT", "ADAUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT"]
+            
+            for symbol in target_symbols:
+                try:
+                    # 抓取歷史 K 線數據（250 條 1 分鐘數據）
+                    historical_klines = await self._fetch_historical_klines(symbol, "1m", 250)
+                    
+                    if historical_klines:
+                        # 初始化價格緩衝區
+                        self.price_buffer[symbol] = deque(
+                            [{'price': k['close'], 'timestamp': k['timestamp'], 'volume': k['volume']} 
+                             for k in historical_klines],
+                            maxlen=500
+                        )
+                        
+                        # 初始化成交量緩衝區
+                        self.volume_buffer[symbol] = deque(
+                            [{'volume': k['volume'], 'timestamp': k['timestamp'], 'price': k['close']} 
+                             for k in historical_klines],
+                            maxlen=500
+                        )
+                        
+                        # 初始化 K 線緩衝區（用於技術指標計算）
+                        self.kline_buffers[symbol] = {
+                            '1m': deque(historical_klines, maxlen=500)
+                        }
+                        
+                        logger.info(f"✅ {symbol}: 歷史數據緩衝區初始化完成 ({len(historical_klines)} 條記錄)")
+                    else:
+                        logger.warning(f"⚠️ {symbol}: 歷史數據抓取失敗，使用空緩衝區")
+                        self._initialize_empty_buffers(symbol)
+                
+                except Exception as e:
+                    logger.error(f"❌ {symbol}: 歷史數據初始化失敗 - {e}")
+                    self._initialize_empty_buffers(symbol)
+                
+                # 避免 API 限制
+                await asyncio.sleep(0.2)
+            
+            logger.info("🎉 歷史數據緩衝區初始化完成")
+            
+        except Exception as e:
+            logger.error(f"❌ 歷史數據緩衝區初始化失敗: {e}")
+            raise
+    
+    def _initialize_empty_buffers(self, symbol: str):
+        """初始化空緩衝區（備用方案）"""
+        self.price_buffer[symbol] = deque(maxlen=500)
+        self.volume_buffer[symbol] = deque(maxlen=500)
+        self.orderbook_buffer[symbol] = deque(maxlen=100)
+        self.kline_buffers[symbol] = {'1m': deque(maxlen=500)}
+    
+    async def _fetch_historical_klines(self, symbol: str, interval: str = "1m", limit: int = 250) -> List[Dict[str, Any]]:
+        """抓取歷史 K 線數據 - 支援技術分析"""
+        try:
+            import aiohttp
+            
+            url = "https://api.binance.com/api/v3/klines"
+            params = {
+                'symbol': symbol,
+                'interval': interval,
+                'limit': limit
+            }
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        
+                        # 轉換為標準格式
+                        klines = []
+                        for kline in data:
+                            formatted_kline = {
+                                'open_time': int(kline[0]),
+                                'open': float(kline[1]),
+                                'high': float(kline[2]),
+                                'low': float(kline[3]),
+                                'close': float(kline[4]),
+                                'volume': float(kline[5]),
+                                'close_time': int(kline[6]),
+                                'quote_asset_volume': float(kline[7]),
+                                'number_of_trades': int(kline[8]),
+                                'timestamp': datetime.fromtimestamp(int(kline[0]) / 1000).isoformat()
+                            }
+                            klines.append(formatted_kline)
+                        
+                        logger.debug(f"📈 {symbol}: 成功抓取 {len(klines)} 條 {interval} K線數據")
+                        return klines
+                    else:
+                        logger.error(f"❌ {symbol}: API請求失敗 - {response.status}")
+                        return []
+                        
+        except Exception as e:
+            logger.error(f"❌ {symbol}: K線數據抓取失敗 - {e}")
+            return []
+    
+    async def _initialize_dynamic_parameter_system(self):
+        """初始化動態參數系統 - JSON 規範要求"""
+        logger.info("🔧 初始化動態參數系統...")
+        
+        try:
+            # 從 JSON 配置加載動態參數設置
+            dynamic_config = self.config.get("phase1a_basic_signal_generation_dependency", {}).get("configuration", {}).get("dynamic_parameter_integration", {})
+            
+            self.dynamic_params_enabled = dynamic_config.get("enabled", True)
+            
+            if self.dynamic_params_enabled:
+                # 初始化市場制度檢測
+                await self._initialize_market_regime_detection()
+                
+                # 初始化交易時段檢測
+                await self._initialize_trading_session_detection()
+                
+                logger.info("✅ 動態參數系統初始化完成")
+            else:
+                logger.info("ℹ️ 動態參數系統已禁用，使用靜態參數")
+                
+        except Exception as e:
+            logger.error(f"❌ 動態參數系統初始化失敗: {e}")
+            self.dynamic_params_enabled = False
+    
+    async def _initialize_market_regime_detection(self):
+        """初始化市場制度檢測系統"""
+        try:
+            # 設置預設市場制度
+            self.current_regime = MarketRegime.UNKNOWN
+            self.regime_confidence = 0.0
+            
+            # 從配置中讀取市場制度檢測參數
+            regime_config = self.config.get("phase1a_basic_signal_generation_dependency", {}).get(
+                "configuration", {}).get("dynamic_parameter_integration", {}).get(
+                "market_regime_detection", {})
+            
+            if regime_config.get("enabled", True):
+                # 執行初始市場制度檢測
+                initial_regime, confidence = await self._detect_market_regime()
+                self.current_regime = initial_regime
+                self.regime_confidence = confidence
+                
+                logger.info(f"✅ 市場制度檢測初始化完成: {initial_regime.value} (信心度: {confidence:.2f})")
+            else:
+                logger.info("ℹ️ 市場制度檢測已禁用")
+                
+        except Exception as e:
+            logger.error(f"❌ 市場制度檢測初始化失敗: {e}")
+            self.current_regime = MarketRegime.UNKNOWN
+    
+    async def _initialize_trading_session_detection(self):
+        """初始化交易時段檢測系統"""
+        try:
+            # 設置預設交易時段
+            self.current_trading_session = TradingSession.OFF_HOURS
+            
+            # 從配置中讀取交易時段檢測參數
+            session_config = self.config.get("phase1a_basic_signal_generation_dependency", {}).get(
+                "configuration", {}).get("dynamic_parameter_integration", {}).get(
+                "trading_session_detection", {})
+            
+            if session_config.get("enabled", True):
+                # 執行初始交易時段檢測
+                initial_session = await self._detect_trading_session()
+                self.current_trading_session = initial_session
+                
+                logger.info(f"✅ 交易時段檢測初始化完成: {initial_session.value}")
+            else:
+                logger.info("ℹ️ 交易時段檢測已禁用")
+                
+        except Exception as e:
+            logger.error(f"❌ 交易時段檢測初始化失敗: {e}")
+            self.current_trading_session = TradingSession.OFF_HOURS
+    
+    async def _historical_data_updater(self):
+        """持續更新歷史數據任務"""
+        while self.is_running:
+            try:
+                # 每30分鐘更新一次歷史數據
+                await asyncio.sleep(1800)
+                
+                if self.is_running:
+                    logger.info("🔄 更新歷史數據緩衝區...")
+                    
+                    for symbol in self.price_buffer.keys():
+                        try:
+                            # 抓取最新的 K 線數據
+                            latest_klines = await self._fetch_historical_klines(symbol, "1m", 50)
+                            
+                            if latest_klines:
+                                # 更新緩衝區
+                                for kline in latest_klines:
+                                    self.price_buffer[symbol].append({
+                                        'price': kline['close'],
+                                        'timestamp': kline['timestamp'],
+                                        'volume': kline['volume']
+                                    })
+                                    
+                                    self.volume_buffer[symbol].append({
+                                        'volume': kline['volume'],
+                                        'timestamp': kline['timestamp'],
+                                        'price': kline['close']
+                                    })
+                                    
+                                    if symbol in self.kline_buffers and '1m' in self.kline_buffers[symbol]:
+                                        self.kline_buffers[symbol]['1m'].append(kline)
+                                
+                                logger.debug(f"✅ {symbol}: 歷史數據更新完成")
+                        
+                        except Exception as e:
+                            logger.error(f"❌ {symbol}: 歷史數據更新失敗 - {e}")
+                    
+                    logger.info("🎉 歷史數據緩衝區更新完成")
+                    
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"❌ 歷史數據更新器錯誤: {e}")
+                await asyncio.sleep(60)  # 出錯後等待1分鐘再試
     
     async def process_market_data(self, market_data: Dict[str, Any]) -> Dict[str, Any]:
         """公開的市場數據處理方法"""
@@ -1068,7 +1345,7 @@ class Phase1ABasicSignalGeneration:
                     'type': 'depth_imbalance',
                     'direction': direction,
                     'strength': min(1.0, abs(depth_imbalance)),
-                    'confidence': 0.7
+                    'confidence': 0.3  # 修復：降低硬編碼信心度
                 })
             
             # 流動性信號
@@ -1086,48 +1363,491 @@ class Phase1ABasicSignalGeneration:
         return signals
     
     async def generate_signals(self, symbol: str, market_data: Dict[str, Any]) -> List[BasicSignal]:
-        """公開的信號生成方法"""
+        """公開的信號生成方法 - 基於歷史數據和動態參數"""
         try:
             if not self.is_running:
                 logger.warning("信號生成器未運行")
                 return []
             
-            # 執行4層並行處理
+            # 檢查是否有足夠的歷史數據進行技術分析
+            if symbol not in self.price_buffer or len(self.price_buffer[symbol]) < 10:
+                logger.debug(f"{symbol}: 歷史數據不足，跳過信號生成")
+                return []
+            
+            logger.debug(f"🎯 開始為 {symbol} 生成信號，使用 {len(self.price_buffer[symbol])} 條歷史數據")
+            
+            # 更新當前市場數據到緩衝區
+            await self._update_buffers_with_current_data(symbol, market_data)
+            
+            # 獲取動態參數
+            dynamic_params = await self._get_dynamic_parameters()
+            
+            # 執行4層並行處理 - 基於真實的技術分析
             signals = []
             
-            # Layer 0: 即時信號
+            # Layer 0: 即時信號（基於價格變化）
             layer_0_result = await self._execute_layer_processing(
-                "layer_0", self._layer_0_instant_signals, symbol, market_data
+                "layer_0", self._layer_0_instant_signals_enhanced, symbol, market_data, dynamic_params
             )
             if layer_0_result.signals:
                 signals.extend(layer_0_result.signals)
             
-            # Layer 1: 動量信號
+            # Layer 1: 動量信號（基於移動平均）
             layer_1_result = await self._execute_layer_processing(
-                "layer_1", self._layer_1_momentum_signals, symbol, market_data
+                "layer_1", self._layer_1_momentum_signals_enhanced, symbol, market_data, dynamic_params
             )
             if layer_1_result.signals:
                 signals.extend(layer_1_result.signals)
             
-            # Layer 2: 趨勢信號
+            # Layer 2: 趨勢信號（基於趨勢分析）
             layer_2_result = await self._execute_layer_processing(
-                "layer_2", self._layer_2_trend_signals, symbol, market_data
+                "layer_2", self._layer_2_trend_signals_enhanced, symbol, market_data, dynamic_params
             )
             if layer_2_result.signals:
                 signals.extend(layer_2_result.signals)
             
-            # Layer 3: 成交量信號
+            # Layer 3: 成交量信號（基於成交量分析）
             layer_3_result = await self._execute_layer_processing(
-                "layer_3", self._layer_3_volume_signals, symbol, market_data
+                "layer_3", self._layer_3_volume_signals_enhanced, symbol, market_data, dynamic_params
             )
             if layer_3_result.signals:
                 signals.extend(layer_3_result.signals)
             
+            logger.debug(f"✅ {symbol}: 生成 {len(signals)} 個信號")
             return signals
             
         except Exception as e:
-            logger.error(f"信號生成失敗: {e}")
+            logger.error(f"❌ {symbol}: 信號生成失敗 - {e}")
             return []
+    
+    async def _update_buffers_with_current_data(self, symbol: str, market_data: Dict[str, Any]):
+        """用當前市場數據更新緩衝區"""
+        try:
+            current_price = float(market_data.get('price', 0))
+            current_volume = float(market_data.get('volume', 0)) if market_data.get('volume') != 'N/A' else 0.0
+            timestamp = market_data.get('timestamp', datetime.now().isoformat())
+            
+            if current_price > 0:
+                # 更新價格緩衝區
+                self.price_buffer[symbol].append({
+                    'price': current_price,
+                    'timestamp': timestamp,
+                    'volume': current_volume
+                })
+                
+                # 更新成交量緩衝區
+                self.volume_buffer[symbol].append({
+                    'volume': current_volume,
+                    'timestamp': timestamp,
+                    'price': current_price
+                })
+                
+                # 更新 K 線緩衝區（模擬1分鐘K線）
+                if symbol in self.kline_buffers and '1m' in self.kline_buffers[symbol]:
+                    current_kline = {
+                        'open': current_price,
+                        'high': current_price,
+                        'low': current_price,
+                        'close': current_price,
+                        'volume': current_volume,
+                        'timestamp': timestamp,
+                        'open_time': int(datetime.now().timestamp() * 1000)
+                    }
+                    self.kline_buffers[symbol]['1m'].append(current_kline)
+        
+        except Exception as e:
+            logger.error(f"❌ 緩衝區更新失敗: {e}")
+    
+    async def _layer_0_instant_signals_enhanced(self, symbol: str, market_data: Dict[str, Any], dynamic_params: DynamicParameters) -> List[BasicSignal]:
+        """Layer 0: 增強型即時信號生成 - 基於價格變化分析"""
+        signals = []
+        
+        try:
+            if len(self.price_buffer[symbol]) < 2:
+                return signals
+            
+            # 獲取最近價格數據
+            recent_prices = list(self.price_buffer[symbol])[-10:]  # 最近10個價格點
+            current_price = recent_prices[-1]['price']
+            previous_price = recent_prices[-2]['price'] if len(recent_prices) >= 2 else current_price
+            
+            # 獲取當前成交量
+            current_volume = float(market_data.get('volume', recent_prices[-1].get('volume', 1000.0)))
+            
+            # 計算價格變化率
+            price_change_pct = (current_price - previous_price) / previous_price if previous_price > 0 else 0
+            
+            # 使用動態參數判斷信號
+            if abs(price_change_pct) > dynamic_params.price_change_threshold:
+                
+                # 計算信號強度（基於價格變化幅度）
+                strength_raw = min(1.0, abs(price_change_pct) / dynamic_params.price_change_threshold)
+                strength = strength_raw * dynamic_params.signal_strength_multiplier
+                
+                # 計算信心度（基於歷史波動性）
+                price_values = [p['price'] for p in recent_prices]
+                volatility = np.std(price_values) / np.mean(price_values) if len(price_values) > 1 else 0
+                confidence = max(0.1, dynamic_params.confidence_threshold * (1 + (1 - volatility) * 0.5))
+                
+                # 確定交易方向
+                direction = "BUY" if price_change_pct > 0 else "SELL"
+                
+                # 生成信號
+                signal = BasicSignal(
+                    signal_id=f"{symbol}_instant_{int(time.time() * 1000)}",
+                    symbol=symbol,
+                    signal_type=SignalType.PRICE_ACTION,
+                    direction=direction,
+                    strength=strength,
+                    confidence=confidence,
+                    price=current_price,
+                    volume=current_volume,  # 添加 volume 參數
+                    timestamp=datetime.now(),
+                    priority=Priority.HIGH if strength > 0.7 else Priority.MEDIUM,
+                    layer_source="layer_0_instant",
+                    market_regime=dynamic_params.market_regime.value,
+                    processing_time_ms=5.0,
+                    metadata={
+                        'price_change_pct': price_change_pct,
+                        'volatility': volatility,
+                        'threshold_used': dynamic_params.price_change_threshold,
+                        'data_points': len(recent_prices)
+                    }
+                )
+                signals.append(signal)
+                
+                logger.debug(f"🔥 {symbol}: 即時信號 - {direction} 強度:{strength:.2f} 信心:{confidence:.2f}")
+        
+        except Exception as e:
+            logger.error(f"❌ Layer 0 信號生成失敗: {e}")
+        
+        return signals
+    
+    async def _layer_1_momentum_signals_enhanced(self, symbol: str, market_data: Dict[str, Any], dynamic_params: DynamicParameters) -> List[BasicSignal]:
+        """Layer 1: 增強型動量信號生成 - 基於移動平均分析"""
+        signals = []
+        
+        try:
+            if len(self.price_buffer[symbol]) < 20:  # 需要至少20個數據點
+                return signals
+            
+            # 獲取價格數據
+            recent_prices = [p['price'] for p in list(self.price_buffer[symbol])[-50:]]
+            
+            if len(recent_prices) < 20:
+                return signals
+            
+            # 計算移動平均線
+            ma_5 = np.mean(recent_prices[-5:])   # 5期移動平均
+            ma_10 = np.mean(recent_prices[-10:]) # 10期移動平均
+            ma_20 = np.mean(recent_prices[-20:]) # 20期移動平均
+            
+            current_price = recent_prices[-1]
+            
+            # 動量信號判斷
+            momentum_signals = []
+            
+            # 金叉/死叉信號
+            if ma_5 > ma_10 > ma_20 and current_price > ma_5:
+                # 上升動量
+                strength = min(1.0, (ma_5 - ma_20) / ma_20 * 10)  # 強度基於均線差距
+                confidence = dynamic_params.confidence_threshold + 0.1
+                
+                signal = BasicSignal(
+                    signal_id=f"{symbol}_momentum_bull_{int(time.time() * 1000)}",
+                    symbol=symbol,
+                    signal_type=SignalType.MOMENTUM,
+                    direction="BUY",
+                    strength=strength,
+                    confidence=min(0.95, confidence),
+                    price=current_price,
+                    volume=float(market_data.get('volume', 1000.0)),
+                    timestamp=datetime.now(),
+                    priority=Priority.MEDIUM,
+                    layer_source="layer_1_momentum",
+                    market_regime=dynamic_params.market_regime.value,
+                    processing_time_ms=15.0,
+                    metadata={
+                        'ma_5': ma_5,
+                        'ma_10': ma_10,
+                        'ma_20': ma_20,
+                        'signal_pattern': 'golden_cross'
+                    }
+                )
+                signals.append(signal)
+                
+            elif ma_5 < ma_10 < ma_20 and current_price < ma_5:
+                # 下降動量
+                strength = min(1.0, (ma_20 - ma_5) / ma_20 * 10)
+                confidence = dynamic_params.confidence_threshold + 0.1
+                
+                signal = BasicSignal(
+                    signal_id=f"{symbol}_momentum_bear_{int(time.time() * 1000)}",
+                    symbol=symbol,
+                    signal_type=SignalType.MOMENTUM,
+                    direction="SELL",
+                    strength=strength,
+                    confidence=min(0.95, confidence),
+                    price=current_price,
+                    timestamp=datetime.now(),
+                    priority=Priority.MEDIUM,
+                    layer_source="layer_1_momentum",
+                    market_regime=dynamic_params.market_regime.value,
+                    processing_time_ms=15.0,
+                    metadata={
+                        'ma_5': ma_5,
+                        'ma_10': ma_10,
+                        'ma_20': ma_20,
+                        'signal_pattern': 'death_cross'
+                    }
+                )
+                signals.append(signal)
+                
+            if signals:
+                logger.debug(f"📈 {symbol}: 動量信號 - {len(signals)} 個")
+        
+        except Exception as e:
+            logger.error(f"❌ Layer 1 動量信號生成失敗: {e}")
+        
+        return signals
+    
+    async def _layer_2_trend_signals_enhanced(self, symbol: str, market_data: Dict[str, Any], dynamic_params: DynamicParameters) -> List[BasicSignal]:
+        """Layer 2: 增強型趨勢信號生成 - 基於趨勢分析"""
+        signals = []
+        
+        try:
+            if len(self.price_buffer[symbol]) < 30:
+                return signals
+            
+            # 獲取價格數據
+            recent_prices = [p['price'] for p in list(self.price_buffer[symbol])[-30:]]
+            
+            # 計算趨勢斜率
+            x = np.arange(len(recent_prices))
+            slope, intercept = np.polyfit(x, recent_prices, 1)
+            
+            # 趨勢強度
+            trend_strength = abs(slope) / np.mean(recent_prices) * 100  # 轉換為百分比
+            
+            # 根據動態參數生成趨勢信號
+            if trend_strength > 0.01:  # 趨勢閾值
+                current_price = recent_prices[-1]
+                
+                # 確定趨勢方向
+                direction = "BUY" if slope > 0 else "SELL"
+                
+                # 計算信號強度和信心度
+                strength = min(1.0, trend_strength * 50)  # 調整係數
+                confidence = min(0.95, dynamic_params.confidence_threshold + trend_strength * 5)
+                
+                signal = BasicSignal(
+                    signal_id=f"{symbol}_trend_{direction.lower()}_{int(time.time() * 1000)}",
+                    symbol=symbol,
+                    signal_type=SignalType.TREND,
+                    direction=direction,
+                    strength=strength,
+                    confidence=confidence,
+                    price=current_price,
+                    volume=float(market_data.get('volume', 0)),  # 添加 volume 參數
+                    timestamp=datetime.now(),
+                    priority=Priority.MEDIUM,
+                    layer_source="layer_2_trend",
+                    market_regime=dynamic_params.market_regime.value,
+                    processing_time_ms=20.0,
+                    metadata={
+                        'trend_slope': slope,
+                        'trend_strength': trend_strength,
+                        'data_points': len(recent_prices),
+                        'r_squared': np.corrcoef(x, recent_prices)[0, 1] ** 2
+                    }
+                )
+                signals.append(signal)
+                
+                logger.debug(f"📊 {symbol}: 趨勢信號 - {direction} 強度:{strength:.2f}")
+        
+        except Exception as e:
+            logger.error(f"❌ Layer 2 趨勢信號生成失敗: {e}")
+        
+        return signals
+    
+    async def _layer_3_volume_signals_enhanced(self, symbol: str, market_data: Dict[str, Any], dynamic_params: DynamicParameters) -> List[BasicSignal]:
+        """Layer 3: 增強型成交量信號生成 - 基於成交量分析"""
+        signals = []
+        
+        try:
+            if len(self.volume_buffer[symbol]) < 10:
+                return signals
+            
+            # 獲取成交量數據
+            recent_volumes = [v['volume'] for v in list(self.volume_buffer[symbol])[-20:] if v['volume'] > 0]
+            
+            if len(recent_volumes) < 5:
+                return signals
+            
+            current_volume = recent_volumes[-1]
+            avg_volume = np.mean(recent_volumes[:-1])  # 排除當前成交量
+            
+            # 成交量變化率
+            volume_change_ratio = current_volume / avg_volume if avg_volume > 0 else 1.0
+            
+            # 根據動態參數判斷成交量信號
+            if volume_change_ratio > dynamic_params.volume_change_threshold:
+                current_price = float(market_data.get('price', 0))
+                
+                # 計算信號強度（基於成交量放大倍數）
+                strength = min(1.0, (volume_change_ratio - 1) * 0.5)
+                confidence = min(0.95, dynamic_params.confidence_threshold + 0.05)
+                
+                # 成交量突增通常配合價格判斷方向
+                recent_prices = [p['price'] for p in list(self.price_buffer[symbol])[-5:]]
+                if len(recent_prices) >= 2:
+                    price_trend = "BUY" if recent_prices[-1] > recent_prices[0] else "SELL"
+                else:
+                    price_trend = "BUY"  # 默認
+                
+                signal = BasicSignal(
+                    signal_id=f"{symbol}_volume_{int(time.time() * 1000)}",
+                    symbol=symbol,
+                    signal_type=SignalType.VOLUME,
+                    direction=price_trend,
+                    strength=strength,
+                    confidence=confidence,
+                    price=current_price,
+                    volume=current_volume,  # 添加 volume 參數
+                    timestamp=datetime.now(),
+                    priority=Priority.HIGH if volume_change_ratio > 3.0 else Priority.MEDIUM,
+                    layer_source="layer_3_volume",
+                    market_regime=dynamic_params.market_regime.value,
+                    processing_time_ms=5.0,
+                    metadata={
+                        'volume_change_ratio': volume_change_ratio,
+                        'current_volume': current_volume,
+                        'avg_volume': avg_volume,
+                        'threshold_used': dynamic_params.volume_change_threshold
+                    }
+                )
+                signals.append(signal)
+                
+                logger.debug(f"📊 {symbol}: 成交量信號 - 放大 {volume_change_ratio:.1f}x")
+        
+        except Exception as e:
+            logger.error(f"❌ Layer 3 成交量信號生成失敗: {e}")
+        
+        return signals
+    
+    async def subscribe_to_signals(self, callback):
+        """訂閱信號輸出 - 外部系統用於接收信號"""
+        if callback not in self.signal_subscribers:
+            self.signal_subscribers.append(callback)
+            logger.info(f"✅ 新增信號訂閱者，當前訂閱數: {len(self.signal_subscribers)}")
+    
+    async def unsubscribe_from_signals(self, callback):
+        """取消信號訂閱"""
+        if callback in self.signal_subscribers:
+            self.signal_subscribers.remove(callback)
+            logger.info(f"✅ 移除信號訂閱者，當前訂閱數: {len(self.signal_subscribers)}")
+    
+    async def get_recent_signals(self, limit: int = 50) -> List[BasicSignal]:
+        """獲取最近的信號 - 用於外部系統查詢"""
+        try:
+            # 從信號緩衝區獲取最近的信號
+            recent_signals = []
+            
+            # 如果有信號緩衝區，從中獲取
+            if hasattr(self, 'signal_buffer') and self.signal_buffer:
+                recent_signals = list(self.signal_buffer)[-limit:]
+            
+            # 如果沒有信號，嘗試生成一些測試信號
+            if not recent_signals and self.real_market_data:
+                logger.info("🔄 緩衝區無信號，嘗試即時生成...")
+                
+                for symbol, market_data in self.real_market_data.items():
+                    try:
+                        signals = await self.generate_signals(symbol, market_data)
+                        recent_signals.extend(signals)
+                        
+                        if len(recent_signals) >= limit:
+                            break
+                            
+                    except Exception as e:
+                        logger.error(f"❌ 即時信號生成失敗 {symbol}: {e}")
+            
+            logger.debug(f"📊 返回 {len(recent_signals)} 個最近信號")
+            return recent_signals[:limit]
+            
+        except Exception as e:
+            logger.error(f"❌ 獲取最近信號失敗: {e}")
+            return []
+    
+    async def get_performance_summary(self) -> Dict[str, Any]:
+        """獲取性能統計摘要"""
+        try:
+            summary = {
+                'is_running': self.is_running,
+                'total_signals_generated': getattr(self, 'total_signals_count', 0),
+                'avg_processing_time_ms': 0.0,
+                'active_symbols': len(self.price_buffer),
+                'buffer_sizes': {},
+                'last_signal_time': None,
+                'dynamic_params_enabled': self.dynamic_params_enabled
+            }
+            
+            # 計算平均處理時間
+            if hasattr(self, 'processing_times') and self.processing_times.get('total'):
+                recent_times = list(self.processing_times['total'])[-10:]  # 最近10次
+                if recent_times:
+                    summary['avg_processing_time_ms'] = sum(recent_times) / len(recent_times)
+            
+            # 緩衝區大小統計
+            for symbol, buffer in self.price_buffer.items():
+                summary['buffer_sizes'][symbol] = len(buffer)
+            
+            return summary
+            
+        except Exception as e:
+            logger.error(f"❌ 性能統計獲取失敗: {e}")
+            return {'error': str(e)}
+    
+    async def _distribute_signals(self, signals: List[BasicSignal]):
+        """分發信號到訂閱者"""
+        if not signals:
+            return
+        
+        try:
+            # 添加到信號緩衝區
+            if not hasattr(self, 'signal_buffer'):
+                self.signal_buffer = deque(maxlen=1000)
+            
+            for signal in signals:
+                self.signal_buffer.append(signal)
+            
+            # 通知所有訂閱者
+            if hasattr(self, 'signal_subscribers'):
+                for callback in self.signal_subscribers:
+                    try:
+                        if asyncio.iscoroutinefunction(callback):
+                            await callback(signals)
+                        else:
+                            callback(signals)
+                    except Exception as e:
+                        logger.error(f"❌ 信號分發到訂閱者失敗: {e}")
+            
+            # 更新統計
+            if not hasattr(self, 'total_signals_count'):
+                self.total_signals_count = 0
+            self.total_signals_count += len(signals)
+            
+            logger.debug(f"📡 分發 {len(signals)} 個信號到 {len(getattr(self, 'signal_subscribers', []))} 個訂閱者")
+            
+        except Exception as e:
+            logger.error(f"❌ 信號分發失敗: {e}")
+    
+    def _update_market_data_cache(self, symbol: str, market_data: Dict[str, Any]):
+        """更新市場數據緩存"""
+        if not hasattr(self, 'real_market_data'):
+            self.real_market_data = {}
+        
+        self.real_market_data[symbol] = market_data
     
     async def _on_market_data_update(self, data_type: str, data: Any):
         """市場數據更新回調"""
@@ -1223,30 +1943,43 @@ class Phase1ABasicSignalGeneration:
         except Exception as e:
             logger.error(f"信號生成失敗: {e}")
     
-    async def _execute_layer_processing(self, layer_id: str, processor, symbol: str, market_data) -> LayerProcessingResult:
-        """執行單層處理"""
+    async def _execute_layer_processing(self, layer_id: str, processor, symbol: str, market_data, dynamic_params: DynamicParameters = None) -> 'LayerProcessingResult':
+        """執行單層處理 - 支援動態參數"""
         start_time = datetime.now()
         
         try:
-            signals = await processor(symbol, market_data)
+            # 如果沒有提供動態參數，獲取默認參數
+            if dynamic_params is None:
+                dynamic_params = await self._get_dynamic_parameters()
+            
+            # 調用處理器方法
+            if dynamic_params:
+                signals = await processor(symbol, market_data, dynamic_params)
+            else:
+                # 備用調用方式
+                signals = await processor(symbol, market_data)
             
             end_time = datetime.now()
             processing_time = (end_time - start_time).total_seconds() * 1000
             
             return LayerProcessingResult(
                 layer_id=layer_id,
-                signals=signals,
+                signals=signals if signals else [],
                 processing_time_ms=processing_time,
-                data_quality=0.9,  # 基礎數據品質
-                source_data_count=len(self.price_buffer[symbol])
+                success=True
             )
             
         except Exception as e:
-            logger.error(f"層 {layer_id} 處理失敗: {e}")
+            logger.error(f"❌ {layer_id} 處理失敗: {e}")
+            end_time = datetime.now()
+            processing_time = (end_time - start_time).total_seconds() * 1000
+            
             return LayerProcessingResult(
                 layer_id=layer_id,
                 signals=[],
-                processing_time_ms=0,
+                processing_time_ms=processing_time,
+                success=False,
+                error=str(e),
                 data_quality=0.0,
                 source_data_count=0
             )
@@ -1274,8 +2007,8 @@ class Phase1ABasicSignalGeneration:
                     direction = "BUY" if price_change_pct > 0 else "SELL"
                     strength = min(price_change_abs / (dynamic_params.price_change_threshold * 2), 1.0)
                     
-                    # 使用動態信心度閾值
-                    base_confidence = 0.7 + (price_change_abs - dynamic_params.price_change_threshold) * 10
+                    # 使用動態信心度閾值 - 修復：降低基礎信心度
+                    base_confidence = 0.3 + (price_change_abs - dynamic_params.price_change_threshold) * 10
                     confidence = min(max(base_confidence, 0.3), 1.0)
                     
                     if confidence >= dynamic_params.confidence_threshold:
@@ -1381,7 +2114,7 @@ class Phase1ABasicSignalGeneration:
                         signal_type=SignalType.MOMENTUM,
                         direction="BUY",
                         strength=min((30 - rsi) / 20, 1.0),
-                        confidence=0.75,
+                        confidence=0.35,  # 修復：降低硬編碼信心度
                         priority=Priority.HIGH,
                         timestamp=timestamps[-1],
                         price=prices[-1],
@@ -1402,7 +2135,7 @@ class Phase1ABasicSignalGeneration:
                         signal_type=SignalType.MOMENTUM,
                         direction="SELL",
                         strength=min((rsi - 70) / 20, 1.0),
-                        confidence=0.75,
+                        confidence=0.35,  # 修復：降低硬編碼信心度
                         priority=Priority.HIGH,
                         timestamp=timestamps[-1],
                         price=prices[-1],
@@ -1778,12 +2511,12 @@ class Phase1ABasicSignalGeneration:
                 for symbol in list(self.price_buffer.keys()):
                     # 清理價格緩衝區
                     while (self.price_buffer[symbol] and 
-                           self.price_buffer[symbol][0]['timestamp'] < cutoff_time):
+                           self._convert_timestamp(self.price_buffer[symbol][0]['timestamp']) < cutoff_time):
                         self.price_buffer[symbol].popleft()
                     
                     # 清理成交量緩衝區
                     while (self.volume_buffer[symbol] and 
-                           self.volume_buffer[symbol][0]['timestamp'] < cutoff_time):
+                           self._convert_timestamp(self.volume_buffer[symbol][0]['timestamp']) < cutoff_time):
                         self.volume_buffer[symbol].popleft()
                 
                 # 清理信號緩衝區

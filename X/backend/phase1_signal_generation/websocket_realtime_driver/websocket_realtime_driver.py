@@ -156,17 +156,120 @@ class ConnectionManager:
         self.lock = threading.Lock()
     
     async def start_connections(self, symbols: List[str]):
-        """啟動連接"""
+        """啟動真實 WebSocket 連接"""
         try:
-            # 實現連接啟動邏輯
-            for exchange in ['binance_spot', 'okx_spot', 'bybit_spot']:
-                await self.establish_connection(exchange, f"wss://{exchange}.example.com/ws")
+            # 真實的 Binance WebSocket 連接
+            for symbol in symbols:
+                symbol_lower = symbol.lower()
+                binance_uri = f"wss://stream.binance.com:9443/ws/{symbol_lower}@ticker"
+                
+                # 啟動每個交易對的真實連接
+                success = await self.establish_real_connection(f'binance_{symbol}', binance_uri, [symbol])
+                if success:
+                    logger.info(f"✅ {symbol} 真實連接建立成功")
+                else:
+                    logger.error(f"❌ {symbol} 連接失敗")
+            
+            # 模擬其他交易所連接（暫時保持mock）
+            await self.establish_connection('okx_spot', f"wss://okx_spot.example.com/ws")
+            await self.establish_connection('bybit_spot', f"wss://bybit_spot.example.com/ws")
                 
             logger.info(f"✅ 所有連接已啟動，交易對: {symbols}")
             
         except Exception as e:
             logger.error(f"❌ 連接啟動失敗: {e}")
     
+    async def establish_real_connection(self, exchange: str, uri: str, symbols: List[str]) -> bool:
+        """建立真實的 WebSocket 連接"""
+        try:
+            self.connection_states[exchange] = ConnectionState.CONNECTING
+            logger.info(f"🚀 正在連接真實的 {exchange}: {uri}")
+            
+            # 真實的 WebSocket 連接
+            websocket = await websockets.connect(uri)
+            
+            with self.lock:
+                self.connections[exchange] = websocket
+                self.connection_states[exchange] = ConnectionState.CONNECTED
+                self.connection_quality[exchange] = 1.0
+                
+            logger.info(f"✅ {exchange} 真實連接建立成功")
+            
+            # 開始監聽真實數據
+            asyncio.create_task(self._listen_real_data(exchange, websocket, symbols))
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ {exchange} 真實連接失敗: {e}")
+            self.connection_states[exchange] = ConnectionState.ERROR
+            return False
+    
+    async def _listen_real_data(self, exchange: str, websocket, symbols: List[str]):
+        """監聽真實的 WebSocket 數據"""
+        try:
+            async for message in websocket:
+                try:
+                    data = json.loads(message)
+                    
+                    # 處理 Binance ticker 數據 (單個流格式)
+                    if 's' in data and 'c' in data:  # 直接的 ticker 數據
+                        symbol = data.get('s', '').upper()
+                        price = float(data.get('c', 0))  # 當前價格
+                        volume = float(data.get('v', 0))  # 24h成交量
+                        
+                        if symbol in symbols:
+                            # 更新真實數據到緩衝區
+                            real_snapshot = MarketDataSnapshot(
+                                symbol=symbol,
+                                timestamp=datetime.now(),
+                                price=price,
+                                volume=volume,
+                                bid=float(data.get('b', price - 0.01)),
+                                ask=float(data.get('a', price + 0.01)),
+                                source_exchange=exchange,
+                                latency_ms=5.0,
+                                data_quality=1.0  # 標記為真實數據
+                            )
+                            
+                            # 存儲到數據緩衝區
+                            self.parent_driver.data_buffer.update_real_data(symbol, real_snapshot)
+                            
+                            logger.info(f"💰 收到真實價格 {symbol}: ${price:.2f}")
+                    
+                    # 處理組合流格式 (如果使用了組合流)
+                    elif 'stream' in data and 'data' in data:
+                        ticker_data = data['data']
+                        symbol = ticker_data.get('s', '').upper()
+                        price = float(ticker_data.get('c', 0))
+                        volume = float(ticker_data.get('v', 0))
+                        
+                        if symbol in symbols:
+                            real_snapshot = MarketDataSnapshot(
+                                symbol=symbol,
+                                timestamp=datetime.now(),
+                                price=price,
+                                volume=volume,
+                                bid=float(ticker_data.get('b', price - 0.01)),
+                                ask=float(ticker_data.get('a', price + 0.01)),
+                                source_exchange=exchange,
+                                latency_ms=5.0,
+                                data_quality=1.0
+                            )
+                            
+                            self.parent_driver.data_buffer.update_real_data(symbol, real_snapshot)
+                            logger.info(f"💰 收到真實價格 {symbol}: ${price:.2f}")
+                    
+                except json.JSONDecodeError:
+                    logger.warning(f"⚠️ 無法解析 {exchange} 數據")
+                except Exception as e:
+                    logger.error(f"❌ 處理 {exchange} 數據失敗: {e}")
+                    
+        except websockets.exceptions.ConnectionClosed:
+            logger.warning(f"⚠️ {exchange} WebSocket 連接關閉")
+        except Exception as e:
+            logger.error(f"❌ {exchange} 數據監聽失敗: {e}")
+
     async def establish_connection(self, exchange: str, uri: str) -> bool:
         """建立連接"""
         try:
@@ -1015,6 +1118,22 @@ class EventBroadcaster:
             broadcast_time = (time.time() - broadcast_start) * 1000
             await self.performance_monitor.record_broadcast_latency(broadcast_time)
     
+    async def broadcast_system_status(self, status: str, details: Dict[str, Any] = None):
+        """廣播系統狀態"""
+        await self.broadcast("system_status", {
+            "status": status,
+            "details": details or {},
+            "timestamp": time.time()
+        })
+    
+    async def broadcast_error(self, error_type: str, error_message: str):
+        """廣播錯誤信息"""
+        await self.broadcast("error", {
+            "error_type": error_type,
+            "error_message": error_message,
+            "timestamp": time.time()
+        })
+    
     async def _distribute_to_routing_targets(self, event_type: str, data: Dict[str, Any]):
         """分發到JSON規範路由目標"""
         try:
@@ -1200,6 +1319,7 @@ class DataBuffer:
     
     def __init__(self, max_size: int = 10000):
         self.max_size = max_size
+        self.snapshots: Dict[str, MarketDataSnapshot] = {}  # 存儲最新真實快照
         self.ticker_buffer: deque = deque(maxlen=max_size)
         self.kline_buffer: deque = deque(maxlen=max_size)
         self.depth_buffer: deque = deque(maxlen=max_size)
@@ -1207,11 +1327,54 @@ class DataBuffer:
         self.buffer_size_limits: Dict[str, int] = {}
         self.lock = threading.Lock()
     
-    def get_latest_snapshot(self, symbol: str) -> Optional[MarketDataSnapshot]:
-        """獲取最新快照"""
+    def update_real_data(self, symbol: str, snapshot: MarketDataSnapshot):
+        """更新真實市場數據"""
         try:
             with self.lock:
-                # 簡化實現，返回模擬數據
+                self.snapshots[symbol] = snapshot
+                logger.debug(f"✅ 更新真實數據 {symbol}: ${snapshot.price}")
+                
+                # 廣播數據事件給Phase1A
+                market_data = {
+                    'symbol': symbol,
+                    'price': snapshot.price,
+                    'volume': snapshot.volume,
+                    'timestamp': snapshot.timestamp,
+                    'bid': snapshot.bid,
+                    'ask': snapshot.ask,
+                    'source': snapshot.source_exchange
+                }
+                
+                # 異步廣播事件
+                import asyncio
+                if hasattr(self, 'parent_driver') and hasattr(self.parent_driver, 'event_broadcaster'):
+                    try:
+                        # 創建一個任務來廣播事件，避免阻塞
+                        loop = asyncio.get_event_loop()
+                        if not loop.is_running():
+                            # 如果沒有運行中的事件循環，直接同步調用
+                            asyncio.run(self.parent_driver.event_broadcaster.broadcast("data", market_data))
+                        else:
+                            # 如果有運行中的事件循環，創建任務
+                            loop.create_task(self.parent_driver.event_broadcaster.broadcast("data", market_data))
+                    except Exception as broadcast_error:
+                        logger.debug(f"事件廣播警告: {broadcast_error}")
+                        
+        except Exception as e:
+            logger.error(f"❌ 更新真實數據失敗: {e}")
+
+    def get_latest_snapshot(self, symbol: str) -> Optional[MarketDataSnapshot]:
+        """獲取最新快照 - 優先返回真實數據"""
+        try:
+            with self.lock:
+                # 優先返回真實數據
+                if symbol in self.snapshots:
+                    real_data = self.snapshots[symbol]
+                    logger.debug(f"✅ 返回真實數據 {symbol}: ${real_data.price}")
+                    return real_data
+                
+                # 如果沒有真實數據，返回模擬數據（臨時措施）
+                logger.warning(f"⚠️ {symbol} 無真實數據，返回模擬數據")
                 return MarketDataSnapshot(
                     symbol=symbol,
                     timestamp=datetime.now(),
@@ -1219,9 +1382,9 @@ class DataBuffer:
                     volume=1000.0,
                     bid=49999.0,
                     ask=50001.0,
-                    source_exchange="binance",
+                    source_exchange="mock",
                     latency_ms=5.0,
-                    data_quality=1.0
+                    data_quality=0.5  # 標記為模擬數據
                 )
                 
         except Exception as e:
@@ -1418,9 +1581,9 @@ class WebSocketRealtimeDriver:
             self.start_time = time.time()
             self.status = SystemStatus.STARTING
             
-            # 使用默認交易對如果沒有指定
+            # 使用 JSON schema 配置的默認交易對
             if symbols is None:
-                symbols = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'SOLUSDT']
+                symbols = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT']
             
             # 啟動連接管理器
             await self.connection_manager.start_connections(symbols)

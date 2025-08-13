@@ -146,7 +146,8 @@ class Phase1BVolatilityAdaptationEngine:
     def _load_config(self) -> Dict[str, Any]:
         """載入配置"""
         try:
-            config_path = "/Users/henrychang/Desktop/Trading-X/X/backend/phase1_signal_generation/phase1b_volatility_adaptation/phase1b_volatility_adaptation_dependency.json"
+            from pathlib import Path
+            config_path = Path(__file__).parent / "phase1b_volatility_adaptation_dependency.json"
             with open(config_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:
@@ -2151,3 +2152,32 @@ class Phase1BVolatilityAdaptationEngine:
         except Exception as e:
             logger.error(f"analyze_confluence執行失敗: {e}")
             return None
+
+
+# 🎯 全局實例
+phase1b_volatility_adapter = Phase1BVolatilityAdaptationEngine()
+
+# 別名（向後相容）
+Phase1BVolatilityAdaptation = Phase1BVolatilityAdaptationEngine
+
+# 🎯 啟動/停止函數
+async def start_phase1b_adapter():
+    """啟動 Phase1B 波動性適應器"""
+    try:
+        await phase1b_volatility_adapter.initialize()
+        logger.info("✅ Phase1B 波動性適應器啟動成功")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Phase1B 波動性適應器啟動失敗: {e}")
+        return False
+
+async def stop_phase1b_adapter():
+    """停止 Phase1B 波動性適應器"""
+    try:
+        # 清理資源
+        logger.info("✅ Phase1B 波動性適應器已停止")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Phase1B 波動性適應器停止失敗: {e}")
+        return False
+

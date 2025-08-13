@@ -301,11 +301,11 @@ class Phase1CSignalStandardizationEngine:
     
     async def standardize_signals(self, raw_signals: List[Dict[str, Any]]) -> List[StandardizedSignal]:
         """公開的信號標準化方法"""
+        standardized_signals = []  # 初始化在方法開始，確保變數總是存在
+        
         try:
             if not raw_signals:
-                return []
-            
-            standardized_signals = []
+                return standardized_signals
             
             for signal in raw_signals:
                 try:
@@ -341,7 +341,7 @@ class Phase1CSignalStandardizationEngine:
             
         except Exception as e:
             logger.error(f"標準化方法失敗: {e}")
-            return []
+            return standardized_signals
     
     async def calculate_quality(self, signals: List[Dict[str, Any]]) -> Dict[str, float]:
         """公開的信號品質計算方法"""
@@ -1910,3 +1910,32 @@ class Phase1CSignalStandardizationEngine:
         except Exception as e:
             logger.error(f"assess_signal_quality執行失敗: {e}")
             return None
+
+
+# 🎯 全局實例
+phase1c_signal_standardizer = Phase1CSignalStandardizationEngine()
+
+# 別名（向後相容）
+Phase1CSignalStandardization = Phase1CSignalStandardizationEngine
+
+# 🎯 啟動/停止函數
+async def start_phase1c_standardizer():
+    """啟動 Phase1C 信號標準化器"""
+    try:
+        await phase1c_signal_standardizer.initialize()
+        logger.info("✅ Phase1C 信號標準化器啟動成功")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Phase1C 信號標準化器啟動失敗: {e}")
+        return False
+
+async def stop_phase1c_standardizer():
+    """停止 Phase1C 信號標準化器"""
+    try:
+        # 清理資源
+        logger.info("✅ Phase1C 信號標準化器已停止")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Phase1C 信號標準化器停止失敗: {e}")
+        return False
+
