@@ -127,14 +127,19 @@ class BasicSignal:
     priority: Priority
     timestamp: datetime
     price: float
-    volume: float
-    metadata: Dict[str, Any]
-    layer_source: str
-    processing_time_ms: float
+    volume: float = 0.0
+    metadata: Dict[str, Any] = None
+    layer_source: str = "unknown"
+    processing_time_ms: float = 0.0
     market_regime: str = "UNKNOWN"  # 市場制度
     trading_session: str = "OFF_HOURS"  # 交易時段
     price_change: float = 0.0  # 價格變化率
     volume_change: float = 0.0  # 成交量變化率
+    
+    def __post_init__(self):
+        """後初始化處理"""
+        if self.metadata is None:
+            self.metadata = {}
     
     def to_dict(self) -> Dict[str, Any]:
         """轉換為字典格式"""
@@ -333,9 +338,9 @@ class Phase1ABasicSignalGeneration:
             regime_types = regime_config.get("regime_types", {})
             
             if not market_data:
-                # 沒有市場數據，無法進行制度檢測
-                logger.error("缺乏市場數據，無法進行市場制度檢測")
-                return MarketRegime.UNKNOWN, 0.0
+                # 沒有市場數據時，返回預設制度避免中斷優化流程
+                logger.warning("缺乏市場數據，使用預設市場制度 (NORMAL)")
+                return MarketRegime.NORMAL, 0.5
             
             regime_scores = {}
             
@@ -555,7 +560,7 @@ class Phase1ABasicSignalGeneration:
             logger.error(f"交易時段檢測失敗: {e}")
             return TradingSession.OFF_HOURS
     
-    async def _get_dynamic_parameters(self, mode: str = "basic_mode") -> DynamicParameters:
+    async def _get_dynamic_parameters(self, mode: str = "basic_mode", market_data: Optional[Dict[str, Any]] = None) -> DynamicParameters:
         """獲取動態調整後的參數"""
         current_time = time.time()
         
@@ -577,8 +582,30 @@ class Phase1ABasicSignalGeneration:
         # 如果動態參數系統啟用，進行參數調整
         if self.dynamic_params_enabled:
             try:
+                # 準備市場數據對象用於制度檢測
+                market_data_obj = None
+                if market_data:
+                    # 處理時間戳（可能是毫秒）
+                    timestamp = market_data.get('timestamp', time.time())
+                    if timestamp > 1e10:  # 如果是毫秒級時間戳
+                        timestamp = timestamp / 1000
+                    
+                    market_data_obj = MarketData(
+                        timestamp=datetime.fromtimestamp(timestamp),
+                        price=market_data.get('price', 0.0),
+                        volume=market_data.get('volume', 0.0),
+                        price_change_1h=market_data.get('price_change_1h', 0.0),
+                        price_change_24h=market_data.get('price_change_24h', 0.0),
+                        volume_ratio=market_data.get('volume_ratio', 1.0),
+                        volatility=market_data.get('volatility', 0.0),
+                        fear_greed_index=market_data.get('fear_greed_index', 50),
+                        bid_ask_spread=market_data.get('bid_ask_spread', 0.0),
+                        market_depth=market_data.get('market_depth', 0.0),
+                        moving_averages=market_data.get('moving_averages', {})
+                    )
+                
                 # 獲取當前市場制度和交易時段
-                market_regime, regime_confidence = await self._detect_market_regime()
+                market_regime, regime_confidence = await self._detect_market_regime(market_data_obj)
                 trading_session = await self._detect_trading_session()
                 
                 # 應用市場制度調整
@@ -1380,7 +1407,7 @@ class Phase1ABasicSignalGeneration:
             await self._update_buffers_with_current_data(symbol, market_data)
             
             # 獲取動態參數
-            dynamic_params = await self._get_dynamic_parameters()
+            dynamic_params = await self._get_dynamic_parameters(market_data=market_data)
             
             # 執行4層並行處理 - 基於真實的技術分析
             signals = []
@@ -1537,12 +1564,15 @@ class Phase1ABasicSignalGeneration:
             if len(recent_prices) < 20:
                 return signals
             
-            # 計算移動平均線
-            ma_5 = np.mean(recent_prices[-5:])   # 5期移動平均
-            ma_10 = np.mean(recent_prices[-10:]) # 10期移動平均
-            ma_20 = np.mean(recent_prices[-20:]) # 20期移動平均
+            # 提取價格數值用於計算移動平均線
+            price_values = [p['price'] if isinstance(p, dict) else p for p in recent_prices]
             
-            current_price = recent_prices[-1]
+            # 計算移動平均線
+            ma_5 = np.mean(price_values[-5:])   # 5期移動平均
+            ma_10 = np.mean(price_values[-10:]) # 10期移動平均
+            ma_20 = np.mean(price_values[-20:]) # 20期移動平均
+            
+            current_price = price_values[-1]
             
             # 動量信號判斷
             momentum_signals = []
@@ -2118,7 +2148,7 @@ class Phase1ABasicSignalGeneration:
                         priority=Priority.HIGH,
                         timestamp=timestamps[-1],
                         price=prices[-1],
-                        volume=market_data.volume,
+                        volume=market_data.get('volume', 0),
                         metadata={
                             "rsi_value": rsi,
                             "signal_source": "rsi_oversold"
@@ -2139,7 +2169,7 @@ class Phase1ABasicSignalGeneration:
                         priority=Priority.HIGH,
                         timestamp=timestamps[-1],
                         price=prices[-1],
-                        volume=market_data.volume,
+                        volume=market_data.get('volume', 0),
                         metadata={
                             "rsi_value": rsi,
                             "signal_source": "rsi_overbought"
@@ -2167,7 +2197,7 @@ class Phase1ABasicSignalGeneration:
                         priority=Priority.MEDIUM,
                         timestamp=timestamps[-1],
                         price=prices[-1],
-                        volume=market_data.volume,
+                        volume=market_data.get('volume', 0),
                         metadata={
                             "momentum_pct": recent_momentum,
                             "signal_source": "momentum_change"

@@ -16,6 +16,15 @@ from datetime import datetime, timedelta
 from collections import deque, defaultdict
 from enum import Enum
 import warnings
+import sys
+from pathlib import Path
+import aiohttp
+import pandas as pd
+import numpy as np
+
+# 添加Phase1A模組路徑
+sys.path.append(str(Path(__file__).parent.parent.parent / "phase1_signal_generation" / "phase1a_basic_signal_generation"))
+
 warnings.filterwarnings('ignore')
 
 logger = logging.getLogger(__name__)
@@ -145,12 +154,34 @@ class AutoBacktestValidator:
         # 任務
         self.validator_tasks = []
         
+        # 初始化Phase1A信號生成器
+        self.phase1a_generator = None
+        self._init_phase1a_generator()
+        
         logger.info("自動回測驗證器初始化完成")
+    
+    def _init_phase1a_generator(self):
+        """初始化Phase1A信號生成器"""
+        try:
+            from phase1a_basic_signal_generation import Phase1ABasicSignalGeneration
+            self.phase1a_generator = Phase1ABasicSignalGeneration()
+            
+            # 為回測模式設置運行狀態，不需要實際的WebSocket連接
+            self.phase1a_generator.is_running = True
+            logger.info("✅ Phase1A信號生成器初始化成功（回測模式）")
+        except ImportError as e:
+            logger.error(f"❌ Phase1A模組導入失敗: {e}")
+            self.phase1a_generator = None
+        except Exception as e:
+            logger.error(f"❌ Phase1A信號生成器初始化失敗: {e}")
+            self.phase1a_generator = None
     
     def _load_config(self, config_path: str = None) -> Dict[str, Any]:
         """載入配置"""
         if config_path is None:
-            config_path = "/Users/henrychang/Desktop/Trading-X/X/backend/phase5_backtest_validation/auto_backtest_validator/auto_backtest_config.json"
+            # 動態取得當前檔案路徑
+            current_dir = Path(__file__).parent
+            config_path = str(current_dir / "auto_backtest_config.json")
         
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
@@ -851,6 +882,325 @@ class AutoBacktestValidator:
             logger.error(f"性能摘要獲取失敗: {e}")
             return {'error': str(e)}
 
+    async def _fetch_historical_klines(self, symbol: str, interval: str = '5m', limit: int = 1000) -> pd.DataFrame:
+        """
+        獲取歷史K線數據用於Phase1A回測
+        
+        Args:
+            symbol: 交易對符號 (如 'BTCUSDT')
+            interval: K線間隔 ('1m', '5m', '15m', '1h', '4h', '1d')
+            limit: 獲取數量限制
+            
+        Returns:
+            pd.DataFrame: 包含OHLCV數據的DataFrame
+        """
+        try:
+            url = f"https://api.binance.com/api/v3/klines"
+            params = {
+                'symbol': symbol,
+                'interval': interval,
+                'limit': limit
+            }
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        
+                        # 轉換為DataFrame
+                        df = pd.DataFrame(data, columns=[
+                            'open_time', 'open', 'high', 'low', 'close', 'volume',
+                            'close_time', 'quote_asset_volume', 'number_of_trades',
+                            'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'
+                        ])
+                        
+                        # 數據類型轉換
+                        df['open'] = pd.to_numeric(df['open'])
+                        df['high'] = pd.to_numeric(df['high'])
+                        df['low'] = pd.to_numeric(df['low'])
+                        df['close'] = pd.to_numeric(df['close'])
+                        df['volume'] = pd.to_numeric(df['volume'])
+                        df['open_time'] = pd.to_datetime(df['open_time'], unit='ms')
+                        
+                        return df[['open_time', 'open', 'high', 'low', 'close', 'volume']]
+                    else:
+                        logger.error(f"獲取{symbol}歷史數據失敗: HTTP {response.status}")
+                        return pd.DataFrame()
+                        
+        except Exception as e:
+            logger.error(f"獲取歷史K線數據失敗: {e}")
+            return pd.DataFrame()
+
+    async def _run_phase1a_backtest(self, symbol: str, timeframe: str = '5m', days: int = 7) -> Dict[str, Any]:
+        """
+        運行Phase1A回測驗證
+        
+        Args:
+            symbol: 交易對符號
+            timeframe: 時間框架
+            days: 回測天數
+            
+        Returns:
+            Dict: 回測結果包含勝率、盈虧比等指標
+        """
+        try:
+            # 獲取歷史數據
+            historical_data = await self._fetch_historical_klines(
+                symbol=symbol,
+                interval=timeframe,
+                limit=days * 288  # 5分鐘K線，一天288根
+            )
+            
+            if historical_data.empty:
+                return {'error': f'無法獲取{symbol}歷史數據'}
+            
+            # 使用Phase1A生成器生成信號
+            signals = []
+            for i in range(len(historical_data) - 50):  # 保留50個數據點作為緩衝
+                current_data = historical_data.iloc[:i+50]  # 使用前i+50個數據點
+                
+                # 確保為Phase1A生成器預填充足夠的歷史數據
+                if i == 0:  # 只在第一次時預填充
+                    # 為Phase1A生成器預填充歷史價格數據
+                    self.phase1a_generator.price_buffer[symbol] = deque(maxlen=1000)
+                    for j in range(min(50, len(current_data))):
+                        price_data = {
+                            'timestamp': int(current_data.iloc[j]['open_time'].timestamp() * 1000),
+                            'price': float(current_data.iloc[j]['close']),
+                            'volume': float(current_data.iloc[j]['volume'])
+                        }
+                        self.phase1a_generator.price_buffer[symbol].append(price_data)
+                
+                try:
+                    # 模擬Phase1A信號生成
+                    market_data = {
+                        'symbol': symbol,
+                        'timestamp': int(current_data.iloc[-1]['open_time'].timestamp() * 1000),
+                        'price': float(current_data.iloc[-1]['close']),
+                        'high': float(current_data.iloc[-1]['high']),
+                        'low': float(current_data.iloc[-1]['low']),
+                        'open': float(current_data.iloc[-1]['open']),
+                        'volume': float(current_data.iloc[-1]['volume']),
+                        'change_percent': 0.0,
+                        'bid': float(current_data.iloc[-1]['close']),
+                        'ask': float(current_data.iloc[-1]['close'])
+                    }
+                    
+                    generated_signals = await self.phase1a_generator.generate_signals(symbol, market_data)
+                    
+                    if generated_signals and len(generated_signals) > 0:
+                        # 取第一個信號作為代表
+                        signal = generated_signals[0]
+                        signal_data = {
+                            'timestamp': current_data.iloc[-1]['open_time'],
+                            'symbol': symbol,
+                            'signal_type': signal.direction,
+                            'entry_price': float(current_data.iloc[-1]['close']),
+                            'confidence': signal.confidence,
+                            'target_price': None,  # BasicSignal 沒有此屬性，設為 None
+                            'stop_loss': None      # BasicSignal 沒有此屬性，設為 None
+                        }
+                        signals.append(signal_data)
+                        
+                except Exception as e:
+                    logger.warning(f"Phase1A信號生成失敗 at index {i}: {e}")
+                    continue
+            
+            # 計算回測性能
+            if not signals:
+                return {'error': 'Phase1A未生成任何信號'}
+            
+            # 驗證信號性能
+            validated_signals = []
+            for signal in signals:
+                # 找到信號後續價格數據進行驗證
+                signal_time = signal['timestamp']
+                future_data = historical_data[historical_data['open_time'] > signal_time].head(20)
+                
+                if len(future_data) > 0:
+                    validation_result = self._validate_signal_performance(signal, future_data)
+                    validated_signals.append(validation_result)
+            
+            # 計算統計指標
+            if validated_signals:
+                win_rate = sum(1 for s in validated_signals if s.get('profitable', False)) / len(validated_signals)
+                total_pnl = sum(s.get('pnl_ratio', 0) for s in validated_signals)
+                avg_pnl = total_pnl / len(validated_signals) if validated_signals else 0
+                
+                return {
+                    'symbol': symbol,
+                    'timeframe': timeframe,
+                    'backtest_days': days,
+                    'total_signals': len(validated_signals),
+                    'win_rate': win_rate,
+                    'avg_pnl_ratio': avg_pnl,
+                    'total_pnl_ratio': total_pnl,
+                    'signals': validated_signals[:10]  # 返回前10個信號作為樣本
+                }
+            else:
+                return {'error': '無有效信號可驗證'}
+                
+        except Exception as e:
+            logger.error(f"Phase1A回測失敗: {e}")
+            return {'error': str(e)}
+
+    def _validate_signal_performance(self, signal: Dict, future_data: pd.DataFrame) -> Dict[str, Any]:
+        """
+        驗證單個信號的性能表現
+        
+        Args:
+            signal: 信號數據
+            future_data: 信號後的價格數據
+            
+        Returns:
+            Dict: 包含盈虧信息的驗證結果
+        """
+        try:
+            entry_price = signal['entry_price']
+            signal_type = signal.get('signal_type', 'buy')
+            target_price = signal.get('target_price')
+            stop_loss = signal.get('stop_loss')
+            
+            # 計算信號結果
+            max_profit = 0
+            max_loss = 0
+            final_pnl = 0
+            hit_target = False
+            hit_stop = False
+            
+            for _, row in future_data.iterrows():
+                high_price = row['high']
+                low_price = row['low']
+                close_price = row['close']
+                
+                if signal_type.lower() == 'buy':
+                    # 買入信號邏輯
+                    profit = (high_price - entry_price) / entry_price
+                    loss = (low_price - entry_price) / entry_price
+                    
+                    max_profit = max(max_profit, profit)
+                    max_loss = min(max_loss, loss)
+                    
+                    # 檢查止盈止損
+                    if target_price and high_price >= target_price:
+                        final_pnl = (target_price - entry_price) / entry_price
+                        hit_target = True
+                        break
+                    elif stop_loss and low_price <= stop_loss:
+                        final_pnl = (stop_loss - entry_price) / entry_price
+                        hit_stop = True
+                        break
+                        
+                    # 使用收盤價作為最終結果
+                    final_pnl = (close_price - entry_price) / entry_price
+                    
+                else:  # sell signal
+                    # 賣出信號邏輯
+                    profit = (entry_price - low_price) / entry_price
+                    loss = (high_price - entry_price) / entry_price
+                    
+                    max_profit = max(max_profit, profit)
+                    max_loss = min(max_loss, loss)
+                    
+                    # 檢查止盈止損
+                    if target_price and low_price <= target_price:
+                        final_pnl = (entry_price - target_price) / entry_price
+                        hit_target = True
+                        break
+                    elif stop_loss and high_price >= stop_loss:
+                        final_pnl = (entry_price - stop_loss) / entry_price
+                        hit_stop = True
+                        break
+                        
+                    # 使用收盤價作為最終結果
+                    final_pnl = (entry_price - close_price) / entry_price
+            
+            return {
+                **signal,
+                'profitable': final_pnl > 0,
+                'pnl_ratio': final_pnl,
+                'max_profit': max_profit,
+                'max_loss': max_loss,
+                'hit_target': hit_target,
+                'hit_stop': hit_stop
+            }
+            
+        except Exception as e:
+            logger.error(f"信號性能驗證失敗: {e}")
+            return {**signal, 'error': str(e)}
+
+    async def run_phase1a_validation_cycle(self) -> Dict[str, Any]:
+        """
+        運行Phase1A驗證週期，針對多個主要加密貨幣
+        
+        Returns:
+            Dict: 包含所有幣種回測結果的綜合報告
+        """
+        try:
+            # 主要加密貨幣列表
+            major_symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT']
+            
+            results = {}
+            overall_stats = {
+                'total_signals': 0,
+                'total_wins': 0,
+                'total_pnl': 0,
+                'symbol_count': 0
+            }
+            
+            for symbol in major_symbols:
+                logger.info(f"開始Phase1A回測驗證: {symbol}")
+                
+                # 運行單幣種回測
+                backtest_result = await self._run_phase1a_backtest(
+                    symbol=symbol,
+                    timeframe='5m',
+                    days=7  # 7天回測週期
+                )
+                
+                if 'error' not in backtest_result:
+                    results[symbol] = backtest_result
+                    
+                    # 累積統計
+                    overall_stats['total_signals'] += backtest_result.get('total_signals', 0)
+                    overall_stats['total_wins'] += int(backtest_result.get('win_rate', 0) * backtest_result.get('total_signals', 0))
+                    overall_stats['total_pnl'] += backtest_result.get('total_pnl_ratio', 0)
+                    overall_stats['symbol_count'] += 1
+                    
+                    logger.info(f"{symbol} Phase1A回測完成: 勝率={backtest_result.get('win_rate', 0):.2%}")
+                else:
+                    logger.error(f"{symbol} Phase1A回測失敗: {backtest_result.get('error')}")
+                    results[symbol] = backtest_result
+                
+                # 短暫延遲避免API限制
+                await asyncio.sleep(1)
+            
+            # 計算總體指標
+            overall_win_rate = (overall_stats['total_wins'] / overall_stats['total_signals']) if overall_stats['total_signals'] > 0 else 0
+            avg_pnl_ratio = overall_stats['total_pnl'] / overall_stats['symbol_count'] if overall_stats['symbol_count'] > 0 else 0
+            
+            validation_summary = {
+                'validation_timestamp': datetime.now().isoformat(),
+                'overall_performance': {
+                    'overall_win_rate': overall_win_rate,
+                    'total_signals': overall_stats['total_signals'],
+                    'successful_symbols': overall_stats['symbol_count'],
+                    'avg_pnl_ratio': avg_pnl_ratio,
+                    'target_achieved': overall_win_rate >= 0.70  # 70%目標勝率
+                },
+                'symbol_results': results,
+                'phase1a_integration_status': 'active'
+            }
+            
+            # 記錄驗證結果
+            logger.info(f"Phase1A驗證週期完成 - 總體勝率: {overall_win_rate:.2%}, 目標達成: {'是' if overall_win_rate >= 0.70 else '否'}")
+            
+            return validation_summary
+            
+        except Exception as e:
+            logger.error(f"Phase1A驗證週期失敗: {e}")
+            return {'error': str(e), 'validation_timestamp': datetime.now().isoformat()}
+
 # ==================== 全局實例和便捷函數 ====================
 
 # 全局自動回測驗證器實例
@@ -887,3 +1237,7 @@ async def get_backtest_validator_status() -> Dict[str, Any]:
 async def get_backtest_performance_summary() -> Dict[str, Any]:
     """獲取回測性能摘要"""
     return await auto_backtest_validator.get_performance_summary()
+
+async def run_phase1a_validation() -> Dict[str, Any]:
+    """運行Phase1A驗證週期"""
+    return await auto_backtest_validator.run_phase1a_validation_cycle()
