@@ -234,76 +234,64 @@ class Phase1ABasicSignalGeneration:
         # 應用信號生成配置參數
         self._apply_signal_generation_config()
         
+        # 應用技術指標配置參數
+        self._apply_technical_indicator_config()
+        
         logger.info("Phase1A 基礎信號生成器初始化完成（含動態參數系統）")
     
     def _load_config(self) -> Dict[str, Any]:
-        """載入配置"""
+        """載入配置 - 優先讀取 Phase5 最新優化備份"""
         try:
+            # 策略 1: 優先讀取 Phase5 最新 deployment_initial 備份
+            phase5_config = self._load_from_phase5_backup()
+            if phase5_config:
+                logger.info("✅ 使用 Phase5 最新優化配置")
+                return phase5_config
+            
+            # 策略 2: 備用方案 - 讀取本地原始配置
+            logger.info("🔄 Phase5 備份不可用，使用本地原始配置")
             config_path = Path(__file__).parent / "phase1a_basic_signal_generation.json"
             with open(config_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
+                
         except Exception as e:
             logger.error(f"配置載入失敗: {e}")
-            return self._get_default_config()
+            # 配置載入失敗時返回空字典，依賴動態參數系統
+            logger.warning("使用空配置，系統將完全依賴動態參數")
+            return {}
     
-    def _get_default_config(self) -> Dict[str, Any]:
-        """預設配置 - 增強版本包含完整的 JSON 規範參數"""
-        return {
-            "processing_layers": {
-                "layer_0": {
-                    "name": "instant_signals",
-                    "target_latency_ms": 5,
-                    "signal_types": ["price_spike", "volume_spike"]
-                },
-                "layer_1": {
-                    "name": "momentum_signals", 
-                    "target_latency_ms": 15,
-                    "signal_types": ["rsi_divergence", "macd_cross"]
-                },
-                "layer_2": {
-                    "name": "trend_signals",
-                    "target_latency_ms": 20,
-                    "signal_types": ["trend_break", "support_resistance"]
-                },
-                "layer_3": {
-                    "name": "volume_signals",
-                    "target_latency_ms": 5,
-                    "signal_types": ["volume_confirmation", "unusual_volume"]
-                }
-            },
-            "signal_generation_params": {
-                "basic_mode": {
-                    "price_change_threshold": 0.001,
-                    "volume_change_threshold": 1.5,
-                    "signal_strength_range": [0.0, 1.0],
-                    "confidence_calculation": "basic_statistical_model"
-                },
-                "extreme_market_mode": {
-                    "price_change_threshold": 0.005,
-                    "volume_change_threshold": 3.0,
-                    "signal_strength_boost": 1.2,
-                    "priority_escalation": True
-                }
-            },
-            "signal_thresholds": {
-                "price_spike": 0.5,
-                "volume_spike": 2.0,
-                "rsi_oversold": 30,
-                "rsi_overbought": 70,
-                "price_change_threshold_basic": 0.001,
-                "price_change_threshold_extreme": 0.005,
-                "signal_strength_boost": 1.2
-            },
-            "performance_targets": {
-                "total_processing_time": "< 45ms",
-                "signal_accuracy": "> 75%",
-                "false_positive_rate": "< 15%",
-                "processing_latency_p99": "< 30ms",
-                "signal_generation_rate": "10-50 signals/minute",
-                "accuracy_baseline": "> 60%",
-                "system_availability": "> 99.5%"
-            }
-        }
+    def _load_from_phase5_backup(self) -> Optional[Dict[str, Any]]:
+        """從 Phase5 備份目錄讀取最新優化配置"""
+        try:
+            # Phase5 備份目錄路徑
+            phase5_backup_dir = Path(__file__).parent.parent.parent / "phase5_backtest_validation" / "safety_backups" / "working"
+            
+            if not phase5_backup_dir.exists():
+                logger.debug(f"Phase5 備份目錄不存在: {phase5_backup_dir}")
+                return None
+            
+            # 尋找所有 deployment_initial 檔案
+            deployment_files = list(phase5_backup_dir.glob("phase1a_backup_deployment_initial_*.json"))
+            
+            if not deployment_files:
+                logger.debug("沒有找到 Phase5 deployment_initial 備份檔案")
+                return None
+            
+            # 按修改時間排序，取最新的
+            latest_backup = max(deployment_files, key=lambda x: x.stat().st_mtime)
+            
+            # 讀取最新備份配置
+            with open(latest_backup, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            
+            logger.info(f"🎯 成功讀取最新 Phase5 備份: {latest_backup.name}")
+            logger.info(f"📅 備份時間: {datetime.fromtimestamp(latest_backup.stat().st_mtime)}")
+            
+            return config
+            
+        except Exception as e:
+            logger.debug(f"從 Phase5 備份讀取配置失敗: {e}")
+            return None
     
     def _init_dynamic_parameter_system(self) -> bool:
         """初始化動態參數系統"""
@@ -699,6 +687,43 @@ class Phase1ABasicSignalGeneration:
         self.priority_escalation_enabled = extreme_mode.get('priority_escalation', True)
         
         logger.info("信號生成配置參數已應用")
+    
+    def _apply_technical_indicator_config(self):
+        """應用技術指標配置參數 - 支援自適應參數"""
+        # 從配置中讀取技術指標參數（與JSON schema相容）
+        self.rsi_period = self.config.get('rsi_period', 14)
+        self.macd_fast = self.config.get('macd_fast', 12)
+        self.macd_slow = self.config.get('macd_slow', 26)
+        self.macd_signal = self.config.get('macd_signal', 9)
+        
+        # 移動平均線參數
+        self.ma_periods = {
+            'ma_20': 20,
+            'ma_50': 50,
+            'ma_200': 200
+        }
+        
+        # 自適應參數優化
+        performance_boost = self.config.get('performance_boost', 1.0)
+        if performance_boost != 1.0:
+            self.performance_boost = performance_boost
+            logger.info(f"啟用性能提升係數: {performance_boost}")
+        else:
+            self.performance_boost = 1.0
+        
+        # 記錄配置的技術指標參數
+        logger.info(f"技術指標參數: RSI({self.rsi_period}), MACD({self.macd_fast},{self.macd_slow},{self.macd_signal}), 性能提升({self.performance_boost}x)")
+    
+    def get_technical_indicator_params(self) -> Dict[str, Any]:
+        """獲取當前的技術指標參數 - 供外部系統查詢"""
+        return {
+            'rsi_period': getattr(self, 'rsi_period', 14),
+            'macd_fast': getattr(self, 'macd_fast', 12),
+            'macd_slow': getattr(self, 'macd_slow', 26),
+            'macd_signal': getattr(self, 'macd_signal', 9),
+            'performance_boost': getattr(self, 'performance_boost', 1.0),
+            'ma_periods': getattr(self, 'ma_periods', {'ma_20': 20, 'ma_50': 50, 'ma_200': 200})
+        }
     
     async def _process_market_data(self, ticker_data: Dict[str, Any]) -> Dict[str, Any]:
         """處理市場數據 - 修復數據流斷點"""

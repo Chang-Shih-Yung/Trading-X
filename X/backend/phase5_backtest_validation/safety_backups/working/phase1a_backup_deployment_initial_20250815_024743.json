@@ -472,13 +472,13 @@
   "optimized_by_test": "Fixed_Safety_Manager",
   "test_verification": true,
   "optimization_round": 2,
-  "rsi_period": 17,
-  "macd_fast": 20,
-  "macd_slow": 31,
-  "optimization_timestamp": "2025-08-15T03:00:40.367479",
+  "rsi_period": 18,
+  "macd_fast": 18,
+  "macd_slow": 32,
+  "optimization_timestamp": "2025-08-15T02:47:43.346970",
   "optimized_by": "Phase5_Fixed_Test_Suite",
   "test_mode": true,
-  "performance_boost": 1.08,
+  "performance_boost": 1.12,
   "optimization_method": "adaptive_random",
-  "parameter_generation_timestamp": "2025-08-15T03:00:40.367477"
+  "parameter_generation_timestamp": "2025-08-15T02:47:43.346967"
 }

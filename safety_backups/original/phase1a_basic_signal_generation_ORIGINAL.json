@@ -244,14 +244,7 @@
             1.0
           ],
           "confidence_calculation": "basic_statistical_model",
-          "confidence_threshold": {
-            "base_value": 0.7,
-            "type": "dynamic_parameter",
-            "parameter_id": "phase1_confidence_threshold",
-            "market_regime_dependent": true,
-            "trading_session_dependent": true,
-            "description": "基礎信號生成信心度閾值，根據市場制度和交易時段動態調整"
-          }
+          "confidence_threshold": 0.85
         },
         "extreme_market_mode": {
           "price_change_threshold": {
@@ -272,15 +265,7 @@
           },
           "signal_strength_boost": 1.2,
           "priority_escalation": true,
-          "confidence_threshold": {
-            "base_value": 0.8,
-            "type": "dynamic_parameter",
-            "parameter_id": "phase1_confidence_threshold_extreme",
-            "market_regime_dependent": true,
-            "trading_session_dependent": true,
-            "extreme_mode_multiplier": 1.067,
-            "description": "極端市場模式信心度閾值，比基礎模式稍高要求"
-          }
+          "confidence_threshold": 0.85
         }
       },
       "performance_targets": {
@@ -311,7 +296,7 @@
                 "fear_greed_index": "> 60",
                 "moving_average_alignment": "bullish_stack"
               },
-              "confidence_threshold": 0.8,
+              "confidence_threshold": 0.85,
               "parameter_adjustments": {
                 "confidence_threshold_multiplier": 0.9,
                 "price_change_threshold_multiplier": 0.8,
@@ -326,7 +311,7 @@
                 "fear_greed_index": "< 40",
                 "moving_average_alignment": "bearish_stack"
               },
-              "confidence_threshold": 0.8,
+              "confidence_threshold": 0.85,
               "parameter_adjustments": {
                 "confidence_threshold_multiplier": 1.1,
                 "price_change_threshold_multiplier": 1.2,
@@ -341,7 +326,7 @@
                 "volume_ratio": "[0.8, 1.2]",
                 "range_bound_confirmation": true
               },
-              "confidence_threshold": 0.7,
+              "confidence_threshold": 0.85,
               "parameter_adjustments": {
                 "confidence_threshold_multiplier": 1.05,
                 "price_change_threshold_multiplier": 1.3,
@@ -356,7 +341,7 @@
                 "volume_spikes": "> 2.0",
                 "intraday_range": "> 0.05"
               },
-              "confidence_threshold": 0.75,
+              "confidence_threshold": 0.85,
               "parameter_adjustments": {
                 "confidence_threshold_multiplier": 0.95,
                 "price_change_threshold_multiplier": 0.7,
@@ -466,19 +451,5 @@
         "monitoring_feed": "signal_performance_tracker"
       }
     }
-  },
-  "rsi_period_test": 19,
-  "macd_fast_test": 17,
-  "optimized_by_test": "Fixed_Safety_Manager",
-  "test_verification": true,
-  "optimization_round": 2,
-  "rsi_period": 17,
-  "macd_fast": 20,
-  "macd_slow": 31,
-  "optimization_timestamp": "2025-08-15T03:00:40.367479",
-  "optimized_by": "Phase5_Fixed_Test_Suite",
-  "test_mode": true,
-  "performance_boost": 1.08,
-  "optimization_method": "adaptive_random",
-  "parameter_generation_timestamp": "2025-08-15T03:00:40.367477"
+  }
 }
