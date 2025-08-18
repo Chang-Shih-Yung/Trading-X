@@ -16,10 +16,11 @@ from datetime import datetime
 from typing import List, Dict, Any
 import json
 
-# 添加項目路徑
-project_root = Path(__file__).parent.parent
+# 設置項目路徑 - 使用 X 資料夾作為根目錄
+current_dir = Path(__file__).parent
+project_root = current_dir.parent  # X 資料夾
 sys.path.append(str(project_root))
-sys.path.append(str(project_root / "backend"))
+sys.path.append(str(current_dir))  # backend 資料夾
 
 from backend.trading_x_backend_integrator import backend_integrator
 

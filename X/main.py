@@ -14,15 +14,15 @@ import logging
 import sys
 from pathlib import Path
 
-# 添加父目錄到路徑以導入app模組
-parent_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(parent_dir))
+# 確保可以導入 X 資料夾內的模組
+current_dir = Path(__file__).parent
+sys.path.insert(0, str(current_dir))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-# 導入backend的監控系統
+# 導入backend的監控系統 - 使用 X 資料夾內的模組
 from backend.phase4_output_monitoring.real_time_unified_monitoring_manager import unified_monitoring_manager
 from backend.phase4_output_monitoring.monitoring_api import include_monitoring_routes
 

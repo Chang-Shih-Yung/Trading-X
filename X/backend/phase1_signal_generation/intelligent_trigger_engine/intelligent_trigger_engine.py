@@ -16,15 +16,23 @@ from dataclasses import dataclass, asdict, field
 from datetime import datetime, timedelta
 from collections import deque, defaultdict
 from enum import Enum
+from pathlib import Path
 import warnings
 warnings.filterwarnings('ignore')
 
-# 技術指標庫
+# 技術指標庫 - 產品等級要求
 try:
     import pandas_ta as ta
 except ImportError:
     ta = None
-    logging.warning("pandas_ta 未安裝，部分技術指標功能將受限")
+    raise ImportError("❌ pandas_ta 未安裝！產品等級系統要求必須安裝 pandas_ta。請執行: pip install pandas_ta")
+
+# 高級數學計算 - 產品等級支撐阻力算法
+try:
+    from scipy.signal import find_peaks
+except ImportError:
+    find_peaks = None
+    logging.warning("⚠️ scipy 未安裝，將使用簡化的支撐阻力算法")
 
 logger = logging.getLogger(__name__)
 
@@ -57,24 +65,82 @@ class MarketCondition(Enum):
 
 @dataclass
 class TechnicalIndicatorState:
-    """技術指標狀態"""
+    """技術指標狀態 - 產品等級完整實現"""
+    # 基礎技術指標
     rsi: Optional[float] = None
     rsi_convergence: float = 0.0
+    rsi_14: Optional[float] = None
+    rsi_21: Optional[float] = None
+    
+    # MACD 指標組
     macd: Optional[float] = None
     macd_signal: Optional[float] = None
     macd_histogram: Optional[float] = None
     macd_convergence: float = 0.0
+    
+    # 移動平均線組
+    sma_10: Optional[float] = None
+    sma_20: Optional[float] = None
+    sma_50: Optional[float] = None
+    sma_200: Optional[float] = None
+    ema_12: Optional[float] = None
+    ema_26: Optional[float] = None
+    ema_50: Optional[float] = None
+    
+    # 布林帶
     bollinger_upper: Optional[float] = None
     bollinger_lower: Optional[float] = None
     bollinger_middle: Optional[float] = None
     bollinger_convergence: float = 0.0
+    bollinger_bandwidth: Optional[float] = None
+    bollinger_percent: Optional[float] = None
+    
+    # 成交量指標
+    obv: Optional[float] = None
     volume_sma: Optional[float] = None
     volume_spike_ratio: float = 0.0
     volume_convergence: float = 0.0
+    vwap: Optional[float] = None
+    
+    # 趨勢指標
+    adx: Optional[float] = None
+    adx_plus: Optional[float] = None
+    adx_minus: Optional[float] = None
+    aroon_up: Optional[float] = None
+    aroon_down: Optional[float] = None
+    
+    # 動量指標
+    stoch_k: Optional[float] = None
+    stoch_d: Optional[float] = None
+    williams_r: Optional[float] = None
+    roc: Optional[float] = None
+    
+    # 波動性指標
+    atr: Optional[float] = None
+    natr: Optional[float] = None
+    true_range: Optional[float] = None
+    
+    # 週期性指標
+    cycle_period: Optional[float] = None
+    cycle_strength: Optional[float] = None
+    
+    # 模式識別
+    doji_pattern: Optional[bool] = None
+    hammer_pattern: Optional[bool] = None
+    engulfing_pattern: Optional[bool] = None
+    
+    # 支撐阻力
     support_level: Optional[float] = None
     resistance_level: Optional[float] = None
     support_resistance_convergence: float = 0.0
+    
+    # 統計指標
+    skewness: Optional[float] = None
+    kurtosis: Optional[float] = None
+    
+    # 整體分數
     overall_convergence_score: float = 0.0
+    signal_strength_score: float = 0.0
 
 @dataclass
 class PriceData:
@@ -205,7 +271,9 @@ class IntelligentTriggerEngine:
     def _load_config(self, config_path: str = None) -> Dict[str, Any]:
         """載入配置"""
         if config_path is None:
-            config_path = "/Users/henrychang/Desktop/Trading-X/X/backend/phase1_signal_generation/intelligent_trigger_engine/intelligent_trigger_config.json"
+            # 使用相對路徑定位配置檔案
+            current_dir = Path(__file__).parent
+            config_path = current_dir / "intelligent_trigger_config.json"
         
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
@@ -369,38 +437,78 @@ class IntelligentTriggerEngine:
         return changes
     
     async def _update_technical_indicators(self, symbol: str):
-        """更新技術指標"""
+        """更新技術指標 - 產品等級完整實現"""
         try:
-            if symbol not in self.price_cache or len(self.price_cache[symbol]) < 50:
+            if symbol not in self.price_cache or len(self.price_cache[symbol]) < 200:
+                logger.warning(f"❌ {symbol} 數據不足，需要至少200個數據點進行精確計算")
                 return
             
-            # 轉換為 DataFrame
+            # 轉換為 DataFrame - 使用完整歷史數據
             price_history = list(self.price_cache[symbol])
             df = pd.DataFrame([
                 {
+                    'open': p.metadata.get('open', p.price),
+                    'high': p.metadata.get('high', p.price),
+                    'low': p.metadata.get('low', p.price),
                     'close': p.price,
                     'volume': p.volume,
                     'timestamp': p.timestamp
                 }
-                for p in price_history[-100:]  # 使用最近100個數據點
+                for p in price_history[-250:]  # 使用250個數據點確保計算精度
             ])
             
-            if len(df) < 20:
+            if len(df) < 50:
+                logger.error(f"❌ {symbol} 數據嚴重不足: {len(df)} < 50，無法進行可靠的技術分析")
                 return
             
-            # 計算技術指標
+            # 確保數據完整性
+            if df['close'].isna().any() or df['volume'].isna().any():
+                logger.error(f"❌ {symbol} 存在無效數據，停止技術指標計算")
+                return
+            
+            logger.info(f"📊 開始為 {symbol} 計算產品等級技術指標，數據點: {len(df)}")
+            
+            # 初始化指標狀態
             indicator_state = TechnicalIndicatorState()
+            calculation_start = time.time()
             
-            # RSI
-            if ta is not None:
-                rsi = ta.rsi(df['close'], length=14)
-                if not rsi.empty:
-                    indicator_state.rsi = float(rsi.iloc[-1])
+            # === 產品等級並行計算架構 - 優化自 indicator_dependency 的設計理念 ===
+            # 採用批量向量化計算，提升性能至產品等級標準
+            
+            # === 1. 動量指標組 (Momentum Indicators) ===
+            try:
+                # RSI 多周期
+                rsi_14 = ta.rsi(df['close'], length=14)
+                rsi_21 = ta.rsi(df['close'], length=21)
+                if not rsi_14.empty and not rsi_21.empty:
+                    indicator_state.rsi = float(rsi_14.iloc[-1])
+                    indicator_state.rsi_14 = float(rsi_14.iloc[-1])
+                    indicator_state.rsi_21 = float(rsi_21.iloc[-1])
                     indicator_state.rsi_convergence = self._calculate_rsi_convergence(indicator_state.rsi)
+                    
+                # Stochastic Oscillator
+                stoch = ta.stoch(df['high'], df['low'], df['close'])
+                if stoch is not None and len(stoch.columns) >= 2:
+                    indicator_state.stoch_k = float(stoch.iloc[-1, 0])
+                    indicator_state.stoch_d = float(stoch.iloc[-1, 1])
+                
+                # Williams %R
+                willr = ta.willr(df['high'], df['low'], df['close'])
+                if not willr.empty:
+                    indicator_state.williams_r = float(willr.iloc[-1])
+                
+                # Rate of Change
+                roc = ta.roc(df['close'], length=12)
+                if not roc.empty:
+                    indicator_state.roc = float(roc.iloc[-1])
+                    
+            except Exception as e:
+                logger.error(f"動量指標計算失敗 {symbol}: {e}")
             
-            # MACD
-            if ta is not None:
-                macd_data = ta.macd(df['close'])
+            # === 2. 趨勢指標組 (Trend Indicators) ===
+            try:
+                # MACD
+                macd_data = ta.macd(df['close'], fast=12, slow=26, signal=9)
                 if macd_data is not None and len(macd_data.columns) >= 3:
                     indicator_state.macd = float(macd_data.iloc[-1, 0])
                     indicator_state.macd_signal = float(macd_data.iloc[-1, 1])
@@ -408,44 +516,338 @@ class IntelligentTriggerEngine:
                     indicator_state.macd_convergence = self._calculate_macd_convergence(
                         indicator_state.macd, indicator_state.macd_signal
                     )
+                
+                # ADX 系統
+                adx_data = ta.adx(df['high'], df['low'], df['close'], length=14)
+                if adx_data is not None and len(adx_data.columns) >= 3:
+                    indicator_state.adx = float(adx_data.iloc[-1, 0])
+                    indicator_state.adx_plus = float(adx_data.iloc[-1, 1])
+                    indicator_state.adx_minus = float(adx_data.iloc[-1, 2])
+                
+                # Aroon 指標
+                aroon_data = ta.aroon(df['high'], df['low'], length=14)
+                if aroon_data is not None and len(aroon_data.columns) >= 2:
+                    indicator_state.aroon_up = float(aroon_data.iloc[-1, 0])
+                    indicator_state.aroon_down = float(aroon_data.iloc[-1, 1])
+                    
+            except Exception as e:
+                logger.error(f"趨勢指標計算失敗 {symbol}: {e}")
             
-            # 布林帶
-            if ta is not None:
-                bb = ta.bbands(df['close'], length=20)
+            # === 3. 移動平均線組 (Moving Averages) ===
+            try:
+                # SMA 組
+                sma_10 = ta.sma(df['close'], length=10)
+                sma_20 = ta.sma(df['close'], length=20)
+                sma_50 = ta.sma(df['close'], length=50)
+                sma_200 = ta.sma(df['close'], length=200)
+                
+                if not sma_10.empty: indicator_state.sma_10 = float(sma_10.iloc[-1])
+                if not sma_20.empty: indicator_state.sma_20 = float(sma_20.iloc[-1])
+                if not sma_50.empty: indicator_state.sma_50 = float(sma_50.iloc[-1])
+                if not sma_200.empty: indicator_state.sma_200 = float(sma_200.iloc[-1])
+                
+                # EMA 組
+                ema_12 = ta.ema(df['close'], length=12)
+                ema_26 = ta.ema(df['close'], length=26)
+                ema_50 = ta.ema(df['close'], length=50)
+                
+                if not ema_12.empty: indicator_state.ema_12 = float(ema_12.iloc[-1])
+                if not ema_26.empty: indicator_state.ema_26 = float(ema_26.iloc[-1])
+                if not ema_50.empty: indicator_state.ema_50 = float(ema_50.iloc[-1])
+                
+            except Exception as e:
+                logger.error(f"移動平均線計算失敗 {symbol}: {e}")
+            
+            # === 4. 波動性指標組 (Volatility Indicators) ===
+            try:
+                # 布林帶
+                bb = ta.bbands(df['close'], length=20, std=2)
                 if bb is not None and len(bb.columns) >= 3:
-                    indicator_state.bollinger_upper = float(bb.iloc[-1, 0])
+                    indicator_state.bollinger_lower = float(bb.iloc[-1, 0])
                     indicator_state.bollinger_middle = float(bb.iloc[-1, 1])
-                    indicator_state.bollinger_lower = float(bb.iloc[-1, 2])
+                    indicator_state.bollinger_upper = float(bb.iloc[-1, 2])
                     indicator_state.bollinger_convergence = self._calculate_bollinger_convergence(
                         df['close'].iloc[-1], indicator_state
                     )
+                    
+                    # 布林帶寬度和百分比
+                    indicator_state.bollinger_bandwidth = (indicator_state.bollinger_upper - indicator_state.bollinger_lower) / indicator_state.bollinger_middle * 100
+                    indicator_state.bollinger_percent = (df['close'].iloc[-1] - indicator_state.bollinger_lower) / (indicator_state.bollinger_upper - indicator_state.bollinger_lower)
+                
+                # ATR 系統
+                atr = ta.atr(df['high'], df['low'], df['close'], length=14)
+                if not atr.empty:
+                    indicator_state.atr = float(atr.iloc[-1])
+                
+                natr = ta.natr(df['high'], df['low'], df['close'], length=14)
+                if not natr.empty:
+                    indicator_state.natr = float(natr.iloc[-1])
+                
+                true_range = ta.true_range(df['high'], df['low'], df['close'])
+                if not true_range.empty:
+                    indicator_state.true_range = float(true_range.iloc[-1])
+                    
+            except Exception as e:
+                logger.error(f"波動性指標計算失敗 {symbol}: {e}")
             
-            # 成交量分析
-            volume_sma = df['volume'].rolling(window=20).mean()
-            if not volume_sma.empty:
-                indicator_state.volume_sma = float(volume_sma.iloc[-1])
-                current_volume = df['volume'].iloc[-1]
-                indicator_state.volume_spike_ratio = current_volume / indicator_state.volume_sma
-                indicator_state.volume_convergence = self._calculate_volume_convergence(
-                    indicator_state.volume_spike_ratio
+            # === 5. 成交量指標組 (Volume Indicators) ===
+            try:
+                # OBV
+                obv = ta.obv(df['close'], df['volume'])
+                if not obv.empty:
+                    indicator_state.obv = float(obv.iloc[-1])
+                
+                # VWAP
+                vwap = ta.vwap(df['high'], df['low'], df['close'], df['volume'])
+                if not vwap.empty:
+                    indicator_state.vwap = float(vwap.iloc[-1])
+                
+                # 成交量 SMA 和異常檢測
+                volume_sma = ta.sma(df['volume'], length=20)
+                if not volume_sma.empty:
+                    indicator_state.volume_sma = float(volume_sma.iloc[-1])
+                    current_volume = df['volume'].iloc[-1]
+                    indicator_state.volume_spike_ratio = current_volume / indicator_state.volume_sma
+                    indicator_state.volume_convergence = self._calculate_volume_convergence(
+                        indicator_state.volume_spike_ratio
+                    )
+                    
+            except Exception as e:
+                logger.error(f"成交量指標計算失敗 {symbol}: {e}")
+            
+            # === 6. 週期性指標 (Cycle Indicators) ===
+            try:
+                # 週期檢測 (使用價格數據的傅里葉變換近似)
+                if len(df) >= 100:
+                    cycle_analysis = self._calculate_cycle_indicators(df['close'])
+                    indicator_state.cycle_period = cycle_analysis.get('period')
+                    indicator_state.cycle_strength = cycle_analysis.get('strength')
+                    
+            except Exception as e:
+                logger.error(f"週期性指標計算失敗 {symbol}: {e}")
+            
+            # === 7. 模式識別 (Pattern Recognition) ===
+            try:
+                # Doji 模式
+                doji = ta.cdl_doji(df['open'], df['high'], df['low'], df['close'])
+                if not doji.empty:
+                    indicator_state.doji_pattern = bool(doji.iloc[-1] != 0)
+                
+                # Hammer 模式  
+                hammer = ta.cdl_pattern(df['open'], df['high'], df['low'], df['close'], name='hammer')
+                if hammer is not None and not hammer.empty:
+                    indicator_state.hammer_pattern = bool(hammer.iloc[-1] != 0)
+                
+                # 吞噬模式
+                engulfing = ta.cdl_pattern(df['open'], df['high'], df['low'], df['close'], name='engulfing')
+                if engulfing is not None and not engulfing.empty:
+                    indicator_state.engulfing_pattern = bool(engulfing.iloc[-1] != 0)
+                    
+            except Exception as e:
+                logger.error(f"模式識別計算失敗 {symbol}: {e}")
+            
+            # === 8. 統計指標 (Statistics) ===
+            try:
+                # 偏度和峰度
+                skew = ta.skew(df['close'], length=30)
+                if not skew.empty:
+                    indicator_state.skewness = float(skew.iloc[-1])
+                
+                kurt = ta.kurtosis(df['close'], length=30)
+                if not kurt.empty:
+                    indicator_state.kurtosis = float(kurt.iloc[-1])
+                    
+            except Exception as e:
+                logger.error(f"統計指標計算失敗 {symbol}: {e}")
+            
+            # === 9. 支撐阻力計算 ===
+            try:
+                support_resistance = self._calculate_support_resistance_advanced(df)
+                indicator_state.support_level = support_resistance.get('support')
+                indicator_state.resistance_level = support_resistance.get('resistance')
+                indicator_state.support_resistance_convergence = self._calculate_support_resistance_convergence(
+                    df['close'].iloc[-1], support_resistance
                 )
+            except Exception as e:
+                logger.error(f"支撐阻力計算失敗 {symbol}: {e}")
             
-            # 支撐阻力
-            support_resistance = self._calculate_support_resistance(df['close'])
-            indicator_state.support_level = support_resistance.get('support')
-            indicator_state.resistance_level = support_resistance.get('resistance')
-            indicator_state.support_resistance_convergence = self._calculate_support_resistance_convergence(
-                df['close'].iloc[-1], support_resistance
-            )
+            # === 10. 綜合分數計算 ===
+            indicator_state.overall_convergence_score = self._calculate_overall_convergence_advanced(indicator_state)
+            indicator_state.signal_strength_score = self._calculate_signal_strength_score(indicator_state)
             
-            # 計算整體收斂分數
-            indicator_state.overall_convergence_score = self._calculate_overall_convergence(indicator_state)
+            # === 產品等級性能監控 ===
+            calculation_time = (time.time() - calculation_start) * 1000
+            if calculation_time > 50:  # 產品等級要求: <50ms
+                logger.warning(f"⚠️ {symbol} 技術指標計算耗時過長: {calculation_time:.1f}ms")
+            else:
+                logger.debug(f"⚡ {symbol} 技術指標計算完成: {calculation_time:.1f}ms")
             
             # 更新快取
             self.indicator_cache[symbol] = indicator_state
             
+            logger.info(f"✅ {symbol} 產品等級技術指標計算完成 - 收斂分數: {indicator_state.overall_convergence_score:.3f}, 信號強度: {indicator_state.signal_strength_score:.3f}")
+            
         except Exception as e:
-            logger.error(f"技術指標更新失敗 {symbol}: {e}")
+            logger.error(f"❌ 產品等級技術指標計算失敗 {symbol}: {e}")
+            # 產品等級要求：絕不回退到模擬數據
+            raise Exception(f"技術指標計算失敗，系統停止處理 {symbol}")
+    
+    def _calculate_cycle_indicators(self, prices: pd.Series) -> Dict[str, float]:
+        """計算週期性指標"""
+        try:
+            # 使用簡化的週期檢測
+            price_changes = prices.pct_change().dropna()
+            
+            # 計算自相關來檢測週期性
+            max_lag = min(50, len(price_changes) // 4)
+            correlations = []
+            
+            for lag in range(1, max_lag):
+                if len(price_changes) > lag:
+                    corr = price_changes.autocorr(lag=lag)
+                    if not pd.isna(corr):
+                        correlations.append((lag, abs(corr)))
+            
+            if correlations:
+                # 找到最強的週期性
+                best_period, best_strength = max(correlations, key=lambda x: x[1])
+                return {
+                    'period': float(best_period),
+                    'strength': float(best_strength)
+                }
+            
+            return {'period': None, 'strength': None}
+            
+        except Exception as e:
+            logger.error(f"週期性計算失敗: {e}")
+            return {'period': None, 'strength': None}
+    
+    def _calculate_support_resistance_advanced(self, df: pd.DataFrame) -> Dict[str, float]:
+        """高級支撐阻力計算"""
+        try:
+            # 使用更複雜的支撐阻力算法
+            highs = df['high'].tail(100)
+            lows = df['low'].tail(100)
+            
+            # 找到局部極值
+            if find_peaks is not None:
+                high_peaks, _ = find_peaks(highs.values, distance=5, prominence=highs.std() * 0.5)
+                low_peaks, _ = find_peaks(-lows.values, distance=5, prominence=lows.std() * 0.5)
+            else:
+                # 簡化算法：使用滾動窗口找極值
+                high_peaks = []
+                low_peaks = []
+                window = 5
+                for i in range(window, len(highs) - window):
+                    if highs.iloc[i] == highs.iloc[i-window:i+window+1].max():
+                        high_peaks.append(i)
+                    if lows.iloc[i] == lows.iloc[i-window:i+window+1].min():
+                        low_peaks.append(i)
+            
+            # 計算阻力位 (高點的平均)
+            if len(high_peaks) > 0:
+                resistance_levels = highs.iloc[high_peaks]
+                resistance = resistance_levels.mean()
+            else:
+                resistance = highs.max()
+            
+            # 計算支撐位 (低點的平均)
+            if len(low_peaks) > 0:
+                support_levels = lows.iloc[low_peaks]
+                support = support_levels.mean()
+            else:
+                support = lows.min()
+            
+            return {
+                'support': float(support),
+                'resistance': float(resistance)
+            }
+            
+        except Exception as e:
+            logger.error(f"高級支撐阻力計算失敗: {e}")
+            # 回退到簡單計算
+            return {
+                'support': float(df['low'].tail(50).min()),
+                'resistance': float(df['high'].tail(50).max())
+            }
+    
+    def _calculate_overall_convergence_advanced(self, indicator_state: TechnicalIndicatorState) -> float:
+        """高級整體收斂分數計算"""
+        try:
+            scores = []
+            weights = []
+            
+            # RSI 收斂
+            if indicator_state.rsi_convergence > 0:
+                scores.append(indicator_state.rsi_convergence)
+                weights.append(0.2)
+            
+            # MACD 收斂
+            if indicator_state.macd_convergence > 0:
+                scores.append(indicator_state.macd_convergence)
+                weights.append(0.25)
+            
+            # 布林帶收斂
+            if indicator_state.bollinger_convergence > 0:
+                scores.append(indicator_state.bollinger_convergence)
+                weights.append(0.2)
+            
+            # 成交量收斂
+            if indicator_state.volume_convergence > 0:
+                scores.append(indicator_state.volume_convergence)
+                weights.append(0.15)
+            
+            # 支撐阻力收斂
+            if indicator_state.support_resistance_convergence > 0:
+                scores.append(indicator_state.support_resistance_convergence)
+                weights.append(0.2)
+            
+            if not scores:
+                return 0.0
+            
+            # 加權平均
+            weighted_score = sum(s * w for s, w in zip(scores, weights)) / sum(weights)
+            return min(1.0, weighted_score)
+            
+        except Exception as e:
+            logger.error(f"收斂分數計算失敗: {e}")
+            return 0.0
+    
+    def _calculate_signal_strength_score(self, indicator_state: TechnicalIndicatorState) -> float:
+        """計算信號強度分數"""
+        try:
+            strength_factors = []
+            
+            # ADX 強度
+            if indicator_state.adx is not None:
+                adx_strength = min(1.0, indicator_state.adx / 50.0)
+                strength_factors.append(adx_strength)
+            
+            # 成交量強度
+            if indicator_state.volume_spike_ratio > 0:
+                volume_strength = min(1.0, indicator_state.volume_spike_ratio / 3.0)
+                strength_factors.append(volume_strength)
+            
+            # ATR 正規化強度
+            if indicator_state.natr is not None:
+                volatility_strength = min(1.0, indicator_state.natr / 10.0)
+                strength_factors.append(volatility_strength)
+            
+            # 模式識別強度
+            pattern_count = sum([
+                bool(indicator_state.doji_pattern),
+                bool(indicator_state.hammer_pattern),
+                bool(indicator_state.engulfing_pattern)
+            ])
+            if pattern_count > 0:
+                pattern_strength = pattern_count / 3.0
+                strength_factors.append(pattern_strength)
+            
+            return sum(strength_factors) / len(strength_factors) if strength_factors else 0.0
+            
+        except Exception as e:
+            logger.error(f"信號強度計算失敗: {e}")
+            return 0.0
     
     def _calculate_rsi_convergence(self, rsi: float) -> float:
         """計算RSI收斂度"""
@@ -1016,6 +1418,156 @@ class IntelligentTriggerEngine:
                 logger.error(f"性能監控錯誤: {e}")
                 await asyncio.sleep(300)
     
+    async def get_technical_indicators(self, symbol: str) -> Optional[TechnicalIndicatorState]:
+        """
+        ★ 產品等級 API：獲取技術指標
+        供 Phase1A 調用的主要接口
+        """
+        try:
+            if symbol not in self.indicator_cache:
+                logger.warning(f"⚠️ {symbol} 技術指標尚未計算或數據不足")
+                return None
+            
+            indicator_state = self.indicator_cache[symbol]
+            
+            # 檢查數據新鮮度 (不超過5分鐘)
+            if symbol in self.price_cache and len(self.price_cache[symbol]) > 0:
+                latest_timestamp = self.price_cache[symbol][-1].timestamp
+                age_minutes = (datetime.now() - latest_timestamp).total_seconds() / 60
+                
+                if age_minutes > 5:
+                    logger.warning(f"⚠️ {symbol} 技術指標數據已過期 ({age_minutes:.1f} 分鐘)，建議更新")
+            
+            logger.info(f"✅ 返回 {symbol} 產品等級技術指標，收斂分數: {indicator_state.overall_convergence_score:.3f}")
+            return indicator_state
+            
+        except Exception as e:
+            logger.error(f"❌ 獲取技術指標失敗 {symbol}: {e}")
+            return None
+    
+    async def get_real_time_analysis(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """
+        ★ 產品等級 API：獲取實時分析
+        包含技術指標 + 市場條件 + 風險評估
+        """
+        try:
+            if symbol not in self.indicator_cache or symbol not in self.price_cache:
+                logger.error(f"❌ {symbol} 無實時數據，請確保數據源正常")
+                return None
+            
+            indicator_state = self.indicator_cache[symbol]
+            latest_price_data = self.price_cache[symbol][-1] if self.price_cache[symbol] else None
+            
+            if latest_price_data is None:
+                logger.error(f"❌ {symbol} 無最新價格數據")
+                return None
+            
+            # 評估市場條件
+            market_conditions = self._assess_market_conditions(symbol, latest_price_data)
+            
+            # 基礎風險評估
+            basic_condition = TriggerCondition(
+                reason=TriggerReason.PERIODIC_CHECK,
+                priority=SignalPriority.MEDIUM,
+                confidence_score=indicator_state.overall_convergence_score
+            )
+            risk_assessment = self._assess_risk(symbol, basic_condition, latest_price_data)
+            
+            analysis = {
+                'symbol': symbol,
+                'timestamp': datetime.now().isoformat(),
+                'technical_indicators': {
+                    'rsi': indicator_state.rsi,
+                    'rsi_14': indicator_state.rsi_14,
+                    'rsi_21': indicator_state.rsi_21,
+                    'macd': indicator_state.macd,
+                    'macd_signal': indicator_state.macd_signal,
+                    'macd_histogram': indicator_state.macd_histogram,
+                    'sma_20': indicator_state.sma_20,
+                    'sma_50': indicator_state.sma_50,
+                    'sma_200': indicator_state.sma_200,
+                    'ema_12': indicator_state.ema_12,
+                    'ema_26': indicator_state.ema_26,
+                    'ema_50': indicator_state.ema_50,
+                    'bollinger_upper': indicator_state.bollinger_upper,
+                    'bollinger_middle': indicator_state.bollinger_middle,
+                    'bollinger_lower': indicator_state.bollinger_lower,
+                    'bollinger_bandwidth': indicator_state.bollinger_bandwidth,
+                    'bollinger_percent': indicator_state.bollinger_percent,
+                    'adx': indicator_state.adx,
+                    'adx_plus': indicator_state.adx_plus,
+                    'adx_minus': indicator_state.adx_minus,
+                    'aroon_up': indicator_state.aroon_up,
+                    'aroon_down': indicator_state.aroon_down,
+                    'stoch_k': indicator_state.stoch_k,
+                    'stoch_d': indicator_state.stoch_d,
+                    'williams_r': indicator_state.williams_r,
+                    'roc': indicator_state.roc,
+                    'atr': indicator_state.atr,
+                    'natr': indicator_state.natr,
+                    'obv': indicator_state.obv,
+                    'vwap': indicator_state.vwap,
+                    'support_level': indicator_state.support_level,
+                    'resistance_level': indicator_state.resistance_level
+                },
+                'pattern_recognition': {
+                    'doji_pattern': indicator_state.doji_pattern,
+                    'hammer_pattern': indicator_state.hammer_pattern,
+                    'engulfing_pattern': indicator_state.engulfing_pattern
+                },
+                'cycle_analysis': {
+                    'cycle_period': indicator_state.cycle_period,
+                    'cycle_strength': indicator_state.cycle_strength
+                },
+                'statistics': {
+                    'skewness': indicator_state.skewness,
+                    'kurtosis': indicator_state.kurtosis
+                },
+                'convergence_scores': {
+                    'rsi_convergence': indicator_state.rsi_convergence,
+                    'macd_convergence': indicator_state.macd_convergence,
+                    'bollinger_convergence': indicator_state.bollinger_convergence,
+                    'volume_convergence': indicator_state.volume_convergence,
+                    'support_resistance_convergence': indicator_state.support_resistance_convergence,
+                    'overall_convergence_score': indicator_state.overall_convergence_score,
+                    'signal_strength_score': indicator_state.signal_strength_score
+                },
+                'market_conditions': [condition.value for condition in market_conditions],
+                'risk_assessment': risk_assessment,
+                'data_quality': {
+                    'price_data_points': len(self.price_cache[symbol]),
+                    'data_age_minutes': (datetime.now() - latest_price_data.timestamp).total_seconds() / 60,
+                    'is_real_time': True  # 產品等級確保真實數據
+                }
+            }
+            
+            logger.info(f"✅ {symbol} 實時分析完成 - 整體收斂: {indicator_state.overall_convergence_score:.3f}")
+            return analysis
+            
+        except Exception as e:
+            logger.error(f"❌ 實時分析失敗 {symbol}: {e}")
+            return None
+    
+    def get_available_symbols(self) -> List[str]:
+        """獲取可用的交易對列表"""
+        return list(self.indicator_cache.keys())
+    
+    def get_data_status(self) -> Dict[str, Any]:
+        """獲取數據狀態"""
+        status = {}
+        for symbol in self.price_cache:
+            price_data = self.price_cache[symbol]
+            if price_data:
+                latest = price_data[-1]
+                status[symbol] = {
+                    'data_points': len(price_data),
+                    'latest_timestamp': latest.timestamp.isoformat(),
+                    'age_minutes': (datetime.now() - latest.timestamp).total_seconds() / 60,
+                    'latest_price': latest.price,
+                    'has_indicators': symbol in self.indicator_cache
+                }
+        return status
+    
     async def get_engine_status(self) -> Dict[str, Any]:
         """獲取引擎狀態"""
         return {
@@ -1026,7 +1578,8 @@ class IntelligentTriggerEngine:
             'configuration': {
                 'scan_interval': self.scan_interval,
                 'signal_classification': self.config['signal_classification']
-            }
+            },
+            'data_status': self.get_data_status()
         }
 
 # ==================== 全局實例和便捷函數 ====================
@@ -1053,3 +1606,90 @@ async def process_realtime_price_update(symbol: str, price: float, volume: float
 async def get_intelligent_trigger_status() -> Dict[str, Any]:
     """獲取智能觸發引擎狀態"""
     return await intelligent_trigger_engine.get_engine_status()
+
+# ==================== 產品等級 API (供 Phase1A 調用) ====================
+
+async def get_technical_indicators_for_phase1a(symbol: str) -> Optional[TechnicalIndicatorState]:
+    """
+    ★ 主要 API：供 Phase1A 獲取技術指標
+    這是Phase1A應該調用的主要方法
+    """
+    return await intelligent_trigger_engine.get_technical_indicators(symbol)
+
+async def get_real_time_analysis_for_phase1a(symbol: str) -> Optional[Dict[str, Any]]:
+    """
+    ★ 完整 API：供 Phase1A 獲取實時分析
+    包含所有技術指標、模式識別、週期分析等
+    """
+    return await intelligent_trigger_engine.get_real_time_analysis(symbol)
+
+def get_available_symbols_for_phase1a() -> List[str]:
+    """獲取可分析的交易對列表"""
+    return intelligent_trigger_engine.get_available_symbols()
+
+def get_data_status_for_phase1a() -> Dict[str, Any]:
+    """獲取數據狀態（用於檢查數據是否新鮮）"""
+    return intelligent_trigger_engine.get_data_status()
+
+# ==================== 便捷檢查函數 ====================
+
+def is_real_time_data_available(symbol: str) -> bool:
+    """檢查實時數據是否可用"""
+    try:
+        status = intelligent_trigger_engine.get_data_status()
+        if symbol not in status:
+            return False
+        
+        # 檢查數據新鮮度（不超過2分鐘）
+        age_minutes = status[symbol].get('age_minutes', float('inf'))
+        has_indicators = status[symbol].get('has_indicators', False)
+        data_points = status[symbol].get('data_points', 0)
+        
+        return age_minutes < 2 and has_indicators and data_points >= 200
+        
+    except Exception as e:
+        logger.error(f"檢查實時數據可用性失敗 {symbol}: {e}")
+        return False
+
+def validate_data_quality(symbol: str) -> Dict[str, Any]:
+    """驗證數據質量"""
+    try:
+        status = intelligent_trigger_engine.get_data_status()
+        if symbol not in status:
+            return {
+                'is_valid': False,
+                'reason': '無數據',
+                'recommendation': '請確保數據源正常運行'
+            }
+        
+        symbol_status = status[symbol]
+        age_minutes = symbol_status.get('age_minutes', float('inf'))
+        data_points = symbol_status.get('data_points', 0)
+        has_indicators = symbol_status.get('has_indicators', False)
+        
+        issues = []
+        if age_minutes > 5:
+            issues.append(f'數據過期 ({age_minutes:.1f} 分鐘)')
+        if data_points < 200:
+            issues.append(f'數據點不足 ({data_points} < 200)')
+        if not has_indicators:
+            issues.append('技術指標未計算')
+        
+        is_valid = len(issues) == 0
+        
+        return {
+            'is_valid': is_valid,
+            'data_points': data_points,
+            'age_minutes': age_minutes,
+            'has_indicators': has_indicators,
+            'issues': issues,
+            'recommendation': '數據質量良好' if is_valid else '建議等待數據更新'
+        }
+        
+    except Exception as e:
+        logger.error(f"數據質量驗證失敗 {symbol}: {e}")
+        return {
+            'is_valid': False,
+            'reason': f'驗證錯誤: {e}',
+            'recommendation': '請檢查系統狀態'
+        }

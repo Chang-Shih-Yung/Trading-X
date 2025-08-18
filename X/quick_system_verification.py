@@ -6,11 +6,15 @@
 import asyncio
 import sys
 import os
+import logging
 from datetime import datetime
 from typing import Dict, Any
 
-# 添加當前目錄到路徑以支援導入
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+logger = logging.getLogger(__name__)
+
+# 確保可以導入 X 資料夾內的模組
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, current_dir)
 
 def test_imports():
     """測試核心模組導入"""

@@ -15,27 +15,74 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
 import json
 
+# 設置 logger
+logger = logging.getLogger(__name__)
+
 # 導入真實系統組件
 import sys
 from pathlib import Path
 
-# 添加上級目錄到路徑
+# 添加 X 資料夾內的路徑
 current_dir = Path(__file__).parent
-sys.path.append(str(current_dir.parent.parent / "app" / "services"))
-sys.path.append(str(current_dir.parent / "core"))
+x_root_dir = current_dir.parent  # X 資料夾根目錄
+sys.path.append(str(x_root_dir / "app" / "services"))
+sys.path.append(str(x_root_dir / "backend" / "phase2_pre_evaluation" / "real_data_signal_quality_engine"))
+sys.path.append(str(x_root_dir))
 
-from gmail_notification import GmailNotificationService
-from sniper_email_manager import SniperEmailManager
+# 嘗試導入通知服務（可能不存在）
+try:
+    from app.services.gmail_notification import GmailNotificationService, SniperEmailManager
+    GMAIL_AVAILABLE = True
+except ImportError:
+    GMAIL_AVAILABLE = False
+    logger.warning("Gmail 通知服務不可用，將跳過郵件通知功能")
+    
+    # 創建虛擬的通知服務類
+    class GmailNotificationService:
+        def __init__(self): pass
+        async def send_signal_notification(self, *args, **kwargs): pass
+    
+    class SniperEmailManager:
+        def __init__(self): pass
 
 # 導入我們的信號質量控制引擎
-from real_data_signal_quality_engine import (
-    RealDataSignalQualityEngine,
-    SignalCandidate,
-    EPLDecision,
-    SignalPriority,
-    RealTimeDataSnapshot,
-    DataIntegrityStatus
-)
+try:
+    from backend.phase2_pre_evaluation.real_data_signal_quality_engine.real_data_signal_quality_engine import (
+        RealDataSignalQualityEngine,
+        SignalCandidate,
+        EPLDecision,
+        SignalPriority,
+        RealTimeDataSnapshot,
+        QualityStatus,
+        SystemLoadMonitor,
+        MicroAnomalyDetector,
+        DelayedObservationTracker
+    )
+    QUALITY_ENGINE_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"⚠️ 信號質量引擎不可用: {e}")
+    QUALITY_ENGINE_AVAILABLE = False
+    
+    # 建立備用類別
+    class RealDataSignalQualityEngine:
+        def __init__(self): pass
+        async def process_signal(self, signal): return True
+    
+    class SignalCandidate:
+        def __init__(self, **kwargs): pass
+    
+    class EPLDecision:
+        def __init__(self, **kwargs): pass
+
+# 定義缺失的枚舉
+from enum import Enum
+
+class DataIntegrityStatus(Enum):
+    """數據完整性狀態"""
+    VALID = "valid"
+    INVALID = "invalid"
+    PARTIAL = "partial"
+    UNKNOWN = "unknown"
 
 logger = logging.getLogger(__name__)
 

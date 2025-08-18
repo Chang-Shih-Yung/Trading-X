@@ -2,6 +2,8 @@
 🎯 Trading X - Phase1A 基礎信號生成器
 基於 WebSocket 實時數據的多層級信號處理引擎
 實現 < 45ms 的信號生成與分發
+
+★ 產品等級架構：調用 intelligent_trigger_engine 進行技術分析
 """
 """
 JSON規範映射註釋:
@@ -48,6 +50,25 @@ from enum import Enum
 import time
 import pytz
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+# ★ 產品等級導入：調用 intelligent_trigger_engine
+import sys
+sys.path.append(str(Path(__file__).parent.parent / "intelligent_trigger_engine"))
+
+try:
+    from intelligent_trigger_engine import (
+        get_technical_indicators_for_phase1a,
+        get_real_time_analysis_for_phase1a,
+        is_real_time_data_available,
+        validate_data_quality,
+        TechnicalIndicatorState
+    )
+    logger.info("✅ 產品等級 intelligent_trigger_engine API 導入成功")
+except ImportError as e:
+    logger.error(f"❌ intelligent_trigger_engine 導入失敗: {e}")
+    raise Exception("產品等級系統要求必須正確配置 intelligent_trigger_engine")
 
 logger = logging.getLogger(__name__)
 
@@ -327,8 +348,8 @@ class Phase1ABasicSignalGeneration:
             
             if not market_data:
                 # 沒有市場數據時，返回預設制度避免中斷優化流程
-                logger.warning("缺乏市場數據，使用預設市場制度 (NORMAL)")
-                return MarketRegime.NORMAL, 0.5
+                logger.warning("缺乏市場數據，使用預設市場制度 (UNKNOWN)")
+                return MarketRegime.UNKNOWN, 0.5
             
             regime_scores = {}
             
@@ -358,8 +379,8 @@ class Phase1ABasicSignalGeneration:
                 confidence = regime_scores[best_regime]
                 
                 # 檢查是否滿足最小信心度要求 - 完全依賴配置
-                min_confidence = regime_types.get(best_regime.value, {}).get("confidence_threshold")
-                if min_confidence and confidence >= min_confidence:
+                min_confidence = regime_types.get(best_regime.value, {}).get("confidence_threshold", 0.5)
+                if isinstance(min_confidence, (int, float)) and confidence >= float(min_confidence):
                     self.current_regime = best_regime
                     self.regime_confidence = confidence
                     self.regime_cache_timestamp = current_time
@@ -603,17 +624,29 @@ class Phase1ABasicSignalGeneration:
                     regime_adjustments = regime_config.get(market_regime.value, {}).get("parameter_adjustments", {})
                 
                 if regime_adjustments:
-                    confidence_threshold *= regime_adjustments.get("confidence_threshold_multiplier", 1.0)
-                    price_threshold *= regime_adjustments.get("price_change_threshold_multiplier", 1.0)
-                    volume_threshold *= regime_adjustments.get("volume_change_threshold_multiplier", 1.0)
+                    confidence_mult = regime_adjustments.get("confidence_threshold_multiplier", 1.0)
+                    price_mult = regime_adjustments.get("price_change_threshold_multiplier", 1.0)
+                    volume_mult = regime_adjustments.get("volume_change_threshold_multiplier", 1.0)
+                    
+                    if isinstance(confidence_mult, (int, float)):
+                        confidence_threshold *= float(confidence_mult)
+                    if isinstance(price_mult, (int, float)):
+                        price_threshold *= float(price_mult)
+                    if isinstance(volume_mult, (int, float)):
+                        volume_threshold *= float(volume_mult)
                 
                 # 應用交易時段調整
                 session_config = self.config.get("phase1a_basic_signal_generation_dependency", {}).get("configuration", {}).get("dynamic_parameter_integration", {}).get("trading_session_detection", {}).get("session_types", {})
                 session_adjustments = session_config.get(trading_session.value, {}).get("parameter_adjustments", {})
                 
                 if session_adjustments:
-                    confidence_threshold *= session_adjustments.get("confidence_threshold_multiplier", 1.0)
-                    volume_threshold *= session_adjustments.get("volume_sensitivity_boost", 1.0)
+                    confidence_mult = session_adjustments.get("confidence_threshold_multiplier", 1.0)
+                    volume_boost = session_adjustments.get("volume_sensitivity_boost", 1.0)
+                    
+                    if isinstance(confidence_mult, (int, float)):
+                        confidence_threshold *= float(confidence_mult)
+                    if isinstance(volume_boost, (int, float)):
+                        volume_threshold *= float(volume_boost)
                 
                 logger.debug(f"動態參數調整完成 - {mode}: confidence_threshold = {confidence_threshold:.3f}, market_regime = {market_regime.value}, trading_session = {trading_session.value}")
                 
@@ -1576,217 +1609,644 @@ class Phase1ABasicSignalGeneration:
         return signals
     
     async def _layer_1_momentum_signals_enhanced(self, symbol: str, market_data: Dict[str, Any], dynamic_params: DynamicParameters) -> List[BasicSignal]:
-        """Layer 1: 增強型動量信號生成 - 基於移動平均分析"""
+        """Layer 1: 增強型動量信號生成 - 基於 pandas-ta 技術指標"""
         signals = []
         
         try:
             if len(self.price_buffer[symbol]) < 20:  # 需要至少20個數據點
                 return signals
             
-            # 獲取價格數據
-            recent_prices = [p['price'] for p in list(self.price_buffer[symbol])[-50:]]
-            
-            if len(recent_prices) < 20:
+            # 使用 pandas-ta 計算完整技術指標
+            indicators = self._calculate_advanced_indicators(symbol)
+            if not indicators:
                 return signals
             
-            # 提取價格數值用於計算移動平均線
-            price_values = [p['price'] if isinstance(p, dict) else p for p in recent_prices]
+            # 獲取當前價格
+            current_price = list(self.price_buffer[symbol])[-1]['price']
             
-            # 計算移動平均線
-            ma_5 = np.mean(price_values[-5:])   # 5期移動平均
-            ma_10 = np.mean(price_values[-10:]) # 10期移動平均
-            ma_20 = np.mean(price_values[-20:]) # 20期移動平均
+            # 1. RSI 信號
+            rsi = indicators.get('rsi')
+            if rsi is not None:
+                if rsi < 30:  # 超賣
+                    signal = BasicSignal(
+                        signal_id=f"{symbol}_rsi_oversold_{int(time.time() * 1000)}",
+                        symbol=symbol,
+                        signal_type=SignalType.MOMENTUM,
+                        direction="BUY",
+                        strength=min(1.0, (30 - rsi) / 30),
+                        confidence=dynamic_params.confidence_threshold + 0.1,
+                        price=current_price,
+                        volume=float(market_data.get('volume', 1000.0)),
+                        timestamp=datetime.now(),
+                        priority=Priority.MEDIUM,
+                        layer_source="layer_1_momentum",
+                        market_regime=dynamic_params.market_regime.value,
+                        processing_time_ms=15.0,
+                        metadata={
+                            'rsi': rsi,
+                            'signal_pattern': 'rsi_oversold',
+                            'threshold': 30
+                        }
+                    )
+                    signals.append(signal)
+                elif rsi > 70:  # 超買
+                    signal = BasicSignal(
+                        signal_id=f"{symbol}_rsi_overbought_{int(time.time() * 1000)}",
+                        symbol=symbol,
+                        signal_type=SignalType.MOMENTUM,
+                        direction="SELL",
+                        strength=min(1.0, (rsi - 70) / 30),
+                        confidence=dynamic_params.confidence_threshold + 0.1,
+                        price=current_price,
+                        timestamp=datetime.now(),
+                        priority=Priority.MEDIUM,
+                        layer_source="layer_1_momentum",
+                        market_regime=dynamic_params.market_regime.value,
+                        processing_time_ms=15.0,
+                        metadata={
+                            'rsi': rsi,
+                            'signal_pattern': 'rsi_overbought',
+                            'threshold': 70
+                        }
+                    )
+                    signals.append(signal)
             
-            current_price = price_values[-1]
+            # 2. MACD 信號
+            macd = indicators.get('macd')
+            macd_signal = indicators.get('macd_signal')
+            macd_histogram = indicators.get('macd_histogram')
             
-            # 動量信號判斷
-            momentum_signals = []
+            if macd is not None and macd_signal is not None:
+                if macd > macd_signal and macd_histogram is not None and macd_histogram > 0:
+                    signal = BasicSignal(
+                        signal_id=f"{symbol}_macd_bull_{int(time.time() * 1000)}",
+                        symbol=symbol,
+                        signal_type=SignalType.MOMENTUM,
+                        direction="BUY",
+                        strength=min(1.0, abs(macd - macd_signal) / abs(macd) if macd != 0 else 0.5),
+                        confidence=dynamic_params.confidence_threshold + 0.15,
+                        price=current_price,
+                        volume=float(market_data.get('volume', 1000.0)),
+                        timestamp=datetime.now(),
+                        priority=Priority.MEDIUM,
+                        layer_source="layer_1_momentum",
+                        market_regime=dynamic_params.market_regime.value,
+                        processing_time_ms=15.0,
+                        metadata={
+                            'macd': macd,
+                            'macd_signal': macd_signal,
+                            'macd_histogram': macd_histogram,
+                            'signal_pattern': 'macd_bullish_crossover'
+                        }
+                    )
+                    signals.append(signal)
+                elif macd < macd_signal and macd_histogram is not None and macd_histogram < 0:
+                    signal = BasicSignal(
+                        signal_id=f"{symbol}_macd_bear_{int(time.time() * 1000)}",
+                        symbol=symbol,
+                        signal_type=SignalType.MOMENTUM,
+                        direction="SELL",
+                        strength=min(1.0, abs(macd - macd_signal) / abs(macd) if macd != 0 else 0.5),
+                        confidence=dynamic_params.confidence_threshold + 0.15,
+                        price=current_price,
+                        timestamp=datetime.now(),
+                        priority=Priority.MEDIUM,
+                        layer_source="layer_1_momentum",
+                        market_regime=dynamic_params.market_regime.value,
+                        processing_time_ms=15.0,
+                        metadata={
+                            'macd': macd,
+                            'macd_signal': macd_signal,
+                            'macd_histogram': macd_histogram,
+                            'signal_pattern': 'macd_bearish_crossover'
+                        }
+                    )
+                    signals.append(signal)
             
-            # 金叉/死叉信號
-            if ma_5 > ma_10 > ma_20 and current_price > ma_5:
-                # 上升動量
-                strength = min(1.0, (ma_5 - ma_20) / ma_20 * 10)  # 強度基於均線差距
-                confidence = dynamic_params.confidence_threshold + 0.1
-                
-                signal = BasicSignal(
-                    signal_id=f"{symbol}_momentum_bull_{int(time.time() * 1000)}",
-                    symbol=symbol,
-                    signal_type=SignalType.MOMENTUM,
-                    direction="BUY",
-                    strength=strength,
-                    confidence=min(0.95, confidence),
-                    price=current_price,
-                    volume=float(market_data.get('volume', 1000.0)),
-                    timestamp=datetime.now(),
-                    priority=Priority.MEDIUM,
-                    layer_source="layer_1_momentum",
-                    market_regime=dynamic_params.market_regime.value,
-                    processing_time_ms=15.0,
-                    metadata={
-                        'ma_5': ma_5,
-                        'ma_10': ma_10,
-                        'ma_20': ma_20,
-                        'signal_pattern': 'golden_cross'
-                    }
-                )
-                signals.append(signal)
-                
-            elif ma_5 < ma_10 < ma_20 and current_price < ma_5:
-                # 下降動量
-                strength = min(1.0, (ma_20 - ma_5) / ma_20 * 10)
-                confidence = dynamic_params.confidence_threshold + 0.1
-                
-                signal = BasicSignal(
-                    signal_id=f"{symbol}_momentum_bear_{int(time.time() * 1000)}",
-                    symbol=symbol,
-                    signal_type=SignalType.MOMENTUM,
-                    direction="SELL",
-                    strength=strength,
-                    confidence=min(0.95, confidence),
-                    price=current_price,
-                    timestamp=datetime.now(),
-                    priority=Priority.MEDIUM,
-                    layer_source="layer_1_momentum",
-                    market_regime=dynamic_params.market_regime.value,
-                    processing_time_ms=15.0,
-                    metadata={
-                        'ma_5': ma_5,
-                        'ma_10': ma_10,
-                        'ma_20': ma_20,
-                        'signal_pattern': 'death_cross'
-                    }
-                )
-                signals.append(signal)
+            # 3. Stochastic 信號
+            stoch_k = indicators.get('stoch_k')
+            stoch_d = indicators.get('stoch_d')
+            
+            if stoch_k is not None and stoch_d is not None:
+                if stoch_k < 20 and stoch_d < 20 and stoch_k > stoch_d:
+                    signal = BasicSignal(
+                        signal_id=f"{symbol}_stoch_oversold_{int(time.time() * 1000)}",
+                        symbol=symbol,
+                        signal_type=SignalType.MOMENTUM,
+                        direction="BUY",
+                        strength=min(1.0, (20 - min(stoch_k, stoch_d)) / 20),
+                        confidence=dynamic_params.confidence_threshold + 0.1,
+                        price=current_price,
+                        timestamp=datetime.now(),
+                        priority=Priority.MEDIUM,
+                        layer_source="layer_1_momentum",
+                        market_regime=dynamic_params.market_regime.value,
+                        processing_time_ms=15.0,
+                        metadata={
+                            'stoch_k': stoch_k,
+                            'stoch_d': stoch_d,
+                            'signal_pattern': 'stochastic_oversold_crossover'
+                        }
+                    )
+                    signals.append(signal)
+                elif stoch_k > 80 and stoch_d > 80 and stoch_k < stoch_d:
+                    signal = BasicSignal(
+                        signal_id=f"{symbol}_stoch_overbought_{int(time.time() * 1000)}",
+                        symbol=symbol,
+                        signal_type=SignalType.MOMENTUM,
+                        direction="SELL",
+                        strength=min(1.0, (min(stoch_k, stoch_d) - 80) / 20),
+                        confidence=dynamic_params.confidence_threshold + 0.1,
+                        price=current_price,
+                        timestamp=datetime.now(),
+                        priority=Priority.MEDIUM,
+                        layer_source="layer_1_momentum",
+                        market_regime=dynamic_params.market_regime.value,
+                        processing_time_ms=15.0,
+                        metadata={
+                            'stoch_k': stoch_k,
+                            'stoch_d': stoch_d,
+                            'signal_pattern': 'stochastic_overbought_crossover'
+                        }
+                    )
+                    signals.append(signal)
+            
+            # 4. EMA 交叉信號 (更精確的移動平均線)
+            ema_5 = indicators.get('ema_5')
+            ema_10 = indicators.get('ema_10')
+            ema_20 = indicators.get('ema_20')
+            
+            if ema_5 is not None and ema_10 is not None and ema_20 is not None:
+                if ema_5 > ema_10 > ema_20 and current_price > ema_5:
+                    signal = BasicSignal(
+                        signal_id=f"{symbol}_ema_golden_cross_{int(time.time() * 1000)}",
+                        symbol=symbol,
+                        signal_type=SignalType.MOMENTUM,
+                        direction="BUY",
+                        strength=min(1.0, (ema_5 - ema_20) / ema_20 * 10),
+                        confidence=dynamic_params.confidence_threshold + 0.2,
+                        price=current_price,
+                        volume=float(market_data.get('volume', 1000.0)),
+                        timestamp=datetime.now(),
+                        priority=Priority.MEDIUM,
+                        layer_source="layer_1_momentum",
+                        market_regime=dynamic_params.market_regime.value,
+                        processing_time_ms=15.0,
+                        metadata={
+                            'ema_5': ema_5,
+                            'ema_10': ema_10,
+                            'ema_20': ema_20,
+                            'signal_pattern': 'ema_golden_cross'
+                        }
+                    )
+                    signals.append(signal)
+                elif ema_5 < ema_10 < ema_20 and current_price < ema_5:
+                    signal = BasicSignal(
+                        signal_id=f"{symbol}_ema_death_cross_{int(time.time() * 1000)}",
+                        symbol=symbol,
+                        signal_type=SignalType.MOMENTUM,
+                        direction="SELL",
+                        strength=min(1.0, (ema_20 - ema_5) / ema_20 * 10),
+                        confidence=dynamic_params.confidence_threshold + 0.2,
+                        price=current_price,
+                        timestamp=datetime.now(),
+                        priority=Priority.MEDIUM,
+                        layer_source="layer_1_momentum",
+                        market_regime=dynamic_params.market_regime.value,
+                        processing_time_ms=15.0,
+                        metadata={
+                            'ema_5': ema_5,
+                            'ema_10': ema_10,
+                            'ema_20': ema_20,
+                            'signal_pattern': 'ema_death_cross'
+                        }
+                    )
+                    signals.append(signal)
                 
             if signals:
-                logger.debug(f"📈 {symbol}: 動量信號 - {len(signals)} 個")
+                logger.debug(f"📈 {symbol}: pandas-ta 動量信號 - {len(signals)} 個")
         
         except Exception as e:
-            logger.error(f"❌ Layer 1 動量信號生成失敗: {e}")
+            logger.error(f"❌ Layer 1 pandas-ta 動量信號生成失敗: {e}")
         
         return signals
     
     async def _layer_2_trend_signals_enhanced(self, symbol: str, market_data: Dict[str, Any], dynamic_params: DynamicParameters) -> List[BasicSignal]:
-        """Layer 2: 增強型趨勢信號生成 - 基於趨勢分析"""
+        """Layer 2: 增強型趨勢信號生成 - 基於 pandas-ta 趨勢指標"""
         signals = []
         
         try:
             if len(self.price_buffer[symbol]) < 30:
                 return signals
             
-            # 獲取價格數據
-            recent_prices = [p['price'] for p in list(self.price_buffer[symbol])[-30:]]
+            # 使用 pandas-ta 計算趨勢指標
+            indicators = self._calculate_advanced_indicators(symbol)
+            if not indicators:
+                return signals
             
-            # 計算趨勢斜率
-            x = np.arange(len(recent_prices))
-            slope, intercept = np.polyfit(x, recent_prices, 1)
+            current_price = list(self.price_buffer[symbol])[-1]['price']
             
-            # 趨勢強度
-            trend_strength = abs(slope) / np.mean(recent_prices) * 100  # 轉換為百分比
+            # 1. ADX 趨勢強度信號
+            adx = indicators.get('adx')
+            plus_di = indicators.get('plus_di')
+            minus_di = indicators.get('minus_di')
             
-            # 根據動態參數生成趨勢信號
-            if trend_strength > 0.01:  # 趨勢閾值
-                current_price = recent_prices[-1]
+            if adx is not None and adx > 25:  # 強趨勢
+                if plus_di is not None and minus_di is not None:
+                    if plus_di > minus_di:  # 上升趨勢
+                        signal = BasicSignal(
+                            signal_id=f"{symbol}_adx_uptrend_{int(time.time() * 1000)}",
+                            symbol=symbol,
+                            signal_type=SignalType.TREND,
+                            direction="BUY",
+                            strength=min(1.0, adx / 50),  # 基於 ADX 值計算強度
+                            confidence=dynamic_params.confidence_threshold + 0.2,
+                            price=current_price,
+                            volume=float(market_data.get('volume', 1000.0)),
+                            timestamp=datetime.now(),
+                            priority=Priority.MEDIUM,
+                            layer_source="layer_2_trend",
+                            market_regime=dynamic_params.market_regime.value,
+                            processing_time_ms=20.0,
+                            metadata={
+                                'adx': adx,
+                                'plus_di': plus_di,
+                                'minus_di': minus_di,
+                                'signal_pattern': 'adx_strong_uptrend'
+                            }
+                        )
+                        signals.append(signal)
+                    elif minus_di > plus_di:  # 下降趨勢
+                        signal = BasicSignal(
+                            signal_id=f"{symbol}_adx_downtrend_{int(time.time() * 1000)}",
+                            symbol=symbol,
+                            signal_type=SignalType.TREND,
+                            direction="SELL",
+                            strength=min(1.0, adx / 50),
+                            confidence=dynamic_params.confidence_threshold + 0.2,
+                            price=current_price,
+                            timestamp=datetime.now(),
+                            priority=Priority.MEDIUM,
+                            layer_source="layer_2_trend",
+                            market_regime=dynamic_params.market_regime.value,
+                            processing_time_ms=20.0,
+                            metadata={
+                                'adx': adx,
+                                'plus_di': plus_di,
+                                'minus_di': minus_di,
+                                'signal_pattern': 'adx_strong_downtrend'
+                            }
+                        )
+                        signals.append(signal)
+            
+            # 2. Aroon 趨勢信號
+            aroon_up = indicators.get('aroon_up')
+            aroon_down = indicators.get('aroon_down')
+            aroon_osc = indicators.get('aroon_osc')
+            
+            if aroon_up is not None and aroon_down is not None:
+                if aroon_up > 70 and aroon_down < 30:  # 強上升趨勢
+                    signal = BasicSignal(
+                        signal_id=f"{symbol}_aroon_bull_{int(time.time() * 1000)}",
+                        symbol=symbol,
+                        signal_type=SignalType.TREND,
+                        direction="BUY",
+                        strength=min(1.0, aroon_up / 100),
+                        confidence=dynamic_params.confidence_threshold + 0.15,
+                        price=current_price,
+                        volume=float(market_data.get('volume', 1000.0)),
+                        timestamp=datetime.now(),
+                        priority=Priority.MEDIUM,
+                        layer_source="layer_2_trend",
+                        market_regime=dynamic_params.market_regime.value,
+                        processing_time_ms=20.0,
+                        metadata={
+                            'aroon_up': aroon_up,
+                            'aroon_down': aroon_down,
+                            'aroon_osc': aroon_osc,
+                            'signal_pattern': 'aroon_strong_uptrend'
+                        }
+                    )
+                    signals.append(signal)
+                elif aroon_down > 70 and aroon_up < 30:  # 強下降趨勢
+                    signal = BasicSignal(
+                        signal_id=f"{symbol}_aroon_bear_{int(time.time() * 1000)}",
+                        symbol=symbol,
+                        signal_type=SignalType.TREND,
+                        direction="SELL",
+                        strength=min(1.0, aroon_down / 100),
+                        confidence=dynamic_params.confidence_threshold + 0.15,
+                        price=current_price,
+                        timestamp=datetime.now(),
+                        priority=Priority.MEDIUM,
+                        layer_source="layer_2_trend",
+                        market_regime=dynamic_params.market_regime.value,
+                        processing_time_ms=20.0,
+                        metadata={
+                            'aroon_up': aroon_up,
+                            'aroon_down': aroon_down,
+                            'aroon_osc': aroon_osc,
+                            'signal_pattern': 'aroon_strong_downtrend'
+                        }
+                    )
+                    signals.append(signal)
+            
+            # 3. Parabolic SAR 信號
+            psar = indicators.get('psar')
+            if psar is not None:
+                if current_price > psar:  # 價格在 SAR 之上
+                    signal = BasicSignal(
+                        signal_id=f"{symbol}_psar_bull_{int(time.time() * 1000)}",
+                        symbol=symbol,
+                        signal_type=SignalType.TREND,
+                        direction="BUY",
+                        strength=min(1.0, (current_price - psar) / current_price * 100),
+                        confidence=dynamic_params.confidence_threshold + 0.1,
+                        price=current_price,
+                        volume=float(market_data.get('volume', 1000.0)),
+                        timestamp=datetime.now(),
+                        priority=Priority.MEDIUM,
+                        layer_source="layer_2_trend",
+                        market_regime=dynamic_params.market_regime.value,
+                        processing_time_ms=20.0,
+                        metadata={
+                            'psar': psar,
+                            'price_vs_psar': (current_price - psar) / current_price,
+                            'signal_pattern': 'psar_bullish'
+                        }
+                    )
+                    signals.append(signal)
+                elif current_price < psar:  # 價格在 SAR 之下
+                    signal = BasicSignal(
+                        signal_id=f"{symbol}_psar_bear_{int(time.time() * 1000)}",
+                        symbol=symbol,
+                        signal_type=SignalType.TREND,
+                        direction="SELL",
+                        strength=min(1.0, (psar - current_price) / current_price * 100),
+                        confidence=dynamic_params.confidence_threshold + 0.1,
+                        price=current_price,
+                        timestamp=datetime.now(),
+                        priority=Priority.MEDIUM,
+                        layer_source="layer_2_trend",
+                        market_regime=dynamic_params.market_regime.value,
+                        processing_time_ms=20.0,
+                        metadata={
+                            'psar': psar,
+                            'price_vs_psar': (current_price - psar) / current_price,
+                            'signal_pattern': 'psar_bearish'
+                        }
+                    )
+                    signals.append(signal)
+            
+            # 4. 布林帶突破信號
+            bb_upper = indicators.get('bb_upper')
+            bb_middle = indicators.get('bb_middle')
+            bb_lower = indicators.get('bb_lower')
+            bb_percent = indicators.get('bb_percent')
+            
+            if bb_upper is not None and bb_lower is not None and bb_percent is not None:
+                if current_price > bb_upper and bb_percent > 1.0:  # 突破上軌
+                    signal = BasicSignal(
+                        signal_id=f"{symbol}_bb_breakout_up_{int(time.time() * 1000)}",
+                        symbol=symbol,
+                        signal_type=SignalType.TREND,
+                        direction="BUY",
+                        strength=min(1.0, bb_percent - 1.0),
+                        confidence=dynamic_params.confidence_threshold + 0.1,
+                        price=current_price,
+                        volume=float(market_data.get('volume', 1000.0)),
+                        timestamp=datetime.now(),
+                        priority=Priority.MEDIUM,
+                        layer_source="layer_2_trend",
+                        market_regime=dynamic_params.market_regime.value,
+                        processing_time_ms=20.0,
+                        metadata={
+                            'bb_upper': bb_upper,
+                            'bb_middle': bb_middle,
+                            'bb_lower': bb_lower,
+                            'bb_percent': bb_percent,
+                            'signal_pattern': 'bollinger_upward_breakout'
+                        }
+                    )
+                    signals.append(signal)
+                elif current_price < bb_lower and bb_percent < 0.0:  # 突破下軌
+                    signal = BasicSignal(
+                        signal_id=f"{symbol}_bb_breakout_down_{int(time.time() * 1000)}",
+                        symbol=symbol,
+                        signal_type=SignalType.TREND,
+                        direction="SELL",
+                        strength=min(1.0, abs(bb_percent)),
+                        confidence=dynamic_params.confidence_threshold + 0.1,
+                        price=current_price,
+                        timestamp=datetime.now(),
+                        priority=Priority.MEDIUM,
+                        layer_source="layer_2_trend",
+                        market_regime=dynamic_params.market_regime.value,
+                        processing_time_ms=20.0,
+                        metadata={
+                            'bb_upper': bb_upper,
+                            'bb_middle': bb_middle,
+                            'bb_lower': bb_lower,
+                            'bb_percent': bb_percent,
+                            'signal_pattern': 'bollinger_downward_breakout'
+                        }
+                    )
+                    signals.append(signal)
+            
+            if signals:
+                logger.debug(f"📊 {symbol}: pandas-ta 趨勢信號 - {len(signals)} 個")
                 
-                # 確定趨勢方向
-                direction = "BUY" if slope > 0 else "SELL"
-                
-                # 計算信號強度和信心度
-                strength = min(1.0, trend_strength * 50)  # 調整係數
-                confidence = min(0.95, dynamic_params.confidence_threshold + trend_strength * 5)
-                
-                signal = BasicSignal(
-                    signal_id=f"{symbol}_trend_{direction.lower()}_{int(time.time() * 1000)}",
-                    symbol=symbol,
-                    signal_type=SignalType.TREND,
-                    direction=direction,
-                    strength=strength,
-                    confidence=confidence,
-                    price=current_price,
-                    volume=float(market_data.get('volume', 0)),  # 添加 volume 參數
-                    timestamp=datetime.now(),
-                    priority=Priority.MEDIUM,
-                    layer_source="layer_2_trend",
-                    market_regime=dynamic_params.market_regime.value,
-                    processing_time_ms=20.0,
-                    metadata={
-                        'trend_slope': slope,
-                        'trend_strength': trend_strength,
-                        'data_points': len(recent_prices),
-                        'r_squared': np.corrcoef(x, recent_prices)[0, 1] ** 2
-                    }
-                )
-                signals.append(signal)
-                
-                logger.debug(f"📊 {symbol}: 趨勢信號 - {direction} 強度:{strength:.2f}")
-        
         except Exception as e:
-            logger.error(f"❌ Layer 2 趨勢信號生成失敗: {e}")
+            logger.error(f"❌ Layer 2 pandas-ta 趨勢信號生成失敗: {e}")
         
         return signals
     
     async def _layer_3_volume_signals_enhanced(self, symbol: str, market_data: Dict[str, Any], dynamic_params: DynamicParameters) -> List[BasicSignal]:
-        """Layer 3: 增強型成交量信號生成 - 基於成交量分析"""
+        """Layer 3: 增強型成交量信號生成 - 基於 pandas-ta 成交量指標"""
         signals = []
         
         try:
             if len(self.volume_buffer[symbol]) < 10:
                 return signals
             
-            # 獲取成交量數據
-            recent_volumes = [v['volume'] for v in list(self.volume_buffer[symbol])[-20:] if v['volume'] > 0]
-            
-            if len(recent_volumes) < 5:
+            # 使用 pandas-ta 計算成交量指標
+            indicators = self._calculate_advanced_indicators(symbol)
+            if not indicators:
                 return signals
             
-            current_volume = recent_volumes[-1]
-            avg_volume = np.mean(recent_volumes[:-1])  # 排除當前成交量
+            current_price = list(self.price_buffer[symbol])[-1]['price']
+            current_volume = float(market_data.get('volume', 1000.0))
             
-            # 成交量變化率
-            volume_change_ratio = current_volume / avg_volume if avg_volume > 0 else 1.0
+            # 1. OBV (On Balance Volume) 信號
+            obv = indicators.get('obv')
+            if obv is not None:
+                # 檢查 OBV 趨勢 - 需要歷史 OBV 數據來比較
+                recent_volumes = [v['volume'] for v in list(self.volume_buffer[symbol])[-10:] if v['volume'] > 0]
+                if len(recent_volumes) >= 5:
+                    avg_volume = np.mean(recent_volumes[:-1])
+                    volume_change_ratio = current_volume / avg_volume if avg_volume > 0 else 1.0
+                    
+                    if volume_change_ratio > dynamic_params.volume_change_threshold:
+                        signal = BasicSignal(
+                            signal_id=f"{symbol}_obv_confirmation_{int(time.time() * 1000)}",
+                            symbol=symbol,
+                            signal_type=SignalType.VOLUME,
+                            direction="BUY",
+                            strength=min(1.0, volume_change_ratio / dynamic_params.volume_change_threshold),
+                            confidence=dynamic_params.confidence_threshold + 0.05,
+                            price=current_price,
+                            volume=current_volume,
+                            timestamp=datetime.now(),
+                            priority=Priority.MEDIUM,
+                            layer_source="layer_3_volume",
+                            market_regime=dynamic_params.market_regime.value,
+                            processing_time_ms=5.0,
+                            metadata={
+                                'obv': obv,
+                                'volume_change_ratio': volume_change_ratio,
+                                'avg_volume': avg_volume,
+                                'threshold_used': dynamic_params.volume_change_threshold,
+                                'signal_pattern': 'obv_volume_confirmation'
+                            }
+                        )
+                        signals.append(signal)
             
-            # 根據動態參數判斷成交量信號
-            if volume_change_ratio > dynamic_params.volume_change_threshold:
-                current_price = float(market_data.get('price', 0))
-                
-                # 計算信號強度（基於成交量放大倍數）
-                strength = min(1.0, (volume_change_ratio - 1) * 0.5)
-                confidence = min(0.95, dynamic_params.confidence_threshold + 0.05)
-                
-                # 成交量突增通常配合價格判斷方向
+            # 2. A/D Line (Accumulation/Distribution Line) 信號
+            ad_line = indicators.get('ad_line')
+            if ad_line is not None:
+                # 基於 A/D Line 和價格背離檢測
                 recent_prices = [p['price'] for p in list(self.price_buffer[symbol])[-5:]]
-                if len(recent_prices) >= 2:
-                    price_trend = "BUY" if recent_prices[-1] > recent_prices[0] else "SELL"
-                else:
-                    price_trend = "BUY"  # 默認
+                if len(recent_prices) >= 3:
+                    price_trend = recent_prices[-1] - recent_prices[0]
+                    
+                    # 簡化的背離檢測
+                    if price_trend > 0 and ad_line > 0:  # 價格上升且 A/D Line 正值
+                        signal = BasicSignal(
+                            signal_id=f"{symbol}_ad_line_bull_{int(time.time() * 1000)}",
+                            symbol=symbol,
+                            signal_type=SignalType.VOLUME,
+                            direction="BUY",
+                            strength=min(1.0, abs(price_trend) / recent_prices[0] * 100),
+                            confidence=dynamic_params.confidence_threshold + 0.1,
+                            price=current_price,
+                            volume=current_volume,
+                            timestamp=datetime.now(),
+                            priority=Priority.MEDIUM,
+                            layer_source="layer_3_volume",
+                            market_regime=dynamic_params.market_regime.value,
+                            processing_time_ms=5.0,
+                            metadata={
+                                'ad_line': ad_line,
+                                'price_trend': price_trend,
+                                'signal_pattern': 'ad_line_bullish_confirmation'
+                            }
+                        )
+                        signals.append(signal)
+                    elif price_trend < 0 and ad_line < 0:  # 價格下降且 A/D Line 負值
+                        signal = BasicSignal(
+                            signal_id=f"{symbol}_ad_line_bear_{int(time.time() * 1000)}",
+                            symbol=symbol,
+                            signal_type=SignalType.VOLUME,
+                            direction="SELL",
+                            strength=min(1.0, abs(price_trend) / recent_prices[0] * 100),
+                            confidence=dynamic_params.confidence_threshold + 0.1,
+                            price=current_price,
+                            timestamp=datetime.now(),
+                            priority=Priority.MEDIUM,
+                            layer_source="layer_3_volume",
+                            market_regime=dynamic_params.market_regime.value,
+                            processing_time_ms=5.0,
+                            metadata={
+                                'ad_line': ad_line,
+                                'price_trend': price_trend,
+                                'signal_pattern': 'ad_line_bearish_confirmation'
+                            }
+                        )
+                        signals.append(signal)
+            
+            # 3. VWAP (Volume Weighted Average Price) 信號
+            vwap = indicators.get('vwap')
+            if vwap is not None:
+                if current_price > vwap:  # 價格高於 VWAP
+                    signal = BasicSignal(
+                        signal_id=f"{symbol}_vwap_above_{int(time.time() * 1000)}",
+                        symbol=symbol,
+                        signal_type=SignalType.VOLUME,
+                        direction="BUY",
+                        strength=min(1.0, (current_price - vwap) / vwap * 10),
+                        confidence=dynamic_params.confidence_threshold + 0.05,
+                        price=current_price,
+                        volume=current_volume,
+                        timestamp=datetime.now(),
+                        priority=Priority.MEDIUM,
+                        layer_source="layer_3_volume",
+                        market_regime=dynamic_params.market_regime.value,
+                        processing_time_ms=5.0,
+                        metadata={
+                            'vwap': vwap,
+                            'price_vs_vwap': (current_price - vwap) / vwap,
+                            'signal_pattern': 'price_above_vwap'
+                        }
+                    )
+                    signals.append(signal)
+                elif current_price < vwap:  # 價格低於 VWAP
+                    signal = BasicSignal(
+                        signal_id=f"{symbol}_vwap_below_{int(time.time() * 1000)}",
+                        symbol=symbol,
+                        signal_type=SignalType.VOLUME,
+                        direction="SELL",
+                        strength=min(1.0, (vwap - current_price) / vwap * 10),
+                        confidence=dynamic_params.confidence_threshold + 0.05,
+                        price=current_price,
+                        timestamp=datetime.now(),
+                        priority=Priority.MEDIUM,
+                        layer_source="layer_3_volume",
+                        market_regime=dynamic_params.market_regime.value,
+                        processing_time_ms=5.0,
+                        metadata={
+                            'vwap': vwap,
+                            'price_vs_vwap': (current_price - vwap) / vwap,
+                            'signal_pattern': 'price_below_vwap'
+                        }
+                    )
+                    signals.append(signal)
+            
+            # 4. 傳統成交量異常檢測 (保留原有邏輯)
+            recent_volumes = [v['volume'] for v in list(self.volume_buffer[symbol])[-20:] if v['volume'] > 0]
+            if len(recent_volumes) >= 5:
+                avg_volume = np.mean(recent_volumes[:-1])
+                volume_change_ratio = current_volume / avg_volume if avg_volume > 0 else 1.0
                 
-                signal = BasicSignal(
-                    signal_id=f"{symbol}_volume_{int(time.time() * 1000)}",
-                    symbol=symbol,
-                    signal_type=SignalType.VOLUME,
-                    direction=price_trend,
-                    strength=strength,
-                    confidence=confidence,
-                    price=current_price,
-                    volume=current_volume,  # 添加 volume 參數
-                    timestamp=datetime.now(),
-                    priority=Priority.HIGH if volume_change_ratio > 3.0 else Priority.MEDIUM,
-                    layer_source="layer_3_volume",
-                    market_regime=dynamic_params.market_regime.value,
-                    processing_time_ms=5.0,
-                    metadata={
-                        'volume_change_ratio': volume_change_ratio,
-                        'current_volume': current_volume,
-                        'avg_volume': avg_volume,
-                        'threshold_used': dynamic_params.volume_change_threshold
-                    }
-                )
-                signals.append(signal)
+                if volume_change_ratio > dynamic_params.volume_change_threshold * 2:  # 更高的閾值用於異常檢測
+                    signal = BasicSignal(
+                        signal_id=f"{symbol}_volume_spike_{int(time.time() * 1000)}",
+                        symbol=symbol,
+                        signal_type=SignalType.VOLUME,
+                        direction="BUY",
+                        strength=1.0,
+                        confidence=min(0.95, dynamic_params.confidence_threshold + 0.25),
+                        price=current_price,
+                        volume=current_volume,
+                        timestamp=datetime.now(),
+                        priority=Priority.HIGH,
+                        layer_source="layer_3_volume",
+                        market_regime=dynamic_params.market_regime.value,
+                        processing_time_ms=5.0,
+                        metadata={
+                            'volume_change_ratio': volume_change_ratio,
+                            'current_volume': current_volume,
+                            'avg_volume': avg_volume,
+                            'threshold_used': dynamic_params.volume_change_threshold,
+                            'signal_pattern': 'unusual_volume_spike'
+                        }
+                    )
+                    signals.append(signal)
+            
+            if signals:
+                logger.debug(f"📦 {symbol}: pandas-ta 成交量信號 - {len(signals)} 個")
                 
-                logger.debug(f"📊 {symbol}: 成交量信號 - 放大 {volume_change_ratio:.1f}x")
-        
         except Exception as e:
-            logger.error(f"❌ Layer 3 成交量信號生成失敗: {e}")
+            logger.error(f"❌ Layer 3 pandas-ta 成交量信號生成失敗: {e}")
         
         return signals
     
@@ -2438,6 +2898,169 @@ class Phase1ABasicSignalGeneration:
         except Exception as e:
             logger.error(f"RSI 計算失敗: {e}")
             return None
+
+    async def _calculate_advanced_indicators(self, symbol: str) -> Dict[str, Any]:
+        """
+        ★ 產品等級技術指標計算 - 調用 intelligent_trigger_engine
+        移除重複計算，直接使用 intelligent_trigger_engine 的產品等級實現
+        """
+        try:
+            # 檢查數據質量
+            data_quality = validate_data_quality(symbol)
+            if not data_quality['is_valid']:
+                logger.warning(f"⚠️ {symbol} 數據質量問題: {data_quality['issues']}")
+                logger.warning(f"建議: {data_quality['recommendation']}")
+                return {}
+            
+            # 檢查實時數據可用性
+            if not is_real_time_data_available(symbol):
+                logger.error(f"❌ {symbol} 實時數據不可用，無法進行技術分析")
+                return {}
+            
+            # 從 intelligent_trigger_engine 獲取產品等級技術指標
+            technical_indicators = await get_technical_indicators_for_phase1a(symbol)
+            
+            if technical_indicators is None:
+                logger.error(f"❌ {symbol} 無法獲取技術指標")
+                return {}
+            
+            # 轉換為 Phase1A 格式
+            indicators = {}
+            
+            # 1. 移動平均線組
+            if technical_indicators.sma_10 is not None:
+                indicators['sma_10'] = technical_indicators.sma_10
+            if technical_indicators.sma_20 is not None:
+                indicators['sma_20'] = technical_indicators.sma_20
+            if technical_indicators.sma_50 is not None:
+                indicators['sma_50'] = technical_indicators.sma_50
+            if technical_indicators.sma_200 is not None:
+                indicators['sma_200'] = technical_indicators.sma_200
+                
+            if technical_indicators.ema_12 is not None:
+                indicators['ema_12'] = technical_indicators.ema_12
+            if technical_indicators.ema_26 is not None:
+                indicators['ema_26'] = technical_indicators.ema_26
+            if technical_indicators.ema_50 is not None:
+                indicators['ema_50'] = technical_indicators.ema_50
+            
+            # 2. 動量指標
+            if technical_indicators.rsi is not None:
+                indicators['rsi'] = technical_indicators.rsi
+            if technical_indicators.rsi_14 is not None:
+                indicators['rsi_14'] = technical_indicators.rsi_14
+            if technical_indicators.rsi_21 is not None:
+                indicators['rsi_21'] = technical_indicators.rsi_21
+                
+            # 3. MACD 系統
+            if technical_indicators.macd is not None:
+                indicators['macd'] = technical_indicators.macd
+            if technical_indicators.macd_signal is not None:
+                indicators['macd_signal'] = technical_indicators.macd_signal
+            if technical_indicators.macd_histogram is not None:
+                indicators['macd_histogram'] = technical_indicators.macd_histogram
+            
+            # 4. 隨機指標
+            if technical_indicators.stoch_k is not None:
+                indicators['stoch_k'] = technical_indicators.stoch_k
+            if technical_indicators.stoch_d is not None:
+                indicators['stoch_d'] = technical_indicators.stoch_d
+            if technical_indicators.williams_r is not None:
+                indicators['williams_r'] = technical_indicators.williams_r
+            
+            # 5. 成交量指標
+            if technical_indicators.obv is not None:
+                indicators['obv'] = technical_indicators.obv
+            if technical_indicators.vwap is not None:
+                indicators['vwap'] = technical_indicators.vwap
+            if technical_indicators.volume_sma is not None:
+                indicators['volume_sma'] = technical_indicators.volume_sma
+            
+            # 6. 布林帶
+            if technical_indicators.bollinger_upper is not None:
+                indicators['bb_upper'] = technical_indicators.bollinger_upper
+            if technical_indicators.bollinger_middle is not None:
+                indicators['bb_middle'] = technical_indicators.bollinger_middle
+            if technical_indicators.bollinger_lower is not None:
+                indicators['bb_lower'] = technical_indicators.bollinger_lower
+            if technical_indicators.bollinger_bandwidth is not None:
+                indicators['bb_width'] = technical_indicators.bollinger_bandwidth
+            if technical_indicators.bollinger_percent is not None:
+                indicators['bb_percent'] = technical_indicators.bollinger_percent
+            
+            # 7. 波動性指標
+            if technical_indicators.atr is not None:
+                indicators['atr'] = technical_indicators.atr
+            if technical_indicators.natr is not None:
+                indicators['natr'] = technical_indicators.natr
+            if technical_indicators.true_range is not None:
+                indicators['true_range'] = technical_indicators.true_range
+            
+            # 8. 趨勢指標
+            if technical_indicators.adx is not None:
+                indicators['adx'] = technical_indicators.adx
+            if technical_indicators.adx_plus is not None:
+                indicators['plus_di'] = technical_indicators.adx_plus
+            if technical_indicators.adx_minus is not None:
+                indicators['minus_di'] = technical_indicators.adx_minus
+            if technical_indicators.aroon_up is not None:
+                indicators['aroon_up'] = technical_indicators.aroon_up
+            if technical_indicators.aroon_down is not None:
+                indicators['aroon_down'] = technical_indicators.aroon_down
+            
+            # 9. 支撐阻力
+            if technical_indicators.support_level is not None:
+                indicators['support_level'] = technical_indicators.support_level
+            if technical_indicators.resistance_level is not None:
+                indicators['resistance_level'] = technical_indicators.resistance_level
+            
+            # 10. 週期性指標 (新增功能)
+            if technical_indicators.cycle_period is not None:
+                indicators['cycle_period'] = technical_indicators.cycle_period
+            if technical_indicators.cycle_strength is not None:
+                indicators['cycle_strength'] = technical_indicators.cycle_strength
+            
+            # 11. 統計指標
+            if technical_indicators.skewness is not None:
+                indicators['skew'] = technical_indicators.skewness
+            if technical_indicators.kurtosis is not None:
+                indicators['kurtosis'] = technical_indicators.kurtosis
+            
+            # 12. 模式識別 (新增功能)
+            if technical_indicators.doji_pattern is not None:
+                indicators['doji_pattern'] = float(technical_indicators.doji_pattern)
+            if technical_indicators.hammer_pattern is not None:
+                indicators['hammer_pattern'] = float(technical_indicators.hammer_pattern)
+            if technical_indicators.engulfing_pattern is not None:
+                indicators['engulfing_pattern'] = float(technical_indicators.engulfing_pattern)
+            
+            # 13. 收斂和強度分數 (新增功能)
+            indicators['overall_convergence_score'] = technical_indicators.overall_convergence_score
+            indicators['signal_strength_score'] = technical_indicators.signal_strength_score
+            
+            # 14. 基礎蠟燭體計算 (保留原有邏輯)
+            try:
+                if len(self.price_buffer[symbol]) > 0:
+                    latest_data = self.price_buffer[symbol][-1]
+                    open_price = latest_data.get('open', latest_data['price'])
+                    close_price = latest_data['price']
+                    high_price = latest_data.get('high', latest_data['price'])
+                    low_price = latest_data.get('low', latest_data['price'])
+                    
+                    indicators['candle_body'] = abs(close_price - open_price)
+                    indicators['upper_shadow'] = high_price - max(close_price, open_price)
+                    indicators['lower_shadow'] = min(close_price, open_price) - low_price
+            except Exception as e:
+                logger.debug(f"蠟燭體計算失敗: {e}")
+            
+            logger.info(f"✅ {symbol} 產品等級技術指標獲取成功，指標數量: {len(indicators)}")
+            logger.info(f"📊 收斂分數: {technical_indicators.overall_convergence_score:.3f}, 信號強度: {technical_indicators.signal_strength_score:.3f}")
+            return indicators
+            
+        except Exception as e:
+            logger.error(f"❌ {symbol} 產品等級技術指標獲取失敗: {e}")
+            # 產品等級要求：絕不回退到本地計算
+            raise Exception(f"技術指標計算失敗，請檢查 intelligent_trigger_engine 狀態: {e}")
     
     def _calculate_trend_strength(self, prices: List[float]) -> float:
         """計算趨勢強度"""
