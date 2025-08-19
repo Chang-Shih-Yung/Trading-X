@@ -108,7 +108,110 @@ class Priority(Enum):
     CRITICAL = "CRITICAL"
     HIGH = "HIGH"
     MEDIUM = "MEDIUM"
-    LOW = "LOW"
+
+class SignalTier(Enum):
+    """信號分層系統 - 多層級信號處理"""
+    CRITICAL = "🚨"     # 高信心度：大倉位，嚴格標準
+    HIGH = "🎯"         # 中信心度：中倉位，適中標準  
+    MEDIUM = "📊"       # 低信心度：中小倉位，寬鬆標準
+    LOW = "📈"          # 探索性：小倉位，學習用途
+
+@dataclass
+class TierConfiguration:
+    """分層配置 - 對應不同信號等級的處理參數"""
+    tier: SignalTier
+    lean_threshold: float           # Lean 信心度要求
+    technical_threshold: float      # 技術指標閾值
+    position_multiplier: float      # 倉位乘數
+    stop_loss_ratio: float         # 止損比例
+    execution_priority: int         # 執行優先級 (1-4)
+    max_signals_per_hour: int      # 每小時最大信號數
+
+class EnhancedSignalTierSystem:
+    """增強信號分層系統 - Phase1A 核心分層邏輯"""
+    
+    def __init__(self):
+        self.tier_configs = {
+            SignalTier.CRITICAL: TierConfiguration(
+                tier=SignalTier.CRITICAL,
+                lean_threshold=0.65,
+                technical_threshold=0.8,
+                position_multiplier=0.8,
+                stop_loss_ratio=0.02,
+                execution_priority=1,
+                max_signals_per_hour=3
+            ),
+            SignalTier.HIGH: TierConfiguration(
+                tier=SignalTier.HIGH,
+                lean_threshold=0.55,
+                technical_threshold=0.7,
+                position_multiplier=0.6,
+                stop_loss_ratio=0.025,
+                execution_priority=2,
+                max_signals_per_hour=5
+            ),
+            SignalTier.MEDIUM: TierConfiguration(
+                tier=SignalTier.MEDIUM,
+                lean_threshold=0.45,
+                technical_threshold=0.6,
+                position_multiplier=0.4,
+                stop_loss_ratio=0.03,
+                execution_priority=3,
+                max_signals_per_hour=8
+            ),
+            SignalTier.LOW: TierConfiguration(
+                tier=SignalTier.LOW,
+                lean_threshold=0.35,
+                technical_threshold=0.5,
+                position_multiplier=0.2,
+                stop_loss_ratio=0.04,
+                execution_priority=4,
+                max_signals_per_hour=15
+            )
+        }
+    
+    def get_dynamic_threshold(self, lean_confidence: float, priority: SignalTier) -> float:
+        """根據 Lean 信心度和優先級動態調整閾值"""
+        base_threshold = self.tier_configs[priority].lean_threshold
+        # 動態調整：最低 0.4，基於 lean_confidence 縮放
+        return max(0.4, lean_confidence * base_threshold)
+    
+    def classify_signal_tier(self, lean_confidence: float, technical_score: float) -> SignalTier:
+        """信號分層分類 - 基於 Lean 信心度和技術分數"""
+        # CRITICAL: 需要很高的 Lean 信心度 + 技術確認
+        if lean_confidence >= 0.75 and technical_score >= 0.8:
+            return SignalTier.CRITICAL
+        
+        # HIGH: 較高信心度或單方面優秀
+        elif lean_confidence >= 0.65 or technical_score >= 0.75:
+            return SignalTier.HIGH
+        
+        # MEDIUM: 中等水平
+        elif lean_confidence >= 0.5 or technical_score >= 0.6:
+            return SignalTier.MEDIUM
+        
+        # LOW: 探索性信號
+        else:
+            return SignalTier.LOW
+    
+    def get_tier_config(self, tier: SignalTier) -> TierConfiguration:
+        """獲取分層配置"""
+        return self.tier_configs[tier]
+    
+    def adjust_position_size(self, base_size: float, tier: SignalTier, 
+                           market_volatility: float = 0.02) -> float:
+        """根據分層調整倉位大小"""
+        config = self.tier_configs[tier]
+        
+        # 基礎倉位 × 分層乘數 × 波動性調整
+        volatility_factor = max(0.5, 1.0 - market_volatility * 10)
+        adjusted_size = base_size * config.position_multiplier * volatility_factor
+        
+        return adjusted_size
+    
+    def get_execution_priority(self, tier: SignalTier) -> int:
+        """獲取執行優先級"""
+        return self.tier_configs[tier].execution_priority
 
 @dataclass
 class DynamicParameters:
@@ -191,7 +294,7 @@ class LayerProcessingResult:
     source_data_count: int = 0
 
 class Phase1ABasicSignalGeneration:
-    """Phase1A 基礎信號生成器 - 4層並行處理架構"""
+    """Phase1A 基礎信號生成器 - 4層並行處理架構 + 信號分層系統"""
     
     def __init__(self):
         self.config = self._load_config()
@@ -201,6 +304,11 @@ class Phase1ABasicSignalGeneration:
         self._cached_params = {}
         self._cache_timestamp = 0
         self._cache_ttl = 300  # 5分鐘緩存
+        
+        # ✨ 信號分層系統初始化
+        self.tier_system = self._init_tier_system()
+        self.tier_counters = {tier: 0 for tier in SignalTier}
+        self.tier_history = []
         
         # 市場制度檢測
         self.current_regime = MarketRegime.UNKNOWN
@@ -331,6 +439,68 @@ class Phase1ABasicSignalGeneration:
             logger.error(f"動態參數系統初始化失敗: {e}")
             logger.warning("將使用靜態參數繼續運行")
             return False
+    
+    def _init_tier_system(self) -> Dict[SignalTier, TierConfiguration]:
+        """初始化信號分層系統 - 基於 Lean 優化配置"""
+        try:
+            logger.info("🎯 初始化信號分層系統")
+            
+            # 分層配置 - 基於當前 Lean 優化結果調整
+            tier_configs = {
+                SignalTier.CRITICAL: TierConfiguration(
+                    tier=SignalTier.CRITICAL,
+                    lean_threshold=0.65,      # 高信心度要求 (65%+)
+                    technical_threshold=0.7,  # 嚴格技術指標
+                    position_multiplier=0.8,  # 大倉位
+                    stop_loss_ratio=0.02,     # 緊密止損 2%
+                    execution_priority=1,     # 最高優先級
+                    max_signals_per_hour=3    # 限制頻率
+                ),
+                SignalTier.HIGH: TierConfiguration(
+                    tier=SignalTier.HIGH,
+                    lean_threshold=0.58,      # 中等信心度 (58%+)，對應 Phase5 閾值
+                    technical_threshold=0.5,  # 適中技術指標
+                    position_multiplier=0.5,  # 中等倉位
+                    stop_loss_ratio=0.03,     # 適中止損 3%
+                    execution_priority=2,     # 高優先級
+                    max_signals_per_hour=5    # 適中頻率
+                ),
+                SignalTier.MEDIUM: TierConfiguration(
+                    tier=SignalTier.MEDIUM,
+                    lean_threshold=0.45,      # 低信心度 (45%+)
+                    technical_threshold=0.4,  # 寬鬆技術指標
+                    position_multiplier=0.3,  # 中小倉位
+                    stop_loss_ratio=0.04,     # 寬鬆止損 4%
+                    execution_priority=3,     # 中優先級
+                    max_signals_per_hour=8    # 較高頻率
+                ),
+                SignalTier.LOW: TierConfiguration(
+                    tier=SignalTier.LOW,
+                    lean_threshold=0.30,      # 探索性信心度 (30%+)
+                    technical_threshold=0.25, # 最寬鬆技術指標
+                    position_multiplier=0.1,  # 小倉位測試
+                    stop_loss_ratio=0.06,     # 最寬鬆止損 6%
+                    execution_priority=4,     # 低優先級
+                    max_signals_per_hour=12   # 高頻率學習
+                )
+            }
+            
+            logger.info("✅ 信號分層系統初始化完成")
+            logger.info(f"   🔴 CRITICAL: Lean≥65%, 倉位80%, 止損2%")
+            logger.info(f"   🟡 HIGH: Lean≥58%, 倉位50%, 止損3%")
+            logger.info(f"   🟠 MEDIUM: Lean≥45%, 倉位30%, 止損4%")
+            logger.info(f"   🟢 LOW: Lean≥30%, 倉位10%, 止損6%")
+            
+            return tier_configs
+            
+        except Exception as e:
+            logger.error(f"❌ 信號分層系統初始化失敗: {e}")
+            # 返回默認配置
+            return {
+                SignalTier.CRITICAL: TierConfiguration(
+                    SignalTier.CRITICAL, 0.7, 0.7, 0.5, 0.03, 1, 3
+                )
+            }
     
     async def _detect_market_regime(self, market_data: Optional[MarketData] = None) -> Tuple[MarketRegime, float]:
         """檢測市場制度"""
@@ -1504,6 +1674,145 @@ class Phase1ABasicSignalGeneration:
         except Exception as e:
             logger.error(f"❌ {symbol}: 信號生成失敗 - {e}")
             return []
+
+    async def generate_tiered_signals(self, symbol: str, market_data: Dict[str, Any]) -> Dict[str, Any]:
+        """增強版信號生成 - 整合分層系統"""
+        try:
+            start_time = time.time()
+            
+            if not self.is_running:
+                logger.warning("信號生成器未運行")
+                return {'signals': [], 'tier_analysis': {}}
+            
+            # 檢查歷史數據
+            if symbol not in self.price_buffer or len(self.price_buffer[symbol]) < 10:
+                logger.debug(f"{symbol}: 歷史數據不足，跳過信號生成")
+                return {'signals': [], 'tier_analysis': {'error': '歷史數據不足'}}
+            
+            logger.debug(f"🎯 開始 {symbol} 分層信號生成")
+            
+            # 1. 執行基礎信號生成
+            base_signals = await self.generate_signals(symbol, market_data)
+            
+            # 2. 對每個信號進行分層評估
+            tiered_signals = []
+            tier_statistics = {tier: {'count': 0, 'avg_confidence': 0.0} for tier in SignalTier}
+            
+            for signal in base_signals:
+                try:
+                    # 計算技術指標強度
+                    technical_strength = signal.strength * signal.confidence
+                    
+                    # 評估信號分層
+                    signal_tier, tier_config, tier_metadata = await self.evaluate_signal_tier(
+                        symbol, technical_strength, market_data
+                    )
+                    
+                    # 檢查分層閾值
+                    if technical_strength >= tier_metadata.get('dynamic_threshold', 0.7):
+                        # 增強信號對象
+                        enhanced_signal = self._enhance_signal_with_tier_info(
+                            signal, signal_tier, tier_config, tier_metadata
+                        )
+                        
+                        tiered_signals.append(enhanced_signal)
+                        
+                        # 更新統計
+                        tier_statistics[signal_tier]['count'] += 1
+                        tier_statistics[signal_tier]['avg_confidence'] += signal.confidence
+                        
+                        # 更新分層計數器
+                        self.tier_counters[signal_tier] += 1
+                        
+                        logger.debug(f"✅ {symbol}: {signal_tier.value} 信號通過 (強度: {technical_strength:.3f}, 閾值: {tier_metadata['dynamic_threshold']:.3f})")
+                    else:
+                        logger.debug(f"❌ {symbol}: 信號未達 {signal_tier.value} 閾值 (強度: {technical_strength:.3f}, 需要: {tier_metadata['dynamic_threshold']:.3f})")
+                        
+                except Exception as e:
+                    logger.warning(f"信號分層評估失敗: {e}")
+                    continue
+            
+            # 3. 計算平均信心度
+            for tier, stats in tier_statistics.items():
+                if stats['count'] > 0:
+                    stats['avg_confidence'] = stats['avg_confidence'] / stats['count']
+            
+            # 4. 生成分層分析報告
+            processing_time = (time.time() - start_time) * 1000
+            tier_analysis = {
+                'total_base_signals': len(base_signals),
+                'total_tiered_signals': len(tiered_signals),
+                'tier_statistics': tier_statistics,
+                'tier_counters': dict(self.tier_counters),
+                'processing_time_ms': round(processing_time, 2),
+                'symbol': symbol,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            logger.info(f"🎊 {symbol} 分層信號生成完成: {len(tiered_signals)}/{len(base_signals)} 信號通過分層篩選")
+            
+            return {
+                'signals': tiered_signals,
+                'tier_analysis': tier_analysis
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ {symbol}: 分層信號生成失敗 - {e}")
+            return {'signals': [], 'tier_analysis': {'error': str(e)}}
+    
+    def _enhance_signal_with_tier_info(self, signal: BasicSignal, tier: SignalTier, tier_config: TierConfiguration, tier_metadata: Dict[str, Any]) -> BasicSignal:
+        """用分層信息增強信號對象"""
+        try:
+            # 創建增強的信號副本
+            enhanced_signal = BasicSignal(
+                signal_id=f"{signal.signal_id}_T{tier.value}",
+                symbol=signal.symbol,
+                signal_type=signal.signal_type,
+                direction=signal.direction,
+                strength=signal.strength,
+                confidence=signal.confidence,
+                priority=self._map_tier_to_priority(tier),
+                timestamp=signal.timestamp,
+                price=signal.price,
+                volume=signal.volume,
+                metadata=signal.metadata.copy() if signal.metadata else {},
+                layer_source=signal.layer_source,
+                processing_time_ms=signal.processing_time_ms,
+                market_regime=signal.market_regime,
+                trading_session=signal.trading_session,
+                price_change=signal.price_change,
+                volume_change=signal.volume_change
+            )
+            
+            # 添加分層元數據
+            enhanced_signal.metadata.update({
+                'signal_tier': tier.value,
+                'tier_config': {
+                    'position_multiplier': tier_config.position_multiplier,
+                    'stop_loss_ratio': tier_config.stop_loss_ratio,
+                    'execution_priority': tier_config.execution_priority,
+                    'max_signals_per_hour': tier_config.max_signals_per_hour
+                },
+                'tier_metadata': tier_metadata,
+                'tier_enhanced': True,
+                'tier_processing_timestamp': datetime.now().isoformat()
+            })
+            
+            return enhanced_signal
+            
+        except Exception as e:
+            logger.warning(f"信號增強失敗: {e}")
+            return signal
+    
+    def _map_tier_to_priority(self, tier: SignalTier) -> Priority:
+        """將信號分層映射到優先級"""
+        mapping = {
+            SignalTier.CRITICAL: Priority.CRITICAL,
+            SignalTier.HIGH: Priority.HIGH,
+            SignalTier.MEDIUM: Priority.MEDIUM,
+            SignalTier.LOW: Priority.MEDIUM  # LOW 層級也使用 MEDIUM 優先級
+        }
+        return mapping.get(tier, Priority.MEDIUM)
     
     async def _update_buffers_with_current_data(self, symbol: str, market_data: Dict[str, Any]):
         """用當前市場數據更新緩衝區"""
@@ -2770,13 +3079,23 @@ class Phase1ABasicSignalGeneration:
                 if abs(trend_strength) > 0.5:
                     direction = "BUY" if trend_strength > 0 else "SELL"
                     
+                    # 使用動態信心度閾值 - 來自 Phase5 Lean 優化
+                    dynamic_params = await self._get_dynamic_parameters("basic_mode")
+                    confidence_threshold = dynamic_params.confidence_threshold if dynamic_params else 0.5
+                    
+                    # 載入 Phase5 Lean 優化參數
+                    lean_adjustment = await self._get_lean_adjustment_for_symbol(symbol)
+                    if lean_adjustment and lean_adjustment.get('confidence_level', 0) > 0.6:
+                        # 如果是 Lean 優化的幣種，使用更智能的閾值
+                        confidence_threshold = max(0.4, lean_adjustment['confidence_level'] * 0.8)
+                    
                     signal = BasicSignal(
                         signal_id=f"trend_strength_{symbol}_{timestamps[-1].timestamp()}",
                         symbol=symbol,
                         signal_type=SignalType.TREND,
                         direction=direction,
                         strength=min(abs(trend_strength), 1.0),
-                        confidence=0.7,
+                        confidence=confidence_threshold,  # 使用動態閾值
                         priority=Priority.MEDIUM,
                         timestamp=timestamps[-1],
                         price=prices[-1],
@@ -3414,6 +3733,190 @@ class Phase1ABasicSignalGeneration:
             return True
         except:
             return False
+    
+    async def _get_lean_adjustment_for_symbol(self, symbol: str) -> Dict[str, Any]:
+        """獲取特定幣種的 Lean 優化參數 - 來自 Phase5 回測"""
+        try:
+            # 載入最新的 Phase5 配置
+            config_dir = Path("X/backend/phase5_backtest_validation/safety_backups/working")
+            if config_dir.exists():
+                config_files = list(config_dir.glob("phase1a_backup_deployment_initial_*.json"))
+                if config_files:
+                    latest_config = max(config_files, key=lambda x: x.stat().st_mtime)
+                    
+                    with open(latest_config, 'r', encoding='utf-8') as f:
+                        lean_config = json.load(f)
+                    
+                    # 查找幣種特定配置
+                    lean_key = f"{symbol.lower()}_lean_adjustment"
+                    lean_params = lean_config.get(lean_key, {})
+                    
+                    if lean_params:
+                        logger.debug(f"✅ {symbol} Lean 參數載入: 信心度 {lean_params.get('confidence_level', 0)*100:.1f}%")
+                        return lean_params
+            
+            return {}
+            
+        except Exception as e:
+            logger.error(f"❌ {symbol} Lean 參數載入失敗: {e}")
+            return {}
+
+    async def evaluate_signal_tier(self, symbol: str, technical_strength: float, market_data: Optional[Dict] = None) -> Tuple[SignalTier, TierConfiguration, Dict[str, Any]]:
+        """評估信號分層等級 - 核心分層邏輯"""
+        try:
+            # 1. 獲取 Lean 優化參數
+            lean_params = await self._get_lean_adjustment_for_symbol(symbol)
+            lean_confidence = lean_params.get('confidence_level', 0.0)
+            expected_return = lean_params.get('expected_return', 0.0)
+            
+            # 2. 計算綜合評分
+            composite_score = self._calculate_composite_signal_score(
+                lean_confidence, technical_strength, market_data
+            )
+            
+            # 3. 確定分層等級
+            selected_tier = self._determine_signal_tier(lean_confidence, composite_score)
+            tier_config = self.tier_system.get(selected_tier)
+            
+            # 4. 動態調整閾值
+            dynamic_threshold = self._calculate_dynamic_threshold(
+                lean_confidence, selected_tier, tier_config
+            )
+            
+            # 5. 分層元數據
+            tier_metadata = {
+                'tier': selected_tier,
+                'lean_confidence': lean_confidence,
+                'technical_strength': technical_strength,
+                'composite_score': composite_score,
+                'dynamic_threshold': dynamic_threshold,
+                'expected_return': expected_return,
+                'position_multiplier': tier_config.position_multiplier if tier_config else 0.5,
+                'execution_priority': tier_config.execution_priority if tier_config else 4,
+                'tier_reasoning': self._generate_tier_reasoning(lean_confidence, technical_strength, selected_tier)
+            }
+            
+            logger.debug(f"📊 {symbol} 分層評估: {selected_tier.value} (Lean: {lean_confidence:.1%}, 技術: {technical_strength:.3f})")
+            
+            return selected_tier, tier_config, tier_metadata
+            
+        except Exception as e:
+            logger.error(f"❌ {symbol} 信號分層評估失敗: {e}")
+            # 返回默認 MEDIUM 層級
+            default_config = self.tier_system.get(SignalTier.MEDIUM)
+            default_metadata = {
+                'tier': SignalTier.MEDIUM,
+                'lean_confidence': 0.0,
+                'technical_strength': technical_strength,
+                'composite_score': technical_strength,
+                'dynamic_threshold': 0.7,
+                'expected_return': 0.0,
+                'position_multiplier': 0.3,
+                'execution_priority': 3,
+                'tier_reasoning': '分層評估失敗，使用默認配置'
+            }
+            return SignalTier.MEDIUM, default_config, default_metadata
+    
+    def _calculate_composite_signal_score(self, lean_confidence: float, technical_strength: float, market_data: Optional[Dict] = None) -> float:
+        """計算綜合信號評分 - 多因子評分模型"""
+        try:
+            # 基礎分數 (Lean + 技術指標)
+            base_score = (lean_confidence * 0.6) + (technical_strength * 0.4)
+            
+            # 市場環境調整
+            market_adjustment = 0.0
+            if market_data:
+                # 波動度調整 (高波動度降低評分)
+                volatility = market_data.get('volatility', 0.02)
+                if volatility > 0.05:  # 高波動
+                    market_adjustment -= 0.1
+                elif volatility < 0.01:  # 低波動  
+                    market_adjustment += 0.05
+                
+                # 成交量確認 (高成交量增加評分)
+                volume_ratio = market_data.get('volume_ratio', 1.0)
+                if volume_ratio > 1.5:
+                    market_adjustment += 0.05
+                elif volume_ratio < 0.7:
+                    market_adjustment -= 0.05
+                
+                # 市場制度匹配
+                regime = market_data.get('market_regime', 'UNKNOWN')
+                if regime in ['BULL_TREND', 'BEAR_TREND']:
+                    market_adjustment += 0.03  # 趨勢市場加分
+                elif regime == 'VOLATILE':
+                    market_adjustment -= 0.02  # 震蕩市場減分
+            
+            # 計算最終評分
+            final_score = max(0.0, min(1.0, base_score + market_adjustment))
+            
+            return final_score
+            
+        except Exception as e:
+            logger.warning(f"綜合評分計算失敗: {e}")
+            return max(0.0, min(1.0, (lean_confidence * 0.6) + (technical_strength * 0.4)))
+    
+    def _determine_signal_tier(self, lean_confidence: float, composite_score: float) -> SignalTier:
+        """確定信號分層等級 - 分層決策邏輯"""
+        try:
+            # 優先基於 Lean 信心度分層
+            if lean_confidence >= 0.65 and composite_score >= 0.7:
+                return SignalTier.CRITICAL
+            elif lean_confidence >= 0.58 and composite_score >= 0.55:
+                return SignalTier.HIGH
+            elif lean_confidence >= 0.45 and composite_score >= 0.4:
+                return SignalTier.MEDIUM
+            else:
+                return SignalTier.LOW
+                
+        except Exception as e:
+            logger.warning(f"分層等級決策失敗: {e}")
+            return SignalTier.MEDIUM
+    
+    def _calculate_dynamic_threshold(self, lean_confidence: float, tier: SignalTier, tier_config: Optional[TierConfiguration]) -> float:
+        """計算動態閾值 - 基於 Lean 信心度的閾值調整"""
+        try:
+            if not tier_config:
+                return 0.7  # 默認閾值
+            
+            base_threshold = tier_config.technical_threshold
+            
+            # 基於 Lean 信心度動態調整
+            if lean_confidence >= tier_config.lean_threshold:
+                # Lean 信心度滿足要求，降低技術指標要求
+                adjustment_factor = min(0.8, lean_confidence)
+                dynamic_threshold = max(0.3, base_threshold * adjustment_factor)
+            else:
+                # Lean 信心度不足，保持或提高技術指標要求
+                dynamic_threshold = min(1.0, base_threshold * 1.1)
+            
+            return round(dynamic_threshold, 3)
+            
+        except Exception as e:
+            logger.warning(f"動態閾值計算失敗: {e}")
+            return 0.7
+    
+    def _generate_tier_reasoning(self, lean_confidence: float, technical_strength: float, tier: SignalTier) -> str:
+        """生成分層推理說明"""
+        reasons = []
+        
+        if lean_confidence >= 0.65:
+            reasons.append(f"Lean信心度優秀({lean_confidence:.1%})")
+        elif lean_confidence >= 0.58:
+            reasons.append(f"Lean信心度良好({lean_confidence:.1%})")
+        elif lean_confidence >= 0.45:
+            reasons.append(f"Lean信心度一般({lean_confidence:.1%})")
+        else:
+            reasons.append(f"Lean信心度較低({lean_confidence:.1%})")
+        
+        if technical_strength >= 0.7:
+            reasons.append(f"技術指標強({technical_strength:.2f})")
+        elif technical_strength >= 0.5:
+            reasons.append(f"技術指標中({technical_strength:.2f})")
+        else:
+            reasons.append(f"技術指標弱({technical_strength:.2f})")
+        
+        return f"{tier.value}: {', '.join(reasons)}"
 
 # 全局實例
 phase1a_signal_generator = Phase1ABasicSignalGeneration()

@@ -20,6 +20,7 @@ from pathlib import Path
 current_dir = Path(__file__).parent
 sys.path.extend([
     str(current_dir.parent / "phase1_signal_generation" / "unified_signal_pool"),
+    str(current_dir.parent / "phase1_signal_generation" / "phase1a_basic_signal_generation"),
     str(current_dir.parent / "phase2_pre_evaluation" / "epl_pre_processing_system"),
     str(current_dir.parent / "shared_core")
 ])
@@ -37,6 +38,26 @@ except ImportError as e:
     logging.error(f"❌ Phase1整合失敗 - 系統無法運行: {e}")
     PHASE1_INTEGRATION_AVAILABLE = False
     raise ImportError(f"Phase1依賴缺失: {e}") from e
+
+# 新增：Phase1A 層級系統整合
+try:
+    from phase1a_basic_signal_generation import (
+        SignalTier,
+        TierConfiguration
+    )
+    PHASE1A_TIER_INTEGRATION_AVAILABLE = True
+    logging.info("✅ Phase1A層級系統整合可用 (SignalTier)")
+except ImportError as e:
+    logging.warning(f"⚠️ Phase1A層級系統整合失敗 - 將使用替代方案: {e}")
+    PHASE1A_TIER_INTEGRATION_AVAILABLE = False
+    
+    # 替代方案：本地定義 SignalTier
+    class SignalTier(Enum):
+        """信號層級 - 本地替代定義"""
+        CRITICAL = "CRITICAL"  # 關鍵信號
+        HIGH = "HIGH"          # 高質量信號
+        MEDIUM = "MEDIUM"      # 中等質量信號
+        LOW = "LOW"            # 低質量信號
 
 # JSON 規範: upstream_integration.phase2_pre_evaluation.epl_preprocessing_result
 try:
@@ -3504,3 +3525,418 @@ class ExecutionPolicyLayer:
 
 # 全局執行決策層實例
 execution_policy_layer = ExecutionPolicyLayer()
+
+
+# =============================================================================
+# 🎯 Phase3 EPL 分層決策增強 v1.0 - 層級感知決策引擎
+# =============================================================================
+
+class TierAwareDecisionEnhancer:
+    """
+    層級感知決策增強器
+    整合 Phase1A SignalTier 系統，為 Phase3 EPL 決策提供層級感知能力
+    """
+    
+    def __init__(self):
+        self.tier_decision_mapping = {
+            # 信號層級 -> 決策偏好權重
+            SignalTier.CRITICAL: {
+                "replace_position_weight": 1.2,     # 關鍵信號更容易觸發替單
+                "strengthen_position_weight": 1.1,   # 高加倉權重
+                "create_new_position_weight": 1.15,  # 高新單建立權重
+                "ignore_signal_weight": 0.3,        # 低忽略權重
+                "execution_priority": "IMMEDIATE",   # 即時執行
+                "position_size_multiplier": 1.3,    # 30% 倉位增強
+                "risk_tolerance_increase": 0.15     # 15% 風險容忍度增加
+            },
+            SignalTier.HIGH: {
+                "replace_position_weight": 1.1,
+                "strengthen_position_weight": 1.05,
+                "create_new_position_weight": 1.1,
+                "ignore_signal_weight": 0.5,
+                "execution_priority": "HIGH",
+                "position_size_multiplier": 1.2,
+                "risk_tolerance_increase": 0.1
+            },
+            SignalTier.MEDIUM: {
+                "replace_position_weight": 1.0,
+                "strengthen_position_weight": 1.0,
+                "create_new_position_weight": 1.0,
+                "ignore_signal_weight": 1.0,
+                "execution_priority": "NORMAL",
+                "position_size_multiplier": 1.0,
+                "risk_tolerance_increase": 0.0
+            },
+            SignalTier.LOW: {
+                "replace_position_weight": 0.8,
+                "strengthen_position_weight": 0.9,
+                "create_new_position_weight": 0.85,
+                "ignore_signal_weight": 1.5,        # 較高忽略權重
+                "execution_priority": "LOW",
+                "position_size_multiplier": 0.8,    # 減少倉位
+                "risk_tolerance_increase": -0.05    # 降低風險容忍度
+            }
+        }
+        
+        self.tier_threshold_adjustments = {
+            # 根據信號層級動態調整決策閾值
+            SignalTier.CRITICAL: {
+                "replacement_threshold_reduction": 0.15,    # 降低替單閾值
+                "strengthening_threshold_reduction": 0.12,
+                "creation_threshold_reduction": 0.1,
+                "ignore_threshold_increase": 0.2           # 提高忽略閾值
+            },
+            SignalTier.HIGH: {
+                "replacement_threshold_reduction": 0.1,
+                "strengthening_threshold_reduction": 0.08,
+                "creation_threshold_reduction": 0.06,
+                "ignore_threshold_increase": 0.1
+            },
+            SignalTier.MEDIUM: {
+                "replacement_threshold_reduction": 0.0,    # 無調整
+                "strengthening_threshold_reduction": 0.0,
+                "creation_threshold_reduction": 0.0,
+                "ignore_threshold_increase": 0.0
+            },
+            SignalTier.LOW: {
+                "replacement_threshold_reduction": -0.05,   # 提高閾值（更嚴格）
+                "strengthening_threshold_reduction": -0.03,
+                "creation_threshold_reduction": -0.04,
+                "ignore_threshold_increase": -0.1          # 降低忽略閾值（更容易忽略）
+            }
+        }
+        
+        self.enhancement_stats = {
+            "tier_decisions": {tier: 0 for tier in SignalTier},
+            "tier_success_rates": {tier: [] for tier in SignalTier},
+            "tier_adjustments_applied": 0,
+            "total_enhanced_decisions": 0
+        }
+    
+    def extract_signal_tier(self, candidate: SignalCandidate) -> SignalTier:
+        """
+        從信號候選中提取層級信息
+        """
+        # 嘗試從 candidate 中獲取 tier 信息
+        if hasattr(candidate, 'tier') and candidate.tier:
+            return candidate.tier
+        
+        # 如果沒有層級信息，根據信號強度估算
+        signal_strength = getattr(candidate, 'signal_strength', 0.5)
+        
+        if signal_strength >= 0.85:
+            return SignalTier.CRITICAL
+        elif signal_strength >= 0.70:
+            return SignalTier.HIGH
+        elif signal_strength >= 0.55:
+            return SignalTier.MEDIUM
+        else:
+            return SignalTier.LOW
+    
+    def enhance_replacement_decision(self, candidate: SignalCandidate, 
+                                   base_score: float, 
+                                   base_threshold: float) -> Tuple[float, float, Dict[str, Any]]:
+        """
+        增強替單決策評估
+        """
+        tier = self.extract_signal_tier(candidate)
+        tier_config = self.tier_decision_mapping[tier]
+        tier_adjustments = self.tier_threshold_adjustments[tier]
+        
+        # 應用層級權重
+        enhanced_score = base_score * tier_config["replace_position_weight"]
+        
+        # 調整決策閾值
+        adjusted_threshold = base_threshold - tier_adjustments["replacement_threshold_reduction"]
+        
+        enhancement_details = {
+            "signal_tier": tier.value,
+            "original_score": base_score,
+            "enhanced_score": enhanced_score,
+            "original_threshold": base_threshold,
+            "adjusted_threshold": adjusted_threshold,
+            "weight_applied": tier_config["replace_position_weight"],
+            "threshold_adjustment": tier_adjustments["replacement_threshold_reduction"],
+            "execution_priority": tier_config["execution_priority"],
+            "decision_improved": enhanced_score > base_score
+        }
+        
+        self.enhancement_stats["tier_decisions"][tier] += 1
+        self.enhancement_stats["tier_adjustments_applied"] += 1
+        
+        return enhanced_score, adjusted_threshold, enhancement_details
+    
+    def enhance_strengthening_decision(self, candidate: SignalCandidate,
+                                     base_score: float,
+                                     base_threshold: float) -> Tuple[float, float, Dict[str, Any]]:
+        """
+        增強加倉決策評估
+        """
+        tier = self.extract_signal_tier(candidate)
+        tier_config = self.tier_decision_mapping[tier]
+        tier_adjustments = self.tier_threshold_adjustments[tier]
+        
+        enhanced_score = base_score * tier_config["strengthen_position_weight"]
+        adjusted_threshold = base_threshold - tier_adjustments["strengthening_threshold_reduction"]
+        
+        enhancement_details = {
+            "signal_tier": tier.value,
+            "original_score": base_score,
+            "enhanced_score": enhanced_score,
+            "original_threshold": base_threshold,
+            "adjusted_threshold": adjusted_threshold,
+            "weight_applied": tier_config["strengthen_position_weight"],
+            "threshold_adjustment": tier_adjustments["strengthening_threshold_reduction"],
+            "execution_priority": tier_config["execution_priority"],
+            "position_size_multiplier": tier_config["position_size_multiplier"]
+        }
+        
+        self.enhancement_stats["tier_decisions"][tier] += 1
+        self.enhancement_stats["tier_adjustments_applied"] += 1
+        
+        return enhanced_score, adjusted_threshold, enhancement_details
+    
+    def enhance_creation_decision(self, candidate: SignalCandidate,
+                                base_score: float,
+                                base_threshold: float) -> Tuple[float, float, Dict[str, Any]]:
+        """
+        增強新單建立決策評估
+        """
+        tier = self.extract_signal_tier(candidate)
+        tier_config = self.tier_decision_mapping[tier]
+        tier_adjustments = self.tier_threshold_adjustments[tier]
+        
+        enhanced_score = base_score * tier_config["create_new_position_weight"]
+        adjusted_threshold = base_threshold - tier_adjustments["creation_threshold_reduction"]
+        
+        # 根據層級調整倉位大小
+        base_position_size = 1000  # 假設基礎倉位
+        enhanced_position_size = base_position_size * tier_config["position_size_multiplier"]
+        
+        enhancement_details = {
+            "signal_tier": tier.value,
+            "original_score": base_score,
+            "enhanced_score": enhanced_score,
+            "original_threshold": base_threshold,
+            "adjusted_threshold": adjusted_threshold,
+            "weight_applied": tier_config["create_new_position_weight"],
+            "threshold_adjustment": tier_adjustments["creation_threshold_reduction"],
+            "execution_priority": tier_config["execution_priority"],
+            "base_position_size": base_position_size,
+            "enhanced_position_size": enhanced_position_size,
+            "risk_tolerance_adjustment": tier_config["risk_tolerance_increase"]
+        }
+        
+        self.enhancement_stats["tier_decisions"][tier] += 1
+        self.enhancement_stats["tier_adjustments_applied"] += 1
+        
+        return enhanced_score, adjusted_threshold, enhancement_details
+    
+    def enhance_ignore_decision(self, candidate: SignalCandidate,
+                              base_score: float,
+                              base_threshold: float) -> Tuple[float, float, Dict[str, Any]]:
+        """
+        增強忽略決策評估
+        """
+        tier = self.extract_signal_tier(candidate)
+        tier_config = self.tier_decision_mapping[tier]
+        tier_adjustments = self.tier_threshold_adjustments[tier]
+        
+        enhanced_score = base_score * tier_config["ignore_signal_weight"]
+        adjusted_threshold = base_threshold + tier_adjustments["ignore_threshold_increase"]
+        
+        enhancement_details = {
+            "signal_tier": tier.value,
+            "original_score": base_score,
+            "enhanced_score": enhanced_score,
+            "original_threshold": base_threshold,
+            "adjusted_threshold": adjusted_threshold,
+            "weight_applied": tier_config["ignore_signal_weight"],
+            "threshold_adjustment": tier_adjustments["ignore_threshold_increase"],
+            "execution_priority": tier_config["execution_priority"]
+        }
+        
+        self.enhancement_stats["tier_decisions"][tier] += 1
+        self.enhancement_stats["tier_adjustments_applied"] += 1
+        
+        return enhanced_score, adjusted_threshold, enhancement_details
+    
+    def get_tier_execution_priority(self, candidate: SignalCandidate) -> str:
+        """獲取層級執行優先級"""
+        tier = self.extract_signal_tier(candidate)
+        return self.tier_decision_mapping[tier]["execution_priority"]
+    
+    def get_enhancement_statistics(self) -> Dict[str, Any]:
+        """獲取增強統計信息"""
+        total_decisions = sum(self.enhancement_stats["tier_decisions"].values())
+        
+        stats = {
+            "total_enhanced_decisions": total_decisions,
+            "tier_distribution": {
+                tier.value: count for tier, count in self.enhancement_stats["tier_decisions"].items()
+            },
+            "tier_percentages": {
+                tier.value: (count / total_decisions * 100) if total_decisions > 0 else 0
+                for tier, count in self.enhancement_stats["tier_decisions"].items()
+            },
+            "adjustments_applied": self.enhancement_stats["tier_adjustments_applied"],
+            "enhancement_rate": (self.enhancement_stats["tier_adjustments_applied"] / total_decisions * 100) if total_decisions > 0 else 0
+        }
+        
+        return stats
+
+
+# 全局層級感知增強器實例
+tier_aware_enhancer = TierAwareDecisionEnhancer()
+
+
+class EnhancedExecutionPolicyLayer(ExecutionPolicyLayer):
+    """
+    增強版執行決策層 - 整合層級感知功能
+    """
+    
+    def __init__(self):
+        super().__init__()
+        self.tier_enhancer = tier_aware_enhancer
+        self.enhanced_decision_log = []
+    
+    async def make_decision(self, candidate: SignalCandidate, 
+                          market_snapshot: MarketSnapshot,
+                          portfolio_snapshot: PortfolioSnapshot,
+                          liquidity_snapshot: LiquiditySnapshot) -> EPLDecisionResult:
+        """
+        層級感知決策製作 - 覆寫原始方法以整合層級增強
+        """
+        start_time = datetime.now()
+        processing_start = time.time()
+        
+        # 提取信號層級
+        signal_tier = self.tier_enhancer.extract_signal_tier(candidate)
+        
+        logger.info(f"🎯 開始層級感知決策處理 - {candidate.symbol} [{signal_tier.value}]")
+        
+        # 使用父類的原始決策邏輯，但應用層級增強
+        base_result = await super().make_decision(candidate, market_snapshot, portfolio_snapshot, liquidity_snapshot)
+        
+        # 應用層級增強到決策結果
+        enhanced_result = await self._apply_tier_enhancements(base_result, candidate, signal_tier)
+        
+        # 記錄增強決策
+        enhancement_log = {
+            "timestamp": datetime.now().isoformat(),
+            "symbol": candidate.symbol,
+            "signal_tier": signal_tier.value,
+            "original_decision": base_result.decision.value,
+            "enhanced_decision": enhanced_result.decision.value,
+            "decision_changed": base_result.decision != enhanced_result.decision,
+            "execution_priority": self.tier_enhancer.get_tier_execution_priority(candidate),
+            "processing_time_ms": (time.time() - processing_start) * 1000
+        }
+        
+        self.enhanced_decision_log.append(enhancement_log)
+        
+        # 保留最近1000條記錄
+        if len(self.enhanced_decision_log) > 1000:
+            self.enhanced_decision_log = self.enhanced_decision_log[-1000:]
+        
+        logger.info(f"✅ 層級感知決策完成 - {enhanced_result.decision.value} [{signal_tier.value}]")
+        
+        return enhanced_result
+    
+    async def _apply_tier_enhancements(self, base_result: EPLDecisionResult, 
+                                     candidate: SignalCandidate, 
+                                     signal_tier: SignalTier) -> EPLDecisionResult:
+        """
+        應用層級增強到決策結果
+        """
+        # 深拷貝基礎結果以避免修改原始數據
+        enhanced_result = EPLDecisionResult(
+            decision=base_result.decision,
+            priority=base_result.priority,
+            candidate=base_result.candidate,
+            reasoning=base_result.reasoning.copy(),
+            execution_params=base_result.execution_params.copy(),
+            risk_management=base_result.risk_management.copy(),
+            performance_tracking=base_result.performance_tracking.copy(),
+            notification_config=base_result.notification_config.copy(),
+            timestamp=base_result.timestamp,
+            processing_time_ms=base_result.processing_time_ms
+        )
+        
+        # 根據層級調整執行參數
+        tier_config = self.tier_enhancer.tier_decision_mapping[signal_tier]
+        
+        # 調整倉位大小
+        if "position_size" in enhanced_result.execution_params:
+            original_size = enhanced_result.execution_params["position_size"]
+            enhanced_size = original_size * tier_config["position_size_multiplier"]
+            enhanced_result.execution_params["position_size"] = enhanced_size
+            enhanced_result.execution_params["tier_size_multiplier"] = tier_config["position_size_multiplier"]
+        
+        # 調整風險參數
+        if "stop_loss" in enhanced_result.execution_params and signal_tier in [SignalTier.CRITICAL, SignalTier.HIGH]:
+            # 高層級信號允許更寬的止損
+            risk_adjustment = tier_config["risk_tolerance_increase"]
+            enhanced_result.execution_params["tier_risk_adjustment"] = risk_adjustment
+        
+        # 添加執行優先級
+        enhanced_result.execution_params["execution_priority"] = tier_config["execution_priority"]
+        enhanced_result.execution_params["signal_tier"] = signal_tier.value
+        
+        # 更新通知配置
+        enhanced_result.notification_config["tier_priority"] = signal_tier.value
+        if signal_tier == SignalTier.CRITICAL:
+            enhanced_result.notification_config["urgent"] = True
+            enhanced_result.notification_config["immediate_alert"] = True
+        
+        # 添加層級推理
+        enhanced_result.reasoning.append(f"🔄 層級增強應用: {signal_tier.value}")
+        enhanced_result.reasoning.append(f"📊 倉位乘數: {tier_config['position_size_multiplier']:.2f}")
+        enhanced_result.reasoning.append(f"⚡ 執行優先級: {tier_config['execution_priority']}")
+        
+        # 更新績效追蹤
+        enhanced_result.performance_tracking["tier_enhancement"] = {
+            "signal_tier": signal_tier.value,
+            "size_multiplier": tier_config["position_size_multiplier"],
+            "execution_priority": tier_config["execution_priority"],
+            "enhancement_applied": True
+        }
+        
+        return enhanced_result
+    
+    def get_tier_enhancement_report(self) -> Dict[str, Any]:
+        """獲取層級增強報告"""
+        enhancer_stats = self.tier_enhancer.get_enhancement_statistics()
+        
+        recent_decisions = self.enhanced_decision_log[-100:] if self.enhanced_decision_log else []
+        
+        tier_decision_distribution = {}
+        for decision in recent_decisions:
+            tier = decision["signal_tier"]
+            final_decision = decision["enhanced_decision"]
+            
+            if tier not in tier_decision_distribution:
+                tier_decision_distribution[tier] = {}
+            
+            if final_decision not in tier_decision_distribution[tier]:
+                tier_decision_distribution[tier][final_decision] = 0
+            
+            tier_decision_distribution[tier][final_decision] += 1
+        
+        report = {
+            "enhancement_statistics": enhancer_stats,
+            "recent_decisions_count": len(recent_decisions),
+            "tier_decision_distribution": tier_decision_distribution,
+            "decision_changes": sum(1 for d in recent_decisions if d["decision_changed"]),
+            "average_processing_time_ms": sum(d["processing_time_ms"] for d in recent_decisions) / len(recent_decisions) if recent_decisions else 0,
+            "tier_execution_priorities": {
+                tier.value: config["execution_priority"] 
+                for tier, config in self.tier_enhancer.tier_decision_mapping.items()
+            }
+        }
+        
+        return report
+
+
+# 全局增強版執行決策層實例
+enhanced_execution_policy_layer = EnhancedExecutionPolicyLayer()

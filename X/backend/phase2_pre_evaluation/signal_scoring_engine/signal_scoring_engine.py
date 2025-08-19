@@ -42,23 +42,38 @@ class EnhancedSignalScoringEngine:
         # 歷史數據用於基線計算
         self.historical_confidence_data = []
         self.signal_volatility_history = []
+        
+        # 🎯 分層系統整合
+        self.tier_aware_scoring = True
+        self.tier_boost_factors = {
+            'CRITICAL': 1.2,    # 🚨 CRITICAL 層級信號加成 20%
+            'HIGH': 1.1,        # 🎯 HIGH 層級信號加成 10%
+            'MEDIUM': 1.0,      # 📊 MEDIUM 層級信號保持原值
+            'LOW': 0.9          # 📈 LOW 層級信號降低 10%
+        }
     
     def score_signal(self, signal_data: Dict[str, Any]) -> Dict[str, float]:
         """
-        信號評分主方法 - 3ms embedded processing
+        信號評分主方法 - 3ms embedded processing + 分層意識增強
         
         處理層:
         - Layer 0: Data Extraction (1ms)  
         - Layer 1: Score Calculation (2ms)
+        - Layer 2: Tier Enhancement (0.5ms) 🎯 新增
         """
         try:
             # Layer 0: Data Extraction (1ms)
             extracted_metrics = self._layer_0_data_extraction(signal_data)
             
             # Layer 1: Score Calculation (2ms)
-            complete_score_dict = self._layer_1_score_calculation(extracted_metrics, signal_data)
+            base_score_dict = self._layer_1_score_calculation(extracted_metrics, signal_data)
             
-            return complete_score_dict
+            # Layer 2: Tier Enhancement (0.5ms) 🎯 分層增強
+            if self.tier_aware_scoring:
+                enhanced_score_dict = self._layer_2_tier_enhancement(base_score_dict, signal_data)
+                return enhanced_score_dict
+            else:
+                return base_score_dict
             
         except Exception:
             # 預設回傳值
@@ -250,10 +265,108 @@ class EnhancedSignalScoringEngine:
             else:
                 directions.append(0)
         
-        if not directions:
-            return 1.0
+        # 計算一致性比例
+        if directions:
+            most_common_direction = max(set(directions), key=directions.count)
+            consensus_ratio = directions.count(most_common_direction) / len(directions)
+            return consensus_ratio
         
-        # 計算方向一致性
+        return 1.0
+    
+    def _layer_2_tier_enhancement(self, base_scores: Dict[str, float], signal_data: Dict[str, Any]) -> Dict[str, float]:
+        """Layer 2: 分層增強評分 - 基於 Phase1A 分層信息的評分增強"""
+        try:
+            # 提取分層信息
+            tier_metadata = signal_data.get('metadata', {}).get('tier_metadata', {})
+            tier_config = signal_data.get('metadata', {}).get('tier_config', {})
+            signal_tier = tier_metadata.get('tier', 'MEDIUM')
+            
+            # 如果沒有分層信息，返回原始評分
+            if not tier_metadata:
+                return base_scores
+            
+            # 獲取分層加成係數
+            tier_str = signal_tier.value if hasattr(signal_tier, 'value') else str(signal_tier)
+            tier_boost = self.tier_boost_factors.get(tier_str, 1.0)
+            
+            # 創建增強評分副本
+            enhanced_scores = base_scores.copy()
+            
+            # 1. 基於 Lean 信心度增強信心評分
+            lean_confidence = tier_metadata.get('lean_confidence', 0.0)
+            if lean_confidence > 0:
+                lean_boost = min(0.3, lean_confidence * 0.5)  # 最大30%加成
+                enhanced_scores['confidence_score'] = min(1.0, 
+                    enhanced_scores['confidence_score'] + lean_boost
+                )
+            
+            # 2. 基於分層等級增強強度評分
+            enhanced_scores['strength_score'] = min(1.0, 
+                enhanced_scores['strength_score'] * tier_boost
+            )
+            
+            # 3. 基於倉位乘數調整質量評分
+            position_multiplier = tier_config.get('position_multiplier', 1.0)
+            if position_multiplier > 0.5:  # 大倉位信號提高質量要求
+                enhanced_scores['quality_score'] = min(1.0,
+                    enhanced_scores['quality_score'] * 1.1
+                )
+            elif position_multiplier < 0.3:  # 小倉位信號降低質量要求
+                enhanced_scores['quality_score'] = max(0.3,
+                    enhanced_scores['quality_score'] * 0.9
+                )
+            
+            # 4. 基於執行優先級調整時間評分
+            execution_priority = tier_config.get('execution_priority', 3)
+            if execution_priority <= 2:  # 高優先級信號
+                enhanced_scores['timing_score'] = min(1.0,
+                    enhanced_scores['timing_score'] * 1.15
+                )
+            
+            # 5. 基於期望收益調整風險評分
+            expected_return = tier_metadata.get('expected_return', 0.0)
+            if expected_return > 0.01:  # 高期望收益
+                enhanced_scores['risk_score'] = min(1.0,
+                    enhanced_scores['risk_score'] * 1.1
+                )
+            elif expected_return < 0:  # 負期望收益
+                enhanced_scores['risk_score'] = max(0.3,
+                    enhanced_scores['risk_score'] * 0.8
+                )
+            
+            # 6. 添加分層評分元數據
+            enhanced_scores['tier_enhancement_applied'] = True
+            enhanced_scores['tier_boost_factor'] = tier_boost
+            enhanced_scores['lean_confidence_boost'] = lean_confidence
+            enhanced_scores['tier_level'] = tier_str
+            
+            return enhanced_scores
+            
+        except Exception as e:
+            # 分層增強失敗，返回原始評分
+            base_scores['tier_enhancement_error'] = str(e)
+            return base_scores
+    
+    def get_tier_adjusted_final_score(self, scores: Dict[str, float]) -> float:
+        """計算分層調整後的最終評分"""
+        try:
+            # 基礎加權評分
+            base_final_score = (
+                scores.get('strength_score', 0.5) * self.scoring_weights['strength_scoring'] +
+                scores.get('confidence_score', 0.7) * self.scoring_weights['confidence_scoring'] +
+                scores.get('quality_score', 0.6) * self.scoring_weights['quality_scoring'] +
+                scores.get('risk_score', 0.5) * self.scoring_weights['risk_scoring'] +
+                scores.get('timing_score', 0.8) * self.scoring_weights['timing_scoring']
+            )
+            
+            # 分層加成
+            tier_boost = scores.get('tier_boost_factor', 1.0)
+            final_score = min(1.0, base_final_score * tier_boost)
+            
+            return final_score
+            
+        except Exception:
+            return 0.7  # 默認評分
         most_common_direction = max(set(directions), key=directions.count)
         consensus_count = directions.count(most_common_direction)
         consensus_ratio = consensus_count / len(directions)
@@ -262,3 +375,189 @@ class EnhancedSignalScoringEngine:
 
 # 全域實例 (embedded_in_epl_step3_quality_control)
 signal_scoring_engine = EnhancedSignalScoringEngine()
+
+class TierAwareScoring:
+    """分層感知評分系統 - Phase2 與 Phase1A 分層系統整合"""
+    
+    def __init__(self):
+        self.base_scoring_engine = signal_scoring_engine
+        
+        # 分層權重調整策略
+        self.tier_weight_adjustments = {
+            'CRITICAL': {
+                'strength_weight_boost': 0.1,      # 強度權重提升
+                'confidence_weight_boost': 0.15,   # 信心度權重大幅提升
+                'quality_requirement_strict': True, # 嚴格質量要求
+                'risk_tolerance_low': 0.8          # 低風險容忍度
+            },
+            'HIGH': {
+                'strength_weight_boost': 0.05,
+                'confidence_weight_boost': 0.1,
+                'quality_requirement_strict': True,
+                'risk_tolerance_low': 0.9
+            },
+            'MEDIUM': {
+                'strength_weight_boost': 0.0,
+                'confidence_weight_boost': 0.0,
+                'quality_requirement_strict': False,
+                'risk_tolerance_low': 1.0
+            },
+            'LOW': {
+                'strength_weight_boost': -0.05,    # 探索性信號，降低強度要求
+                'confidence_weight_boost': -0.1,
+                'quality_requirement_strict': False,
+                'risk_tolerance_low': 1.2          # 允許更高風險
+            }
+        }
+    
+    def calculate_tier_score(self, signal_data: Dict[str, Any], lean_params: Dict[str, Any]) -> Dict[str, float]:
+        """計算分層感知評分 - 結合 Lean 信心度和技術指標"""
+        
+        # 提取 Lean 參數
+        lean_confidence = lean_params.get('confidence_level', 0.5)
+        lean_direction = lean_params.get('consensus_direction', 'NEUTRAL')
+        lean_expected_return = lean_params.get('expected_return', 0.0)
+        signal_tier = lean_params.get('signal_tier', 'MEDIUM')
+        
+        # 基礎技術評分
+        base_scores = self.base_scoring_engine.score_signal(signal_data)
+        
+        # 分層權重調整
+        tier_adjustments = self.tier_weight_adjustments.get(signal_tier, self.tier_weight_adjustments['MEDIUM'])
+        
+        # 調整後的評分權重
+        adjusted_weights = self.base_scoring_engine.scoring_weights.copy()
+        adjusted_weights['strength_scoring'] += tier_adjustments['strength_weight_boost']
+        adjusted_weights['confidence_scoring'] += tier_adjustments['confidence_weight_boost']
+        
+        # 正規化權重
+        total_weight = sum(adjusted_weights.values())
+        for key in adjusted_weights:
+            adjusted_weights[key] /= total_weight
+        
+        # Lean 信心度融合到信心度評分
+        lean_boost = lean_confidence * 0.3  # Lean 貢獻最多 30%
+        enhanced_confidence_score = min(1.0, base_scores.get('confidence_score', 0.7) + lean_boost)
+        
+        # 期望收益融合到強度評分
+        return_boost = abs(lean_expected_return) * 5.0  # 期望收益轉換為強度加成
+        enhanced_strength_score = min(1.0, base_scores.get('strength_score', 0.5) + return_boost)
+        
+        # 分層質量要求
+        quality_score = base_scores.get('quality_score', 0.6)
+        if tier_adjustments['quality_requirement_strict'] and quality_score < 0.7:
+            quality_score *= 0.8  # 嚴格模式下，低質量信號懲罰
+        
+        # 風險容忍度調整
+        risk_score = base_scores.get('risk_score', 0.5)
+        risk_adjustment = tier_adjustments['risk_tolerance_low']
+        adjusted_risk_score = min(1.0, risk_score * risk_adjustment)
+        
+        # 計算最終分層評分
+        tier_aware_scores = {
+            'base_strength_score': base_scores.get('strength_score', 0.5),
+            'enhanced_strength_score': enhanced_strength_score,
+            'base_confidence_score': base_scores.get('confidence_score', 0.7),
+            'enhanced_confidence_score': enhanced_confidence_score,
+            'quality_score': quality_score,
+            'adjusted_risk_score': adjusted_risk_score,
+            'timing_score': base_scores.get('timing_score', 0.8),
+            'lean_confidence_boost': lean_boost,
+            'lean_return_boost': return_boost,
+            'signal_tier': signal_tier,
+            'tier_weight_adjustments': tier_adjustments
+        }
+        
+        # 最終加權評分
+        final_tier_score = (
+            enhanced_strength_score * adjusted_weights['strength_scoring'] +
+            enhanced_confidence_score * adjusted_weights['confidence_scoring'] +
+            quality_score * adjusted_weights['quality_scoring'] +
+            adjusted_risk_score * adjusted_weights['risk_scoring'] +
+            tier_aware_scores['timing_score'] * adjusted_weights['timing_scoring']
+        )
+        
+        tier_aware_scores['final_tier_score'] = final_tier_score
+        tier_aware_scores['score_improvement'] = final_tier_score - base_scores.get('final_score', 0.7)
+        
+        return tier_aware_scores
+    
+    def compare_tier_performance(self, signals_with_tiers: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """比較不同分層的性能表現"""
+        tier_performance = {
+            'CRITICAL': {'count': 0, 'avg_score': 0.0, 'scores': []},
+            'HIGH': {'count': 0, 'avg_score': 0.0, 'scores': []},
+            'MEDIUM': {'count': 0, 'avg_score': 0.0, 'scores': []},
+            'LOW': {'count': 0, 'avg_score': 0.0, 'scores': []}
+        }
+        
+        for signal in signals_with_tiers:
+            tier = signal.get('signal_tier', 'MEDIUM')
+            score = signal.get('final_tier_score', 0.0)
+            
+            if tier in tier_performance:
+                tier_performance[tier]['count'] += 1
+                tier_performance[tier]['scores'].append(score)
+        
+        # 計算統計數據
+        for tier in tier_performance:
+            scores = tier_performance[tier]['scores']
+            if scores:
+                tier_performance[tier]['avg_score'] = sum(scores) / len(scores)
+                tier_performance[tier]['min_score'] = min(scores)
+                tier_performance[tier]['max_score'] = max(scores)
+                tier_performance[tier]['score_std'] = (sum((x - tier_performance[tier]['avg_score'])**2 for x in scores) / len(scores))**0.5
+        
+        return tier_performance
+    
+    def get_tier_recommendation(self, tier_score_result: Dict[str, float]) -> Dict[str, Any]:
+        """基於分層評分結果提供建議"""
+        final_score = tier_score_result.get('final_tier_score', 0.0)
+        signal_tier = tier_score_result.get('signal_tier', 'MEDIUM')
+        score_improvement = tier_score_result.get('score_improvement', 0.0)
+        
+        recommendation = {
+            'execution_recommendation': 'HOLD',
+            'confidence_level': 'MEDIUM',
+            'suggested_position_size': 0.5,
+            'reasoning': []
+        }
+        
+        # 基於分層和評分的執行建議
+        if signal_tier == 'CRITICAL' and final_score > 0.8:
+            recommendation['execution_recommendation'] = 'STRONG_BUY'
+            recommendation['confidence_level'] = 'HIGH'
+            recommendation['suggested_position_size'] = 0.8
+            recommendation['reasoning'].append('CRITICAL層級信號，高評分，強烈建議執行')
+            
+        elif signal_tier == 'HIGH' and final_score > 0.75:
+            recommendation['execution_recommendation'] = 'BUY'
+            recommendation['confidence_level'] = 'HIGH'
+            recommendation['suggested_position_size'] = 0.6
+            recommendation['reasoning'].append('HIGH層級信號，良好評分，建議執行')
+            
+        elif signal_tier == 'MEDIUM' and final_score > 0.7:
+            recommendation['execution_recommendation'] = 'BUY'
+            recommendation['confidence_level'] = 'MEDIUM'
+            recommendation['suggested_position_size'] = 0.4
+            recommendation['reasoning'].append('MEDIUM層級信號，達標評分，可以執行')
+            
+        elif signal_tier == 'LOW' and final_score > 0.6:
+            recommendation['execution_recommendation'] = 'SMALL_BUY'
+            recommendation['confidence_level'] = 'LOW'
+            recommendation['suggested_position_size'] = 0.2
+            recommendation['reasoning'].append('LOW層級信號，探索性執行')
+            
+        else:
+            recommendation['reasoning'].append(f'{signal_tier}層級信號評分不足({final_score:.2f})，建議持有')
+        
+        # 改進建議
+        if score_improvement > 0.1:
+            recommendation['reasoning'].append(f'分層優化帶來{score_improvement:.2f}分改進')
+        elif score_improvement < -0.05:
+            recommendation['reasoning'].append(f'分層調整降低{abs(score_improvement):.2f}分，需檢查參數')
+        
+        return recommendation
+
+# 全域分層感知評分實例
+tier_aware_scoring_engine = TierAwareScoring()

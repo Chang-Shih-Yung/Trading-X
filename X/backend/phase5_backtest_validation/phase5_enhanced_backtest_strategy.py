@@ -15,6 +15,7 @@ import logging
 import json
 import warnings
 from pathlib import Path
+import aiohttp
 
 # 關閉警告
 warnings.filterwarnings('ignore')
@@ -87,7 +88,7 @@ class LeanHistoricalMatcher:
         # 主要加密貨幣 (高流動性)
         self.major_symbols = [
             "BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT", 
-            "XRPUSDT", "SOLUSDT", "DOTUSDT"
+            "XRPUSDT", "SOLUSDT", "DOGEUSDT"
         ]
         
         # Lean 時間框架：H4+D1投票，W1制度
@@ -624,7 +625,7 @@ async def run_lean_backtest_analysis(symbols: List[str] = None) -> Dict:
     try:
         # 使用預設主要幣種或用戶指定
         if symbols is None:
-            symbols = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT", "XRPUSDT", "SOLUSDT", "DOTUSDT"]
+            symbols = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT", "XRPUSDT", "SOLUSDT", "DOGEUSDT"]
         
         lean_matcher = LeanHistoricalMatcher()
         lean_results = []
@@ -634,10 +635,10 @@ async def run_lean_backtest_analysis(symbols: List[str] = None) -> Dict:
             logger.info(f"🔍 分析 {symbol} - Lean 相似度匹配...")
             
             try:
-                # 模擬生成不同時間框架的歷史數據
-                h4_df = await generate_mock_historical_data(symbol, "4h", days=30)
-                d1_df = await generate_mock_historical_data(symbol, "1d", days=90) 
-                w1_df = await generate_mock_historical_data(symbol, "1w", days=365)
+                # 獲取真實的不同時間框架歷史數據
+                h4_df = await get_real_binance_data(symbol, "4h", days=30)
+                d1_df = await get_real_binance_data(symbol, "1d", days=90) 
+                w1_df = await get_real_binance_data(symbol, "1w", days=365)
                 
                 # 生成 Lean 共識
                 lean_consensus = await lean_matcher.generate_lean_consensus(symbol, h4_df, d1_df, w1_df)
@@ -690,64 +691,59 @@ async def run_lean_backtest_analysis(symbols: List[str] = None) -> Dict:
     except Exception as e:
         logger.error(f"❌ Lean 回測分析失敗: {e}")
         return {"error": str(e), "lean_analysis_timestamp": datetime.now().isoformat()}
-
-async def generate_mock_historical_data(symbol: str, interval: str, days: int = 30) -> pd.DataFrame:
-    """生成模擬歷史數據 (實際應從 Binance API 獲取)"""
+    
+async def get_real_binance_data(symbol: str, interval: str, days: int = 30) -> pd.DataFrame:
+    """獲取真實 Binance API 歷史數據"""
     try:
-        # 根據時間間隔計算數據點數量
+        # 計算需要的 K 線數量
         if interval == "4h":
-            periods = days * 6  # 一天6根4小時K線
+            limit = days * 6  # 一天6根4小時K線
+            binance_interval = "4h"
         elif interval == "1d":
-            periods = days     # 一天1根日K線
+            limit = days
+            binance_interval = "1d"
         elif interval == "1w":
-            periods = days // 7  # 一週1根週K線
+            limit = days // 7
+            binance_interval = "1w"
         else:
-            periods = days * 24  # 預設小時K線
+            limit = days * 24
+            binance_interval = "1h"
         
-        # 生成時間序列
-        end_time = datetime.now()
-        if interval == "4h":
-            freq = "4H"
-        elif interval == "1d":
-            freq = "D"
-        elif interval == "1w":
-            freq = "W"
-        else:
-            freq = "H"
+        # 限制最大數據量 (Binance API 限制)
+        limit = min(limit, 1000)
         
-        timestamps = pd.date_range(end=end_time, periods=periods, freq=freq)
+        url = "https://api.binance.com/api/v3/klines"
+        params = {
+            "symbol": symbol,
+            "interval": binance_interval,
+            "limit": limit
+        }
         
-        # 模擬價格走勢 (帶有一定趨勢性)
-        base_price = 30000 if "BTC" in symbol else (2000 if "ETH" in symbol else 300)
-        
-        # 生成帶趨勢的隨機遊走
-        returns = np.random.normal(0.0001, 0.02, periods)  # 小幅正向趨勢 + 2%波動
-        returns[0] = 0  # 第一個收益率為0
-        
-        prices = base_price * np.exp(np.cumsum(returns))
-        
-        # 生成 OHLC 數據
-        highs = prices * (1 + np.abs(np.random.normal(0, 0.01, periods)))
-        lows = prices * (1 - np.abs(np.random.normal(0, 0.01, periods)))
-        opens = np.roll(prices, 1)
-        opens[0] = prices[0]
-        
-        # 生成成交量
-        volumes = np.random.lognormal(10, 1, periods)
-        
-        df = pd.DataFrame({
-            'timestamp': timestamps,
-            'open': opens,
-            'high': highs,
-            'low': lows,
-            'close': prices,
-            'volume': volumes
-        })
-        
-        return df
-        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    # 轉換為 DataFrame
+                    df = pd.DataFrame(data, columns=[
+                        'timestamp', 'open', 'high', 'low', 'close', 'volume',
+                        'close_time', 'quote_volume', 'trades', 'taker_buy_base',
+                        'taker_buy_quote', 'ignore'
+                    ])
+                    
+                    # 資料處理
+                    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+                    for col in ['open', 'high', 'low', 'close', 'volume']:
+                        df[col] = df[col].astype(float)
+                    
+                    logger.info(f"✅ 獲取 {symbol} {interval} 真實數據: {len(df)} 根 K 線")
+                    return df
+                else:
+                    logger.error(f"❌ 獲取 {symbol} {interval} 數據失敗: {response.status}")
+                    return pd.DataFrame()
+                    
     except Exception as e:
-        logger.error(f"模擬數據生成失敗: {e}")
+        logger.error(f"❌ 獲取 {symbol} {interval} 真實數據異常: {e}")
         return pd.DataFrame()
 
 # 主要執行函數

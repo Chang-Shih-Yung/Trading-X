@@ -27,7 +27,7 @@ class RealMarketValidator:
     def __init__(self):
         self.binance_url = "https://api.binance.com"
         self.session = None
-        self.test_symbols = ["BTCUSDT", "ETHUSDT", "BNBUSDT"]  # 主要測試幣種
+        self.test_symbols = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT", "SOLUSDT", "DOGEUSDT", "XRPUSDT"]  # 完整測試幣種列表
         self.validation_results = []
         self.signal_tracking = {}
         
