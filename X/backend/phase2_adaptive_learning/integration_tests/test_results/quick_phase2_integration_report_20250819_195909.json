@@ -1,0 +1,74 @@
+{
+  "test_timestamp": "2025-08-19T19:59:09.899627",
+  "test_duration_seconds": 8.054929,
+  "test_configuration": {
+    "test_cycles": 8,
+    "test_symbols": [
+      "BTCUSDT",
+      "ETHUSDT",
+      "ADAUSDT"
+    ],
+    "components_tested": [
+      "AdvancedMarketDetector",
+      "AdaptiveLearningEngine"
+    ]
+  },
+  "integration_statistics": {
+    "total_cycles": 8,
+    "successful_detections": 24,
+    "signals_processed": 24,
+    "learning_updates": 3
+  },
+  "performance_metrics": {
+    "detection_success_rate": 1.0,
+    "signal_processing_efficiency": 1.0,
+    "learning_update_frequency": 0.375,
+    "average_cycle_time": 1.006866125
+  },
+  "component_summaries": {
+    "market_detector": {
+      "total_detections": 24,
+      "regime_transitions": 0,
+      "average_confidence": 1.0,
+      "average_stability": 0.22648455870822093,
+      "current_regime": "BEAR_TREND",
+      "detection_accuracy": 0.22648455870822093,
+      "system_status": "運行正常"
+    },
+    "learning_engine": {
+      "learning_status": "COLLECTING_DATA",
+      "performance_metrics": {
+        "total_signals_tracked": 24,
+        "successful_signals": 8,
+        "total_return": 0.14478930213149901,
+        "average_return": 0.006295187049195609,
+        "success_rate": 0.34782608695652173,
+        "sharpe_ratio": 0.28650686285002147,
+        "max_drawdown": 0.0
+      },
+      "learning_statistics": {
+        "patterns_discovered": 0,
+        "parameters_optimized": 0,
+        "retraining_cycles": 0,
+        "model_accuracy": 0.0
+      },
+      "current_parameters": {
+        "signal_threshold": 0.6,
+        "momentum_weight": 1.0,
+        "volume_weight": 0.8,
+        "volatility_adjustment": 1.0,
+        "trend_sensitivity": 1.0,
+        "risk_multiplier": 1.0
+      },
+      "discovered_patterns": {},
+      "recent_optimizations": {}
+    }
+  },
+  "integration_health": {
+    "market_detection_working": true,
+    "signal_processing_working": true,
+    "learning_updates_working": true,
+    "overall_system_functional": true
+  },
+  "overall_integration_score": 1.0
+}

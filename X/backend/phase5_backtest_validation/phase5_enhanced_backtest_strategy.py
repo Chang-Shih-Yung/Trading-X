@@ -618,7 +618,9 @@ async def save_lean_config_to_phase5_backup(lean_config: Dict) -> str:
 
 # ==================== 主要執行函數 ====================
 
-async def run_lean_backtest_analysis(symbols: List[str] = None) -> Dict:
+async def run_lean_backtest_analysis(symbols: List[str] = None, 
+                                    lookback_days: int = 30, 
+                                    optimization_mode: str = "standard") -> Dict:
     """執行 Lean 回測分析主流程"""
     logger.info("🚀 啟動 Phase5 Lean 相似度回測分析...")
     
@@ -626,6 +628,18 @@ async def run_lean_backtest_analysis(symbols: List[str] = None) -> Dict:
         # 使用預設主要幣種或用戶指定
         if symbols is None:
             symbols = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT", "XRPUSDT", "SOLUSDT", "DOGEUSDT"]
+        
+        # 根據優化模式調整參數
+        if optimization_mode == "startup_optimization":
+            # 啟動優化模式：快速分析
+            h4_days = min(lookback_days, 30)
+            d1_days = min(lookback_days * 3, 90)
+            w1_days = min(lookback_days * 7, 365)
+        else:
+            # 標準模式
+            h4_days = 30
+            d1_days = 90
+            w1_days = 365
         
         lean_matcher = LeanHistoricalMatcher()
         lean_results = []
@@ -636,9 +650,9 @@ async def run_lean_backtest_analysis(symbols: List[str] = None) -> Dict:
             
             try:
                 # 獲取真實的不同時間框架歷史數據
-                h4_df = await get_real_binance_data(symbol, "4h", days=30)
-                d1_df = await get_real_binance_data(symbol, "1d", days=90) 
-                w1_df = await get_real_binance_data(symbol, "1w", days=365)
+                h4_df = await get_real_binance_data(symbol, "4h", days=h4_days)
+                d1_df = await get_real_binance_data(symbol, "1d", days=d1_days) 
+                w1_df = await get_real_binance_data(symbol, "1w", days=w1_days)
                 
                 # 生成 Lean 共識
                 lean_consensus = await lean_matcher.generate_lean_consensus(symbol, h4_df, d1_df, w1_df)

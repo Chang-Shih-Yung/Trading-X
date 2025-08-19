@@ -1,0 +1,885 @@
+{
+  "integration_timestamp": "2025-08-19T20:11:55.407044",
+  "integration_duration_seconds": 11.00553,
+  "integration_mode": "REAL_DATA_ONLY",
+  "phases_integrated": [
+    "Phase1A",
+    "Phase2",
+    "Phase3"
+  ],
+  "total_cycles": 10,
+  "integration_statistics": {
+    "signals_generated": 30,
+    "market_detections": 0,
+    "learning_updates": 3,
+    "parameter_optimizations": 0,
+    "integration_cycles": 10
+  },
+  "phase_success_rates": {
+    "phase1a_success_rate": 1.0,
+    "phase2_success_rate": 1.0,
+    "phase3_success_rate": 1.0
+  },
+  "integration_health": {
+    "multi_phase_integration": true,
+    "real_data_validation": true,
+    "schema_preservation": true,
+    "learning_updates_functional": true,
+    "parameter_optimization_active": false
+  },
+  "data_integrity": {
+    "data_integrity": true,
+    "no_simulation_used": true,
+    "real_components_only": true
+  },
+  "detailed_results": {
+    "integration_cycles": [
+      {
+        "cycle_number": 1,
+        "timestamp": "2025-08-19T20:11:45.370987",
+        "phase1a_signals": [
+          {
+            "symbol": "BTCUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:45.371005",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ETHUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:45.371040",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ADAUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:45.371069",
+            "real_data_used": true
+          }
+        ],
+        "phase2_detections": [
+          {
+            "symbol": "BTCUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:45.371023",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ETHUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:45.371054",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ADAUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:45.371082",
+            "real_data_used": true
+          }
+        ],
+        "phase3_optimizations": [
+          {
+            "symbol": "BTCUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:45.371025"
+          },
+          {
+            "symbol": "ETHUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:45.371055"
+          },
+          {
+            "symbol": "ADAUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:45.371083"
+          }
+        ],
+        "cycle_performance": {}
+      },
+      {
+        "cycle_number": 2,
+        "timestamp": "2025-08-19T20:11:46.372585",
+        "phase1a_signals": [
+          {
+            "symbol": "BTCUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:46.372682",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ETHUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:46.372820",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ADAUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:46.372909",
+            "real_data_used": true
+          }
+        ],
+        "phase2_detections": [
+          {
+            "symbol": "BTCUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:46.372762",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ETHUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:46.372863",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ADAUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:46.372949",
+            "real_data_used": true
+          }
+        ],
+        "phase3_optimizations": [
+          {
+            "symbol": "BTCUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:46.372769"
+          },
+          {
+            "symbol": "ETHUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:46.372868"
+          },
+          {
+            "symbol": "ADAUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:46.372954"
+          }
+        ],
+        "cycle_performance": {}
+      },
+      {
+        "cycle_number": 3,
+        "timestamp": "2025-08-19T20:11:47.374526",
+        "phase1a_signals": [
+          {
+            "symbol": "BTCUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:47.374581",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ETHUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:47.374636",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ADAUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:47.374679",
+            "real_data_used": true
+          }
+        ],
+        "phase2_detections": [
+          {
+            "symbol": "BTCUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:47.374610",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ETHUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:47.374657",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ADAUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:47.374698",
+            "real_data_used": true
+          }
+        ],
+        "phase3_optimizations": [
+          {
+            "symbol": "BTCUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:47.374614"
+          },
+          {
+            "symbol": "ETHUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:47.374659"
+          },
+          {
+            "symbol": "ADAUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:47.374700"
+          }
+        ],
+        "cycle_performance": {}
+      },
+      {
+        "cycle_number": 4,
+        "timestamp": "2025-08-19T20:11:48.378338",
+        "phase1a_signals": [
+          {
+            "symbol": "BTCUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:48.378516",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ETHUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:48.378701",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ADAUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:48.378805",
+            "real_data_used": true
+          }
+        ],
+        "phase2_detections": [
+          {
+            "symbol": "BTCUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:48.378586",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ETHUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:48.378751",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ADAUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:48.378853",
+            "real_data_used": true
+          }
+        ],
+        "phase3_optimizations": [
+          {
+            "symbol": "BTCUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:48.378599"
+          },
+          {
+            "symbol": "ETHUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:48.378757"
+          },
+          {
+            "symbol": "ADAUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:48.378858"
+          }
+        ],
+        "cycle_performance": {}
+      },
+      {
+        "cycle_number": 5,
+        "timestamp": "2025-08-19T20:11:49.381076",
+        "phase1a_signals": [
+          {
+            "symbol": "BTCUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:49.381248",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ETHUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:49.381406",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ADAUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:49.381566",
+            "real_data_used": true
+          }
+        ],
+        "phase2_detections": [
+          {
+            "symbol": "BTCUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:49.381329",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ETHUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:49.381465",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ADAUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:49.381624",
+            "real_data_used": true
+          }
+        ],
+        "phase3_optimizations": [
+          {
+            "symbol": "BTCUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:49.381344"
+          },
+          {
+            "symbol": "ETHUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:49.381471"
+          },
+          {
+            "symbol": "ADAUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:49.381630"
+          }
+        ],
+        "cycle_performance": {}
+      },
+      {
+        "cycle_number": 6,
+        "timestamp": "2025-08-19T20:11:50.383106",
+        "phase1a_signals": [
+          {
+            "symbol": "BTCUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:50.383190",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ETHUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:50.383278",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ADAUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:50.383352",
+            "real_data_used": true
+          }
+        ],
+        "phase2_detections": [
+          {
+            "symbol": "BTCUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:50.383234",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ETHUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:50.383313",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ADAUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:50.383387",
+            "real_data_used": true
+          }
+        ],
+        "phase3_optimizations": [
+          {
+            "symbol": "BTCUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:50.383240"
+          },
+          {
+            "symbol": "ETHUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:50.383317"
+          },
+          {
+            "symbol": "ADAUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:50.383390"
+          }
+        ],
+        "cycle_performance": {}
+      },
+      {
+        "cycle_number": 7,
+        "timestamp": "2025-08-19T20:11:51.390239",
+        "phase1a_signals": [
+          {
+            "symbol": "BTCUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:51.390506",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ETHUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:51.390590",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ADAUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:51.390643",
+            "real_data_used": true
+          }
+        ],
+        "phase2_detections": [
+          {
+            "symbol": "BTCUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:51.390557",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ETHUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:51.390618",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ADAUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:51.390665",
+            "real_data_used": true
+          }
+        ],
+        "phase3_optimizations": [
+          {
+            "symbol": "BTCUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:51.390562"
+          },
+          {
+            "symbol": "ETHUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:51.390620"
+          },
+          {
+            "symbol": "ADAUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:51.390668"
+          }
+        ],
+        "cycle_performance": {}
+      },
+      {
+        "cycle_number": 8,
+        "timestamp": "2025-08-19T20:11:52.394637",
+        "phase1a_signals": [
+          {
+            "symbol": "BTCUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:52.395317",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ETHUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:52.395476",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ADAUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:52.395829",
+            "real_data_used": true
+          }
+        ],
+        "phase2_detections": [
+          {
+            "symbol": "BTCUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:52.395401",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ETHUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:52.395535",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ADAUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:52.395875",
+            "real_data_used": true
+          }
+        ],
+        "phase3_optimizations": [
+          {
+            "symbol": "BTCUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:52.395415"
+          },
+          {
+            "symbol": "ETHUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:52.395541"
+          },
+          {
+            "symbol": "ADAUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:52.395880"
+          }
+        ],
+        "cycle_performance": {}
+      },
+      {
+        "cycle_number": 9,
+        "timestamp": "2025-08-19T20:11:53.402210",
+        "phase1a_signals": [
+          {
+            "symbol": "BTCUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:53.402299",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ETHUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:53.402412",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ADAUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:53.402504",
+            "real_data_used": true
+          }
+        ],
+        "phase2_detections": [
+          {
+            "symbol": "BTCUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:53.402358",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ETHUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:53.402457",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ADAUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:53.402544",
+            "real_data_used": true
+          }
+        ],
+        "phase3_optimizations": [
+          {
+            "symbol": "BTCUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:53.402365"
+          },
+          {
+            "symbol": "ETHUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:53.402462"
+          },
+          {
+            "symbol": "ADAUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:53.402549"
+          }
+        ],
+        "cycle_performance": {}
+      },
+      {
+        "cycle_number": 10,
+        "timestamp": "2025-08-19T20:11:54.404085",
+        "phase1a_signals": [
+          {
+            "symbol": "BTCUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:54.404136",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ETHUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:54.404251",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ADAUSDT",
+            "signal_type": "phase1a",
+            "signal_data": {
+              "signals": [],
+              "tier_analysis": {}
+            },
+            "timestamp": "2025-08-19T20:11:54.404299",
+            "real_data_used": true
+          }
+        ],
+        "phase2_detections": [
+          {
+            "symbol": "BTCUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:54.404166",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ETHUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:54.404275",
+            "real_data_used": true
+          },
+          {
+            "symbol": "ADAUSDT",
+            "detection_type": "phase2_market_regime",
+            "status": "real_data_required",
+            "message": "真實數據模式：禁止使用模擬數據",
+            "timestamp": "2025-08-19T20:11:54.404320",
+            "real_data_used": true
+          }
+        ],
+        "phase3_optimizations": [
+          {
+            "symbol": "BTCUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:54.404171"
+          },
+          {
+            "symbol": "ETHUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:54.404277"
+          },
+          {
+            "symbol": "ADAUSDT",
+            "optimization_type": "phase3_parameter",
+            "status": "skipped_insufficient_data",
+            "timestamp": "2025-08-19T20:11:54.404323"
+          }
+        ],
+        "cycle_performance": {}
+      }
+    ],
+    "phase_performance": {
+      "phase1a": {
+        "signals_generated": 0,
+        "success_rate": 0.0
+      },
+      "phase2": {
+        "detections": 0,
+        "learning_updates": 0,
+        "adaptations": 0
+      }
+    },
+    "real_data_validation": {
+      "data_integrity": true,
+      "no_simulation_used": true,
+      "real_components_only": true
+    }
+  }
+}

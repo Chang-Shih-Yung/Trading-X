@@ -1,0 +1,142 @@
+{
+  "version": "2.0.0",
+  "config_name": "Phase2 自適應參數配置",
+  "description": "Phase2 學習引擎參數輸出與融合策略",
+  "last_updated": "2025-08-19T00:00:00Z",
+  "generation_frequency": {
+    "time_based": {
+      "interval_hours": 2,
+      "description": "每2小時生成一次新配置"
+    },
+    "signal_based": {
+      "signal_count": 200,
+      "description": "每200個信號生成一次新配置"
+    },
+    "trigger_mode": "either",
+    "description": "時間或信號數量任一條件滿足即觸發"
+  },
+
+  "parameter_authority": {
+    "phase2_dominant": {
+      "signal_threshold": {
+        "base_value": 0.6,
+        "adjustment_range": [0.4, 0.8],
+        "fusion_weight": 0.8,
+        "description": "信號閾值由Phase2學習主導"
+      },
+      "momentum_weight": {
+        "base_value": 1.0,
+        "adjustment_range": [0.5, 2.0],
+        "fusion_weight": 0.8,
+        "description": "動量權重由Phase2優化"
+      },
+      "volatility_adjustment": {
+        "base_value": 1.0,
+        "adjustment_range": [0.3, 2.5],
+        "fusion_weight": 0.8,
+        "description": "波動率調整由Phase2市場適應"
+      },
+      "trend_sensitivity": {
+        "base_value": 1.0,
+        "adjustment_range": [0.5, 2.0],
+        "fusion_weight": 0.7,
+        "description": "趨勢敏感度由Phase2微調"
+      }
+    },
+    "phase5_dominant": {
+      "risk_multiplier": {
+        "base_value": 1.0,
+        "adjustment_range": [0.5, 1.5],
+        "fusion_weight": 0.3,
+        "description": "風險乘數由Phase5長期優化主導"
+      },
+      "position_sizing_factor": {
+        "base_value": 1.0,
+        "adjustment_range": [0.8, 1.2],
+        "fusion_weight": 0.2,
+        "description": "倉位大小因子由Phase5資金管理主導"
+      }
+    },
+    "balanced": {
+      "volume_weight": {
+        "base_value": 0.8,
+        "adjustment_range": [0.3, 1.5],
+        "fusion_weight": 0.5,
+        "description": "成交量權重Phase2和Phase5平衡"
+      }
+    }
+  },
+
+  "performance_monitoring": {
+    "rollback_threshold": {
+      "performance_drop_percent": 15,
+      "description": "性能下降15%觸發自動回滾"
+    },
+    "warning_threshold": {
+      "performance_drop_percent": 8,
+      "description": "性能下降8%發出警告"
+    },
+    "validation_requirements": {
+      "minimum_signals": 50,
+      "validation_period_hours": 4,
+      "description": "新配置需50個信號4小時驗證"
+    },
+    "safety_mechanisms": {
+      "max_parameter_change_percent": 25,
+      "gradual_rollout_signals": 20,
+      "emergency_fallback_enabled": true
+    }
+  },
+
+  "learning_sample_requirements": {
+    "minimum_coverage": {
+      "signal_count": 300,
+      "description": "最少300個信號覆蓋Phase5基礎配置"
+    },
+    "stable_adjustment": {
+      "signal_count": 500,
+      "description": "500個信號可進行穩定參數調整"
+    },
+    "high_confidence": {
+      "signal_count": 1000,
+      "description": "1000個信號可進行高信心大幅優化"
+    },
+    "market_regime_coverage": {
+      "required_regimes": 5,
+      "minimum_samples_per_regime": 60,
+      "description": "每個市場狀態至少60個樣本"
+    }
+  },
+
+  "fusion_strategy": {
+    "conflict_resolution": {
+      "method": "weighted_average",
+      "fallback_to_phase5": true,
+      "validation_required": true
+    },
+    "parameter_validation": {
+      "range_check": true,
+      "historical_consistency": true,
+      "market_condition_compatibility": true
+    },
+    "update_mechanism": {
+      "gradual_transition": true,
+      "transition_signals": 10,
+      "A_B_testing_enabled": true
+    }
+  },
+
+  "output_schema": {
+    "file_format": "json",
+    "filename_pattern": "phase2_optimized_params_{timestamp}.json",
+    "backup_retention_hours": 168,
+    "compression_enabled": false
+  },
+
+  "integration_endpoints": {
+    "phase1a_parameter_injection": "/update_adaptive_parameters",
+    "phase5_conflict_resolution": "/resolve_parameter_conflicts",
+    "monitoring_feedback": "/report_parameter_performance",
+    "emergency_rollback": "/emergency_parameter_rollback"
+  }
+}

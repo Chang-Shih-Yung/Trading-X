@@ -49,6 +49,51 @@ import json
 from enum import Enum
 import time
 import pytz
+
+# 🧠 第二階段自適應學習組件導入
+try:
+    import sys
+    from pathlib import Path
+    
+    # 添加上級目錄到路徑以便導入新組件
+    current_dir = Path(__file__).parent
+    backend_dir = current_dir.parent.parent
+    
+    # 嘗試導入新的 Phase 2 組件
+    try:
+        # 使用絕對導入避免循環依賴
+        import importlib.util
+        
+        # 動態導入 advanced_market_detector
+        market_detector_path = backend_dir / "phase2_adaptive_learning" / "market_regime_detection" / "advanced_market_detector.py"
+        spec = importlib.util.spec_from_file_location("advanced_market_detector", market_detector_path)
+        advanced_market_detector = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(advanced_market_detector)
+        
+        # 動態導入 adaptive_learning_engine
+        learning_engine_path = backend_dir / "phase2_adaptive_learning" / "learning_core" / "adaptive_learning_engine.py"
+        spec = importlib.util.spec_from_file_location("adaptive_learning_engine", learning_engine_path)
+        adaptive_learning_engine = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(adaptive_learning_engine)
+        
+        # 從模組中獲取類別
+        AdvancedMarketRegimeDetector = advanced_market_detector.AdvancedMarketRegimeDetector
+        MarketRegime = advanced_market_detector.MarketRegime
+        AdaptiveLearningCore = adaptive_learning_engine.AdaptiveLearningCore
+        LearningStatus = adaptive_learning_engine.LearningStatus
+        
+        ADAPTIVE_LEARNING_ENABLED = True
+        logging.info("✅ 第二階段自適應學習組件載入成功")
+        
+    except Exception as e:
+        ADAPTIVE_LEARNING_ENABLED = False
+        logging.warning(f"⚠️ 第二階段自適應學習組件載入失敗: {e}")
+        logging.warning("系統將以基礎模式運行")
+    
+except ImportError as e:
+    ADAPTIVE_LEARNING_ENABLED = False
+    logging.warning(f"⚠️ 第二階段自適應學習組件載入失敗: {e}")
+    logging.warning("系統將以基礎模式運行")
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -77,7 +122,11 @@ class MarketRegime(Enum):
     BULL_TREND = "BULL_TREND"
     BEAR_TREND = "BEAR_TREND"
     SIDEWAYS = "SIDEWAYS"
+    BREAKOUT_UP = "BREAKOUT_UP"
+    BREAKOUT_DOWN = "BREAKOUT_DOWN"
+    CONSOLIDATION = "CONSOLIDATION"
     VOLATILE = "VOLATILE"
+    TRENDING = "TRENDING"
     UNKNOWN = "UNKNOWN"
 
 class TradingSession(Enum):
@@ -298,6 +347,18 @@ class Phase1ABasicSignalGeneration:
     
     def __init__(self):
         self.config = self._load_config()
+        
+        # 🧠 第二階段自適應學習組件初始化
+        if ADAPTIVE_LEARNING_ENABLED:
+            self.regime_detector = AdvancedMarketRegimeDetector()
+            self.learning_core = AdaptiveLearningCore()
+            self.adaptive_mode = True
+            logger.info("✅ 第二階段自適應學習模式啟用")
+        else:
+            self.regime_detector = None
+            self.learning_core = None
+            self.adaptive_mode = False
+            logger.info("📊 基礎模式運行")
         
         # 動態參數系統
         self.dynamic_params_enabled = self._init_dynamic_parameter_system()
@@ -1618,7 +1679,7 @@ class Phase1ABasicSignalGeneration:
         return signals
     
     async def generate_signals(self, symbol: str, market_data: Dict[str, Any]) -> List[BasicSignal]:
-        """公開的信號生成方法 - 基於歷史數據和動態參數"""
+        """公開的信號生成方法 - 基於歷史數據和動態參數 + 第二階段自適應學習"""
         try:
             if not self.is_running:
                 logger.warning("信號生成器未運行")
@@ -1631,11 +1692,20 @@ class Phase1ABasicSignalGeneration:
             
             logger.debug(f"🎯 開始為 {symbol} 生成信號，使用 {len(self.price_buffer[symbol])} 條歷史數據")
             
+            # 🧠 第二階段自適應學習：市場狀態檢測與學習
+            regime_confidence = None
+            if self.adaptive_mode and self.regime_detector:
+                # 創建市場數據 DataFrame 用於分析
+                market_df = self._create_market_dataframe(symbol)
+                if market_df is not None and len(market_df) >= 20:
+                    regime_confidence = await self.regime_detector.detect_regime_change(market_df, symbol)
+                    logger.debug(f"🧠 {symbol} 市場狀態: {regime_confidence.regime.value}, 信心度: {regime_confidence.confidence:.3f}")
+            
             # 更新當前市場數據到緩衝區
             await self._update_buffers_with_current_data(symbol, market_data)
             
-            # 獲取動態參數
-            dynamic_params = await self._get_dynamic_parameters(market_data=market_data)
+            # 獲取動態參數（若有自適應學習，則考慮市場狀態）
+            dynamic_params = await self._get_adaptive_parameters(market_data, regime_confidence)
             
             # 執行4層並行處理 - 基於真實的技術分析
             signals = []
@@ -3917,6 +3987,158 @@ class Phase1ABasicSignalGeneration:
             reasons.append(f"技術指標弱({technical_strength:.2f})")
         
         return f"{tier.value}: {', '.join(reasons)}"
+    
+    # 🧠 第二階段自適應學習支持方法
+    
+    def _create_market_dataframe(self, symbol: str) -> Optional[pd.DataFrame]:
+        """為自適應學習組件創建市場數據 DataFrame"""
+        try:
+            if symbol not in self.price_buffer or len(self.price_buffer[symbol]) < 20:
+                return None
+            
+            prices = list(self.price_buffer[symbol])
+            volumes = list(self.volume_buffer[symbol]) if symbol in self.volume_buffer else [0] * len(prices)
+            
+            # 創建基本 OHLCV 數據（模擬）
+            data = []
+            for i, (price, volume) in enumerate(zip(prices, volumes)):
+                # 模擬 OHLC 數據
+                high = price * (1 + np.random.uniform(0, 0.005))
+                low = price * (1 - np.random.uniform(0, 0.005))
+                open_price = prices[i-1] if i > 0 else price
+                
+                data.append({
+                    'timestamp': datetime.now() - timedelta(minutes=len(prices)-i),
+                    'open': open_price,
+                    'high': high,
+                    'low': low,
+                    'close': price,
+                    'volume': volume or 1000
+                })
+            
+            return pd.DataFrame(data)
+            
+        except Exception as e:
+            logger.error(f"創建市場數據 DataFrame 失敗: {e}")
+            return None
+    
+    async def _get_adaptive_parameters(self, market_data: Dict[str, Any], regime_confidence=None) -> Dict[str, Any]:
+        """獲取自適應動態參數"""
+        try:
+            # 獲取基礎動態參數
+            base_params = await self._get_dynamic_parameters(market_data=market_data)
+            
+            if not self.adaptive_mode or not regime_confidence:
+                return base_params
+            
+            # 根據市場狀態調整參數
+            adaptive_params = base_params.copy()
+            
+            # 🔥 關鍵修復：整合 Phase2 學習核心的優化參數
+            if self.learning_core:
+                try:
+                    # 獲取 Phase2 學習系統的優化參數
+                    learned_params = self.learning_core.get_optimized_parameters()
+                    
+                    # 應用學習到的參數優化
+                    if learned_params:
+                        # 使用學習到的信號閾值
+                        if 'signal_threshold' in learned_params:
+                            adaptive_params['signal_threshold'] = learned_params['signal_threshold']
+                        
+                        # 應用其他學習到的權重
+                        for param_name in ['momentum_weight', 'volume_weight', 'volatility_adjustment', 
+                                         'trend_sensitivity', 'risk_multiplier']:
+                            if param_name in learned_params:
+                                # 將學習參數映射到信號生成參數
+                                if param_name == 'momentum_weight':
+                                    adaptive_params['momentum_weight'] = learned_params[param_name]
+                                elif param_name == 'volume_weight':
+                                    adaptive_params['volume_weight'] = learned_params[param_name]
+                                elif param_name == 'volatility_adjustment':
+                                    adaptive_params['price_change_threshold'] *= learned_params[param_name]
+                                elif param_name == 'trend_sensitivity':
+                                    adaptive_params['confidence_threshold'] *= learned_params[param_name]
+                                elif param_name == 'risk_multiplier':
+                                    adaptive_params['confidence_multiplier'] = learned_params[param_name]
+                        
+                        logger.info(f"🧠 應用 Phase2 學習參數: 閾值={learned_params.get('signal_threshold', 0):.3f}, 風險={learned_params.get('risk_multiplier', 0):.3f}")
+                        
+                except Exception as e:
+                    logger.debug(f"Phase2 學習參數獲取失敗: {e}")
+            
+            # 根據市場狀態進行額外微調（在學習參數基礎上）
+            if regime_confidence.regime == MarketRegime.BULL_TREND:
+                adaptive_params['signal_threshold'] *= 0.95  # 在學習基礎上微調
+                adaptive_params['momentum_weight'] *= 1.1
+            elif regime_confidence.regime == MarketRegime.BEAR_TREND:
+                adaptive_params['signal_threshold'] *= 1.05  # 在學習基礎上微調
+                adaptive_params['volume_weight'] *= 1.15
+            elif regime_confidence.regime == MarketRegime.VOLATILE:
+                adaptive_params['signal_threshold'] *= 1.1  # 在學習基礎上微調
+                adaptive_params['price_change_threshold'] *= 0.9
+            
+            # 根據信心度調整
+            confidence_factor = 0.8 + (regime_confidence.confidence * 0.4)
+            adaptive_params['confidence_multiplier'] = confidence_factor
+            
+            logger.debug(f"🧠 自適應參數調整: 狀態={regime_confidence.regime.value}, 信心度={regime_confidence.confidence:.3f}")
+            
+            return adaptive_params
+            
+        except Exception as e:
+            logger.error(f"獲取自適應參數失敗: {e}")
+            return await self._get_dynamic_parameters(market_data=market_data)
+    
+    async def _monitor_signal_performance(self, signal: BasicSignal, actual_outcome: Optional[float] = None):
+        """監控信號表現用於自適應學習"""
+        if not self.adaptive_mode or not self.learning_core:
+            return
+        
+        try:
+            # 創建信號數據用於學習
+            signal_data = {
+                'signal_id': f"{signal.symbol}_{signal.timestamp.timestamp()}",
+                'symbol': signal.symbol,
+                'signal_strength': signal.signal_strength,
+                'direction': signal.signal_type,
+                'tier': signal.tier.value,
+                'features': {
+                    'price_change': getattr(signal, 'price_change_pct', 0),
+                    'volume_ratio': getattr(signal, 'volume_ratio', 1),
+                    'technical_strength': getattr(signal, 'technical_strength', 0.5),
+                    'market_regime': self.current_regime.value if hasattr(self, 'current_regime') else 'unknown'
+                }
+            }
+            
+            # 監控信號表現
+            await self.learning_core.monitor_signal_performance(signal_data, actual_outcome)
+            
+        except Exception as e:
+            logger.error(f"信號表現監控失敗: {e}")
+    
+    async def reload_configuration(self):
+        """重新載入配置 - 支持運行時更新"""
+        try:
+            logger.info("🔄 重新載入 Phase1A 配置...")
+            
+            # 重新載入配置
+            new_config = await self._load_configuration()
+            if new_config:
+                self.config = new_config
+                logger.info("✅ Phase1A 配置重新載入成功")
+                
+                # 重新初始化信號分層系統
+                await self._initialize_signal_tier_system()
+                
+                return True
+            else:
+                logger.warning("⚠️ 配置重新載入失敗，保持當前配置")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ 配置重新載入錯誤: {e}")
+            return False
 
 # 全局實例
 phase1a_signal_generator = Phase1ABasicSignalGeneration()

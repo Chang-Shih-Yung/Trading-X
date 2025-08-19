@@ -1,0 +1,80 @@
+{
+  "test_timestamp": "2025-08-19T20:03:02.991983",
+  "test_duration_seconds": 5.054371,
+  "test_mode": "REAL_DATA_ONLY",
+  "data_integrity": {
+    "real_components_used": true,
+    "mock_data_rejected": true,
+    "simulation_prohibited": true
+  },
+  "test_configuration": {
+    "test_cycles": 5,
+    "test_symbols": [
+      "BTCUSDT",
+      "ETHUSDT",
+      "ADAUSDT"
+    ],
+    "components_validated": [
+      "AdvancedMarketRegimeDetector",
+      "AdaptiveLearningCore"
+    ]
+  },
+  "real_data_statistics": {
+    "total_cycles": 5,
+    "real_data_detections": 15,
+    "real_signals_processed": 15,
+    "learning_updates": 2
+  },
+  "performance_metrics": {
+    "real_detection_efficiency": 1.0,
+    "real_signal_processing_efficiency": 1.0,
+    "learning_update_frequency": 0.4,
+    "average_cycle_time": 1.0108742
+  },
+  "component_summaries": {
+    "market_detector": {
+      "total_detections": 15,
+      "regime_transitions": 0,
+      "average_confidence": 1.0,
+      "average_stability": 0.1708183188557702,
+      "current_regime": "BEAR_TREND",
+      "detection_accuracy": 0.1708183188557702,
+      "system_status": "運行正常"
+    },
+    "learning_engine": {
+      "learning_status": "COLLECTING_DATA",
+      "performance_metrics": {
+        "total_signals_tracked": 15,
+        "successful_signals": 0,
+        "total_return": 0.28199999999999986,
+        "average_return": 0.020142857142857132,
+        "success_rate": 0.0,
+        "sharpe_ratio": 2709365535826089.0,
+        "max_drawdown": 0.0
+      },
+      "learning_statistics": {
+        "patterns_discovered": 0,
+        "parameters_optimized": 0,
+        "retraining_cycles": 0,
+        "model_accuracy": 0.0
+      },
+      "current_parameters": {
+        "signal_threshold": 0.6,
+        "momentum_weight": 1.0,
+        "volume_weight": 0.8,
+        "volatility_adjustment": 1.0,
+        "trend_sensitivity": 1.0,
+        "risk_multiplier": 1.0
+      },
+      "discovered_patterns": {},
+      "recent_optimizations": {}
+    }
+  },
+  "real_data_validation": {
+    "market_detection_functional": true,
+    "signal_processing_functional": true,
+    "learning_updates_functional": true,
+    "overall_system_operational": true
+  },
+  "real_data_system_score": 1.0
+}
