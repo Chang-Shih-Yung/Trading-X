@@ -593,7 +593,9 @@ async def generate_lean_backtest_config(lean_consensus_results: List[LeanConsens
         }
 
 async def save_lean_config_to_phase5_backup(lean_config: Dict) -> str:
-    """保存 Lean 配置到 Phase5 備份目錄，供 Phase1A 讀取"""
+    """保存 Lean 配置到 Phase5 備份目錄，供 Phase1A 讀取 - 帶文件鎖保護"""
+    import fcntl  # 添加文件鎖支持
+    
     try:
         # Phase5 備份目錄 (當前目錄的 safety_backups/working)
         backup_dir = Path(__file__).parent / "safety_backups" / "working"
@@ -604,16 +606,30 @@ async def save_lean_config_to_phase5_backup(lean_config: Dict) -> str:
         filename = f"phase1a_backup_deployment_initial_{timestamp}.json"
         filepath = backup_dir / filename
         
-        # 保存配置
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(lean_config, f, indent=2, ensure_ascii=False, default=str)
-        
-        logger.info(f"✅ Lean 配置已保存: {filename}")
-        logger.info(f"📁 路徑: {filepath}")
-        return str(filepath)
+        # 🔒 帶文件鎖的安全保存
+        try:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                # 獲取文件鎖，防止與Phase2同時寫入
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                json.dump(lean_config, f, indent=2, ensure_ascii=False, default=str)
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)  # 釋放鎖
+            
+            logger.info(f"✅ Phase5配置已安全保存: {filename}")
+            logger.info(f"📁 路徑: {filepath}")
+            return str(filepath)
+            
+        except IOError as e:
+            if e.errno == 11:  # EAGAIN - 文件被鎖定
+                logger.warning("⚠️ 文件被鎖定（可能Phase2正在寫入），延遲保存...")
+                await asyncio.sleep(1)
+                # 遞歸重試
+                return await save_lean_config_to_phase5_backup(lean_config)
+            else:
+                logger.error(f"❌ Phase5配置保存失敗: {e}")
+                raise
         
     except Exception as e:
-        logger.error(f"Lean 配置保存失敗: {e}")
+        logger.error(f"Phase5配置保存失敗: {e}")
         return ""
 
 # ==================== 主要執行函數 ====================

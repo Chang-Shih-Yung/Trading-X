@@ -23,7 +23,66 @@ import json
 import pickle
 from collections import defaultdict, deque
 
-logger = logging.getLogger(__name__)
+# 導入存儲模塊 - 嚴格模式：資料庫失敗時終止系統
+import importlib.util
+
+DATABASE_AVAILABLE = False
+PROGRESS_TRACKER_AVAILABLE = False
+
+try:
+    # 動態導入 signal_database
+    current_dir = Path(__file__).parent
+    signal_db_path = current_dir.parent / "storage" / "signal_database.py"
+    spec = importlib.util.spec_from_file_location("signal_database", signal_db_path)
+    signal_database_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(signal_database_module)
+    
+    # 從模組中獲取需要的組件
+    signal_db = signal_database_module.signal_db
+    StoredSignal = signal_database_module.StoredSignal
+    SignalStatus = signal_database_module.SignalStatus
+    
+    DATABASE_AVAILABLE = True
+    logger = logging.getLogger(__name__)
+    logger.info("✅ 信號資料庫已整合（動態導入）")
+except Exception as e:
+    logger = logging.getLogger(__name__)
+    logger.error(f"❌ 嚴格模式：信號資料庫導入失敗 - {e}")
+    logger.error("💥 系統終止：資料庫是系統運行的必要條件")
+    raise SystemExit(f"嚴格模式：資料庫導入失敗 - {e}")
+
+try:
+    # 動態導入 learning_progress_tracker
+    tracker_path = current_dir.parent / "storage" / "learning_progress_tracker.py"
+    spec = importlib.util.spec_from_file_location("learning_progress_tracker", tracker_path)
+    tracker_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tracker_module)
+    
+    progress_tracker = tracker_module.progress_tracker
+    PROGRESS_TRACKER_AVAILABLE = True
+    logger.info("✅ 學習進度追蹤器載入成功（動態導入）")
+except Exception:
+    PROGRESS_TRACKER_AVAILABLE = False
+    logger.warning("⚠️ 學習進度追蹤器不可用（非關鍵組件）")
+
+# ==================== 數據結構定義 ====================
+
+# 學習策略枚舉
+
+try:
+    # 動態導入 learning_progress_tracker
+    current_dir = Path(__file__).parent
+    tracker_path = current_dir.parent / "storage" / "learning_progress_tracker.py"
+    spec = importlib.util.spec_from_file_location("learning_progress_tracker", tracker_path)
+    tracker_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tracker_module)
+    
+    progress_tracker = tracker_module.progress_tracker
+    PROGRESS_TRACKER_AVAILABLE = True
+    logger.info("✅ 學習進度追蹤器載入成功（動態導入）")
+except Exception:
+    PROGRESS_TRACKER_AVAILABLE = False
+    logger.warning("⚠️ 學習進度追蹤器不可用（非關鍵組件）")
 
 class LearningStatus(Enum):
     """學習狀態"""
@@ -74,17 +133,26 @@ class AdaptiveLearningCore:
     def __init__(self):
         self.status = LearningStatus.INITIALIZING
         
-        # 數據存儲
-        self.signal_history = deque(maxlen=10000)  # 保持最近10000個信號
-        self.performance_db = {}  # 信號ID -> SignalPerformance
-        self.learning_patterns = {}  # 模式ID -> LearningPattern
-        self.parameter_history = defaultdict(list)  # 參數名 -> 歷史值列表
+        # 信號資料庫整合 - 嚴格模式
+        self.use_database = DATABASE_AVAILABLE
+        if not self.use_database:
+            logger.error("❌ 嚴格模式：資料庫不可用，系統無法繼續")
+            raise RuntimeError("嚴格模式：資料庫連接失敗，系統終止")
         
-        # 學習配置
+        logger.info("🗄️ 嚴格模式：使用持久化信號資料庫存儲")
+        
+        # 必要的內存存儲屬性 - 修正缺失屬性
+        self.signal_history = deque(maxlen=1000)  # 最近1000個信號
+        self.performance_db = {}  # 信號表現數據庫
+        self.learning_patterns = {}  # 學習模式數據庫
+        self.parameter_history = defaultdict(lambda: deque(maxlen=100))  # 參數優化歷史，每個參數最多100條記錄
+        
+        # 學習配置 - 根據快速信號生成調整頻率
         self.learning_config = {
             'min_signals_for_learning': 50,
-            'pattern_confidence_threshold': 0.65,
-            'parameter_optimization_frequency': 100,  # 每100個信號優化一次
+            'pattern_discovery_frequency': 50,   # 每50個信號進行一次模式發現 (約7-8分鐘)
+            'pattern_confidence_threshold': 0.65, # 模式信心度閾值
+            'parameter_optimization_frequency': 200,  # 每200個信號優化一次參數 (約15分鐘)
             'success_rate_threshold': 0.55,
             'return_threshold': 0.01
         }
@@ -97,6 +165,50 @@ class AdaptiveLearningCore:
             'volatility_adjustment': 1.0,
             'trend_sensitivity': 1.0,
             'risk_multiplier': 1.0
+        }
+        
+        # 產品級幣種分類系統
+        self.coin_categories = {
+            'major': ['BTCUSDT', 'ETHUSDT'],              # 主流幣：穩定性優先
+            'alt': ['BNBUSDT', 'ADAUSDT', 'SOLUSDT'],     # 替代幣：平衡策略
+            'meme': ['DOGEUSDT'],                         # Meme幣：高風險高收益
+            'payment': ['XRPUSDT']                        # 支付幣：特殊策略
+        }
+        
+        # 各類別的優化參數配置（產品級分群學習）
+        self.category_optimized_params = {
+            'major': {
+                'signal_threshold': 0.65,     # 較高門檻，追求穩定
+                'risk_multiplier': 0.85,      # 保守風險
+                'momentum_weight': 1.0,       # 標準動量
+                'volatility_adjustment': 0.9  # 降低波動敏感度
+            },
+            'alt': {
+                'signal_threshold': 0.60,     # 平衡門檻
+                'risk_multiplier': 1.0,       # 標準風險
+                'momentum_weight': 1.1,       # 稍強動量
+                'volatility_adjustment': 1.0  # 標準波動調整
+            },
+            'meme': {
+                'signal_threshold': 0.55,     # 較低門檻，捕捉機會
+                'risk_multiplier': 1.2,       # 積極風險
+                'momentum_weight': 1.3,       # 強調動量
+                'volatility_adjustment': 1.2  # 增強波動敏感度
+            },
+            'payment': {
+                'signal_threshold': 0.62,     # 中等門檻
+                'risk_multiplier': 0.9,       # 稍保守
+                'momentum_weight': 0.9,       # 稍弱動量
+                'volatility_adjustment': 0.95 # 稍降波動敏感度
+            }
+        }
+        
+        # 各類別的學習歷史（分群追蹤）
+        self.category_learning_history = {
+            'major': deque(maxlen=200),
+            'alt': deque(maxlen=200), 
+            'meme': deque(maxlen=200),
+            'payment': deque(maxlen=200)
         }
         
         # 性能監控
@@ -122,7 +234,7 @@ class AdaptiveLearningCore:
         logger.info("✅ AdaptiveLearningCore 初始化完成")
     
     async def monitor_signal_performance(self, signal_data: Dict[str, Any], actual_outcome: Optional[float] = None) -> SignalPerformance:
-        """監控信號表現"""
+        """監控信號表現 - 增強版支援資料庫"""
         try:
             # 創建信號表現記錄
             performance = SignalPerformance(
@@ -147,22 +259,12 @@ class AdaptiveLearningCore:
                 # 更新性能指標
                 self._update_performance_metrics(performance)
             
-            # 存儲記錄
+            # 存儲到內存
             self.signal_history.append(performance)
             self.performance_db[performance.signal_id] = performance
             self.performance_metrics['total_signals_tracked'] += 1
             
-            # 檢查是否需要學習更新
-            if len(self.signal_history) % self.learning_config['pattern_confidence_threshold'] == 0:
-                await self._discover_patterns()
-            
-            # 檢查是否需要參數優化
-            if len(self.signal_history) % self.learning_config['parameter_optimization_frequency'] == 0:
-                await self._optimize_parameters()
-            
-            logger.debug(f"📊 信號表現已記錄: {performance.signal_id}, 表現分數: {performance.performance_score}")
-            
-            return performance
+            return await self._process_signal_performance(performance)
             
         except Exception as e:
             logger.error(f"❌ 信號表現監控失敗: {e}")
@@ -174,6 +276,162 @@ class AdaptiveLearningCore:
                 timestamp=datetime.now()
             )
     
+    async def add_signal_performance(self, performance: SignalPerformance) -> SignalPerformance:
+        """直接添加SignalPerformance對象（用於測試和外部集成）"""
+        try:
+            # 存儲到內存
+            self.signal_history.append(performance)
+            self.performance_db[performance.signal_id] = performance
+            self.performance_metrics['total_signals_tracked'] += 1
+            
+            # 更新性能指標
+            if performance.actual_outcome is not None:
+                self._update_performance_metrics(performance)
+            
+            return await self._process_signal_performance(performance)
+            
+        except Exception as e:
+            logger.error(f"❌ 信號表現添加失敗: {e}")
+            return performance
+    
+    async def _process_signal_performance(self, performance: SignalPerformance) -> SignalPerformance:
+        """處理信號表現的共用邏輯"""
+        try:
+            # 存儲到資料庫
+            if self.use_database:
+                try:
+                    stored_signal = StoredSignal(
+                        signal_id=performance.signal_id,
+                        symbol=performance.symbol,
+                        signal_type=performance.direction,
+                        signal_strength=performance.signal_strength,
+                        timestamp=performance.timestamp,
+                        features=performance.features or {},
+                        market_conditions=performance.market_conditions or {},
+                        tier='MEDIUM',  # 默認級別
+                        status=SignalStatus.COMPLETED if performance.actual_outcome is not None else SignalStatus.PENDING,
+                        actual_outcome=performance.actual_outcome,
+                        performance_score=performance.performance_score
+                    )
+                    await signal_db.store_signal(stored_signal)
+                    logger.debug(f"🗄️ 信號已存儲到資料庫: {performance.signal_id}")
+                except Exception as db_e:
+                    logger.error(f"❌ 資料庫存儲失敗: {db_e}")
+            
+            # 更新學習進度追蹤器
+            if PROGRESS_TRACKER_AVAILABLE:
+                try:
+                    metrics = self._prepare_progress_metrics()
+                    await progress_tracker.update_progress(
+                        signal_count=len(self.signal_history),
+                        performance_metrics=metrics
+                    )
+                    logger.debug("📊 學習進度已更新")
+                except Exception as pt_e:
+                    logger.warning(f"⚠️ 進度追蹤更新失敗: {pt_e}")
+            
+            # 檢查是否需要模式發現 (每50個信號)
+            if len(self.signal_history) % self.learning_config['pattern_discovery_frequency'] == 0:
+                await self._discover_patterns()
+            
+            # 檢查是否需要參數優化 (每200個信號)
+            if len(self.signal_history) % self.learning_config['parameter_optimization_frequency'] == 0:
+                await self._optimize_parameters()
+            
+            # 顯示學習狀態
+            self._log_learning_status()
+            
+            logger.debug(f"📊 信號表現已記錄: {performance.signal_id}, 表現分數: {performance.performance_score}")
+            
+            return performance
+            
+        except Exception as e:
+            logger.error(f"❌ 信號表現處理失敗: {e}")
+            return performance
+    
+    def _log_learning_status(self):
+        """記錄學習狀態"""
+        try:
+            current_signals = len(self.signal_history)
+            min_required = self.learning_config['min_signals_for_learning']
+            
+            if current_signals < min_required:
+                remaining = min_required - current_signals
+                logger.info(f"🎓 學習準備中: {current_signals}/{min_required} 信號 (還需 {remaining} 個)")
+            else:
+                # 學習已啟動
+                next_pattern_check = self.learning_config['pattern_discovery_frequency'] - (current_signals % self.learning_config['pattern_discovery_frequency'])
+                next_param_opt = self.learning_config['parameter_optimization_frequency'] - (current_signals % self.learning_config['parameter_optimization_frequency'])
+                
+                logger.info(f"🧠 學習已啟動: {current_signals} 信號")
+                logger.info(f"   📊 下次模式發現: {next_pattern_check} 信號後")
+                logger.info(f"   🔧 下次參數優化: {next_param_opt} 信號後")
+                
+        except Exception as e:
+            logger.error(f"❌ 學習狀態記錄失敗: {e}")
+
+    def _get_symbol_category(self, symbol: str) -> str:
+        """獲取交易對分類"""
+        for category, symbols in self.coin_categories.items():
+            if symbol in symbols:
+                return category
+        return 'alt'  # 默認歸類為替代幣
+    
+    def _get_category_weight(self, symbol: str) -> float:
+        """獲取幣種類別權重"""
+        category = self._get_symbol_category(symbol)
+        weight_mapping = {
+            'major': 1.2,    # 主流幣加權
+            'alt': 1.0,      # 替代幣標準權重
+            'meme': 0.8,     # Meme幣降權
+            'payment': 1.1   # 支付幣稍加權
+        }
+        return weight_mapping.get(category, 1.0)  # 未知分類默認1.0
+        
+    def get_category_optimized_params(self, symbol: str) -> dict:
+        """獲取特定幣種類別的優化參數"""
+        category = self._get_symbol_category(symbol)
+        return self.category_optimized_params.get(category, self.category_optimized_params['alt'])
+        
+    def record_category_learning(self, symbol: str, performance_data: dict):
+        """記錄分類學習數據"""
+        category = self._get_symbol_category(symbol)
+        if category in self.category_learning_history:
+            self.category_learning_history[category].append({
+                'symbol': symbol,
+                'timestamp': datetime.now(),
+                'performance': performance_data
+            })
+            
+    def get_category_learning_insights(self, category: str = None) -> dict:
+        """獲取分類學習洞察"""
+        if category:
+            # 單一類別分析
+            if category not in self.category_learning_history:
+                return {'error': f'未知類別: {category}'}
+                
+            history = list(self.category_learning_history[category])
+            if not history:
+                return {'category': category, 'insights': '暫無學習數據'}
+                
+            # 計算類別專屬洞察
+            recent_performance = [h['performance'] for h in history[-50:]]
+            avg_performance = np.mean([p.get('success_rate', 0) for p in recent_performance])
+            
+            return {
+                'category': category,
+                'total_signals': len(history),
+                'recent_avg_performance': float(avg_performance),
+                'optimized_params': self.category_optimized_params.get(category, {}),
+                'last_update': history[-1]['timestamp'].isoformat() if history else None
+            }
+        else:
+            # 全部類別概覽
+            insights = {}
+            for cat in self.category_learning_history.keys():
+                insights[cat] = self.get_category_learning_insights(cat)
+            return insights
+
     def _calculate_performance_score(self, direction: str, actual_outcome: float, signal_strength: float) -> float:
         """計算信號表現分數"""
         try:
@@ -232,6 +490,33 @@ class AdaptiveLearningCore:
         
         except Exception as e:
             logger.error(f"❌ 性能指標更新失敗: {e}")
+    
+    def _prepare_progress_metrics(self) -> Dict[str, Any]:
+        """準備進度追蹤器所需的指標"""
+        total_signals = len(self.signal_history)
+        signals_with_outcome = [s for s in self.signal_history if s.actual_outcome is not None]
+        successful_signals = [s for s in signals_with_outcome if s.performance_score and s.performance_score > 1.0]
+        
+        # 計算指標
+        accuracy_rate = len(successful_signals) / len(signals_with_outcome) if signals_with_outcome else 0.0
+        avg_return = self.performance_metrics.get('average_return', 0.0)
+        success_rate = self.performance_metrics.get('success_rate', 0.0)
+        
+        # 計算一致性分數 (最近10個信號的表現標準差)
+        recent_signals = list(self.signal_history)[-10:] if len(self.signal_history) >= 10 else list(self.signal_history)
+        recent_scores = [s.performance_score for s in recent_signals if s.performance_score is not None]
+        consistency_score = 1.0 - (np.std(recent_scores) if len(recent_scores) > 1 else 0.0)
+        consistency_score = max(0.0, min(1.0, consistency_score))
+        
+        return {
+            'performance_score': success_rate,
+            'accuracy_rate': accuracy_rate,
+            'successful_predictions': len(successful_signals),
+            'total_predictions': len(signals_with_outcome),
+            'confidence_level': min(1.0, total_signals / 100.0),  # 基於信號數量的信心水平
+            'avg_return_rate': avg_return,
+            'consistency_score': consistency_score
+        }
     
     async def _discover_patterns(self):
         """發現學習模式"""
@@ -358,32 +643,86 @@ class AdaptiveLearningCore:
             logger.error(f"❌ 參數優化失敗: {e}")
     
     def _evaluate_current_performance(self) -> float:
-        """評估當前參數表現"""
+        """評估當前參數表現 - 產品級時間衰減 + 分群學習版本"""
         try:
-            recent_signals = list(self.signal_history)[-50:]  # 最近50個信號
+            recent_signals = list(self.signal_history)[-100:]  # 增加到100個信號
             if not recent_signals:
                 return 0.0
+
+            # 計算時間加權 + 分群權重表現分數
+            weighted_scores = []
+            weighted_returns = []
+            total_weight = 0.0
+            current_time = datetime.now()
             
-            # 計算加權表現分數
-            performance_scores = []
-            returns = []
+            # 分群表現追蹤
+            category_performance = {'major': [], 'alt': [], 'meme': [], 'payment': []}
             
             for signal in recent_signals:
-                if signal.performance_score is not None:
-                    performance_scores.append(signal.performance_score)
-                if signal.actual_outcome is not None:
-                    returns.append(signal.actual_outcome)
-            
-            if not performance_scores:
+                try:
+                    # 計算時間權重（12小時半衰期）
+                    time_diff_hours = (current_time - signal.timestamp).total_seconds() / 3600
+                    time_weight = np.exp(-time_diff_hours / 12)  # 指數衰減
+                    
+                    # 獲取幣種分群權重
+                    symbol = getattr(signal, 'symbol', 'UNKNOWN')
+                    category = self._get_symbol_category(symbol)
+                    category_weight = self._get_category_weight(symbol)
+                    
+                    # 組合權重：時間 × 分群
+                    combined_weight = time_weight * category_weight
+                    
+                    if signal.performance_score is not None:
+                        weighted_score = signal.performance_score * combined_weight
+                        weighted_scores.append(weighted_score)
+                        total_weight += combined_weight
+                        
+                        # 記錄分群表現
+                        if category in category_performance:
+                            category_performance[category].append({
+                                'score': signal.performance_score,
+                                'weight': combined_weight,
+                                'symbol': symbol
+                            })
+                        
+                    if signal.actual_outcome is not None:
+                        weighted_returns.append(signal.actual_outcome * combined_weight)
+                        
+                except Exception as signal_e:
+                    logger.warning(f"⚠️ 處理信號時出錯: {signal_e}")
+                    continue
+
+            if not weighted_scores:
                 return 0.0
             
-            # 綜合評分：表現分數 + 收益穩定性
-            avg_performance = np.mean(performance_scores)
-            if returns:
-                return_stability = 1.0 / (1.0 + np.std(returns))
-                return avg_performance * 0.7 + return_stability * 0.3
+            # 時間 + 分群加權平均表現
+            avg_weighted_performance = np.sum(weighted_scores) / total_weight if total_weight > 0 else 0.0
+            
+            # 計算收益穩定性（加權）
+            if weighted_returns and len(weighted_returns) > 1:
+                weighted_std = np.std(weighted_returns)
+                return_stability = 1.0 / (1.0 + weighted_std)
+                final_score = avg_weighted_performance * 0.7 + return_stability * 0.3
             else:
-                return avg_performance
+                final_score = avg_weighted_performance
+            
+            # 分群洞察記錄
+            category_insights = {}
+            for category, performances in category_performance.items():
+                if performances:
+                    avg_score = np.mean([p['score'] for p in performances])
+                    total_cat_weight = sum([p['weight'] for p in performances])
+                    category_insights[category] = {
+                        'avg_performance': float(avg_score),
+                        'signal_count': len(performances),
+                        'total_weight': float(total_cat_weight),
+                        'symbols': list(set([p['symbol'] for p in performances]))
+                    }
+            
+            logger.debug(f"📊 分群加權表現評估: {final_score:.4f} (樣本: {len(weighted_scores)}, 總權重: {total_weight:.2f})")
+            logger.debug(f"🎯 分群洞察: {category_insights}")
+            
+            return final_score
         
         except Exception as e:
             logger.error(f"❌ 表現評估失敗: {e}")

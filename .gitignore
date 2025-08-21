@@ -73,6 +73,14 @@ Thumbs.db
 .env.production
 config.local.json
 
+# System runtime status files (both main and X folder)
+data/system_status/shutdown_status.json
+data/system_status/*.json
+X/data/system_status/shutdown_status.json
+X/data/system_status/*.json
+X/data/logs/*.log
+X/data/locks/*.lock
+
 # Backup files
 *.bak
 *.backup

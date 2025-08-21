@@ -25,6 +25,16 @@ try:
 except ImportError as e:
     logging.warning(f"⚠️ 通知系統不可用: {e}")
     NOTIFICATION_AVAILABLE = False
+    
+    # 定義備用類避免 NameError
+    class NotificationPriority(Enum):
+        HIGH = "high"
+        MEDIUM = "medium"
+        LOW = "low"
+    
+    class NotificationChannel(Enum):
+        EMAIL = "email"
+        DISCORD = "discord"
 
 logger = logging.getLogger(__name__)
 

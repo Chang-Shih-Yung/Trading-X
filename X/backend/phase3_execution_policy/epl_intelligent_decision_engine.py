@@ -110,6 +110,7 @@ class EPLDecision(Enum):
     STRENGTHEN_POSITION = "B - Strengthen Position" # 情境B: 加倉決策  
     CREATE_NEW_POSITION = "C - New Position Creation" # 情境C: 新單建立
     IGNORE_SIGNAL = "D - Signal Ignore"            # 情境D: 信號忽略
+    SIGNAL_IGNORE = "SIGNAL_IGNORE"                # 錯誤處理用
 
 class SignalPriority(Enum):
     """信號優先級 - JSON 規範分類系統"""
@@ -215,19 +216,6 @@ class EPLDecisionResult:
     improvement_suggestions: Optional[List[str]] = None  # ignore_decision_engine
     learning_data: Optional[Dict[str, Any]] = None      # ignore_decision_engine
 
-@dataclass
-class EPLDecisionResult:
-    """EPL 決策結果"""
-    decision: EPLDecision
-    priority: SignalPriority
-    candidate: SignalCandidate
-    reasoning: List[str]                    # 決策理由
-    execution_params: Dict[str, Any]        # 執行參數
-    risk_management: Dict[str, Any]         # 風險管理設定
-    performance_tracking: Dict[str, Any]    # 績效追蹤信息
-    notification_config: Dict[str, Any]     # 通知配置
-    timestamp: datetime
-    processing_time_ms: float              # 處理時間記錄
 
 class ReplacementDecisionEngine:
     """情境A: 替單決策引擎 - JSON 規範實現"""
@@ -2470,12 +2458,16 @@ class EPLIntelligentDecisionEngine:
         """創建錯誤結果"""
         
         error_result = EPLDecisionResult(
-            candidate=candidate,
             decision=EPLDecision.SIGNAL_IGNORE,
             confidence=0.0,
-            reasoning=[error_message],
             priority=SignalPriority.LOW,
-            execution_plan={}
+            candidate=candidate,
+            reasoning=[error_message],
+            execution_params={},
+            risk_assessment={},
+            performance_tracking={},
+            notification_config={},
+            timestamp=datetime.now()
         )
         
         if additional_info:
@@ -3206,11 +3198,12 @@ class ExecutionPolicyLayer:
                 
                 result = EPLDecisionResult(
                     decision=EPLDecision.IGNORE_SIGNAL,
+                    confidence=candidate.confidence if hasattr(candidate, 'confidence') else 0.0,
                     priority=priority,
                     candidate=candidate,
                     reasoning=all_reasoning,
                     execution_params={},
-                    risk_management={},
+                    risk_assessment={},
                     performance_tracking=ignore_analysis,
                     notification_config=self._get_notification_config(EPLDecision.IGNORE_SIGNAL, priority),
                     timestamp=datetime.now()
@@ -3291,11 +3284,12 @@ class ExecutionPolicyLayer:
             # 建立決策結果
             result = EPLDecisionResult(
                 decision=decision,
+                confidence=candidate.confidence if hasattr(candidate, 'confidence') else 0.0,
                 priority=priority,
                 candidate=candidate,
                 reasoning=all_reasoning,
                 execution_params=execution_params,
-                risk_management=risk_management,
+                risk_assessment=risk_management,
                 performance_tracking=performance_tracking,
                 notification_config=self._get_notification_config(decision, priority),
                 timestamp=datetime.now()
@@ -3317,11 +3311,12 @@ class ExecutionPolicyLayer:
             # 錯誤時返回忽略決策
             return EPLDecisionResult(
                 decision=EPLDecision.IGNORE_SIGNAL,
+                confidence=0.0,  # 錯誤情況下設為 0
                 priority=SignalPriority.LOW,
                 candidate=candidate,
                 reasoning=all_reasoning,
                 execution_params={},
-                risk_management={},
+                risk_assessment={},
                 performance_tracking={"error": str(e)},
                 notification_config={},
                 timestamp=datetime.now()

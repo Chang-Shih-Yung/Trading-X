@@ -1,0 +1,56 @@
+[
+  {
+    "crash_type": "flash_crash_5min",
+    "timeframe_minutes": 5,
+    "price_threshold_percent": 10.0,
+    "volume_multiplier": null,
+    "confirmation_count": 2,
+    "monitoring_interval_seconds": 60,
+    "action_duration_minutes": 30
+  },
+  {
+    "crash_type": "rapid_decline_15min",
+    "timeframe_minutes": 15,
+    "price_threshold_percent": 15.0,
+    "volume_multiplier": 3.0,
+    "confirmation_count": 2,
+    "monitoring_interval_seconds": 180,
+    "action_duration_minutes": 60
+  },
+  {
+    "crash_type": "sustained_crash_1hour",
+    "timeframe_minutes": 60,
+    "price_threshold_percent": 20.0,
+    "volume_multiplier": null,
+    "confirmation_count": 3,
+    "monitoring_interval_seconds": 300,
+    "action_duration_minutes": 240
+  },
+  {
+    "crash_type": "extreme_crash_24hour",
+    "timeframe_minutes": 1440,
+    "price_threshold_percent": 30.0,
+    "volume_multiplier": null,
+    "confirmation_count": 3,
+    "monitoring_interval_seconds": 900,
+    "action_duration_minutes": 1440
+  },
+  {
+    "crash_type": "volume_anomaly",
+    "timeframe_minutes": 0,
+    "price_threshold_percent": 5.0,
+    "volume_multiplier": 10.0,
+    "confirmation_count": 1,
+    "monitoring_interval_seconds": 30,
+    "action_duration_minutes": 60
+  },
+  {
+    "crash_type": "liquidity_crisis",
+    "timeframe_minutes": 0,
+    "price_threshold_percent": 1.0,
+    "volume_multiplier": null,
+    "confirmation_count": 1,
+    "monitoring_interval_seconds": 30,
+    "action_duration_minutes": 30
+  }
+]

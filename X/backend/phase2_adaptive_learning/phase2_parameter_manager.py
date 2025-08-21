@@ -207,25 +207,66 @@ class Phase2ParameterManager:
     async def _load_phase5_parameters(self) -> Dict[str, Any]:
         """載入 Phase5 參數"""
         try:
-            # 尋找最新的 Phase5 配置文件
-            phase5_dir = Path(__file__).parent.parent.parent / "phase5_backtesting" / "output"
+            # 尋找最新的 Phase5 配置文件 - 正確路徑是 safety_backups/working
+            phase5_dir = Path(__file__).parent.parent / "phase5_backtest_validation" / "safety_backups" / "working"
             if not phase5_dir.exists():
-                logger.warning("⚠️ Phase5 輸出目錄不存在")
+                logger.warning("⚠️ Phase5 safety_backups/working 目錄不存在")
+                return {}
+            
+            # 獲取最新的 Phase1A 備份文件（包含 Phase5 優化配置）
+            phase5_files = list(phase5_dir.glob("phase1a_backup_deployment_*.json"))
+            if not phase5_files:
+                logger.warning("⚠️ 未找到 Phase5 備份配置文件")
                 return {}
             
             # 獲取最新文件
-            phase5_files = list(phase5_dir.glob("optimized_config_*.json"))
-            if not phase5_files:
-                logger.warning("⚠️ 未找到 Phase5 配置文件")
-                return {}
-            
             latest_file = max(phase5_files, key=lambda f: f.stat().st_mtime)
             
             with open(latest_file, 'r', encoding='utf-8') as f:
                 phase5_config = json.load(f)
             
             logger.info(f"📁 載入 Phase5 參數: {latest_file.name}")
-            return phase5_config.get("parameters", {})
+            
+            # 從 Phase5 備份中提取參數
+            parameters = {}
+            
+            # 提取技術指標參數
+            if "rsi_period" in phase5_config:
+                parameters["rsi_period"] = phase5_config["rsi_period"]
+            if "macd_fast" in phase5_config:
+                parameters["macd_fast"] = phase5_config["macd_fast"]
+            if "macd_slow" in phase5_config:
+                parameters["macd_slow"] = phase5_config["macd_slow"]
+            
+            # 提取性能提升係數
+            if "performance_boost" in phase5_config:
+                parameters["performance_boost"] = phase5_config["performance_boost"]
+            
+            # 從 lean_backtest_summary 提取參數
+            if "lean_backtest_summary" in phase5_config:
+                summary = phase5_config["lean_backtest_summary"]
+                if "avg_lean_confidence" in summary:
+                    parameters["signal_threshold"] = summary["avg_lean_confidence"]
+                if "avg_expected_return" in summary:
+                    parameters["risk_multiplier"] = min(2.0, max(0.5, 1.0 + summary["avg_expected_return"] * 10))
+                if "avg_position_sizing" in summary:
+                    parameters["position_sizing_factor"] = summary["avg_position_sizing"]
+            
+            # 檢查是否有配置參數
+            if "config" in phase5_config and "parameters" in phase5_config["config"]:
+                parameters.update(phase5_config["config"]["parameters"])
+            elif "parameters" in phase5_config:
+                parameters.update(phase5_config["parameters"])
+            elif "optimization_results" in phase5_config:
+                # 如果有優化結果，提取最佳參數
+                opt_results = phase5_config["optimization_results"]
+                if "best_parameters" in opt_results:
+                    parameters.update(opt_results["best_parameters"])
+                elif "optimized_parameters" in opt_results:
+                    parameters.update(opt_results["optimized_parameters"])
+            
+            logger.info(f"📊 從 Phase5 提取到 {len(parameters)} 個參數")
+            return parameters
             
         except Exception as e:
             logger.error(f"❌ 載入 Phase5 參數失敗: {e}")
@@ -335,7 +376,9 @@ class Phase2ParameterManager:
         return validated
     
     async def _save_parameter_file(self, parameters: Dict, trigger_reason: str, market_regime: str) -> str:
-        """保存參數文件"""
+        """保存參數文件 - 帶文件鎖保護"""
+        import fcntl  # 添加文件鎖支持
+        
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"phase2_optimized_params_{timestamp}.json"
         filepath = self.output_dir / filename
@@ -372,9 +415,25 @@ class Phase2ParameterManager:
             }
         }
         
-        # 保存文件
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(output_data, f, indent=2, ensure_ascii=False, default=str)
+        # 🔒 帶文件鎖的安全保存
+        try:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                # 獲取文件鎖，防止與Phase5同時寫入
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                json.dump(output_data, f, indent=2, ensure_ascii=False, default=str)
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)  # 釋放鎖
+            
+            logger.info(f"💾 Phase2參數文件已安全保存: {filename}")
+            
+        except IOError as e:
+            if e.errno == 11:  # EAGAIN - 文件被鎖定
+                logger.warning("⚠️ 文件被鎖定（可能Phase5正在寫入），延遲保存...")
+                await asyncio.sleep(1)
+                # 遞歸重試
+                return await self._save_parameter_file(parameters, trigger_reason, market_regime)
+            else:
+                logger.error(f"❌ 文件保存失敗: {e}")
+                raise
         
         logger.info(f"💾 參數文件已保存: {filename}")
         

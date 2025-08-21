@@ -24,31 +24,43 @@ import logging
 from pathlib import Path
 import sys
 
-# 導入現有系統組件
-current_dir = Path(__file__).parent
-backend_dir = current_dir.parent.parent
-phase1a_dir = backend_dir / "phase1_signal_generation" / "phase1a_basic_signal_generation"
-sys.path.append(str(phase1a_dir))
+# 導入現有系統組件 - 避免循環依賴，使用本地定義
+logger = logging.getLogger(__name__)
 
-try:
-    from phase1a_basic_signal_generation import MarketRegime, MarketData
-    logger = logging.getLogger(__name__)
-    logger.info("✅ 成功導入現有 MarketRegime 枚舉")
-except ImportError:
-    # 如果導入失敗，使用本地定義
-    class MarketRegime(Enum):
-        BULL_TREND = "BULL_TREND"
-        BEAR_TREND = "BEAR_TREND"
-        SIDEWAYS = "SIDEWAYS"
-        BREAKOUT_UP = "BREAKOUT_UP"
-        BREAKOUT_DOWN = "BREAKOUT_DOWN"
-        CONSOLIDATION = "CONSOLIDATION"
-        VOLATILE = "VOLATILE"
-        TRENDING = "TRENDING"
-        UNKNOWN = "UNKNOWN"
+# 使用本地 MarketRegime 定義，避免循環導入
+class MarketRegime(Enum):
+    """市場狀態枚舉 - 本地定義版本"""
+    UNKNOWN = "UNKNOWN"
+    BULL_TREND = "BULL_TREND"
+    BEAR_TREND = "BEAR_TREND"
+    BREAKOUT_UP = "BREAKOUT_UP"
+    BREAKOUT_DOWN = "BREAKOUT_DOWN"
+    VOLATILE = "VOLATILE"
+    SIDEWAYS = "SIDEWAYS"
+    CONSOLIDATION = "CONSOLIDATION"
+    TRENDING = "TRENDING"
+    REVERSAL = "REVERSAL"
+    RANGE_HIGH = "RANGE_HIGH"
+    RANGE_MID = "RANGE_MID"
+    RANGE_LOW = "RANGE_LOW"
+    TREND_UP_HIGH = "TREND_UP_HIGH"
+    TREND_UP_MID = "TREND_UP_MID"
+    TREND_DOWN_HIGH = "TREND_DOWN_HIGH"
+    TREND_DOWN_MID = "TREND_DOWN_MID"
     
-    logger = logging.getLogger(__name__)
-    logger.warning("⚠️ 使用本地 MarketRegime 定義")
+# MarketData 本地定義
+@dataclass
+class MarketData:
+    """市場數據結構"""
+    symbol: str
+    timestamp: datetime
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
+
+logger.info("✅ MarketRegime 本地定義已載入")
 
 @dataclass
 class MarketFeatures:
