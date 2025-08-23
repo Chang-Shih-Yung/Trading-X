@@ -362,7 +362,11 @@ class BasicSignal:
             'SHORT': '做空信號',
             'short': '做空信號',
             'PRICE_ACTION': '價格行為',
-            'price_action': '價格行為'
+            'price_action': '價格行為',
+            'TREND': '趨勢跟隨',
+            'trend': '趨勢跟隨',
+            'TREND_FOLLOWING': '趨勢跟隨',
+            'trend_following': '趨勢跟隨'
         }
         
         # 獲取信號類型顯示文字

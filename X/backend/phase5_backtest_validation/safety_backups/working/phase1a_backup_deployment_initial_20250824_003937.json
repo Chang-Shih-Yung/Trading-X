@@ -35,7 +35,7 @@
   },
   "phase1a_basic_signal_generation_dependency": {
     "version": "2.0.0-lean",
-    "created_date": "2025-08-23",
+    "created_date": "2025-08-24",
     "description": "Phase1A Lean 相似度回測優化配置 - 僅形狀比較，避免過擬合",
     "module_type": "lean_signal_generation_foundation",
     "lean_optimization": {
@@ -50,7 +50,7 @@
       "signal_generation_params": {
         "basic_mode": {
           "price_change_threshold": {
-            "base_value": 0.0021089642154813264,
+            "base_value": 0.001988027478559458,
             "type": "dynamic_parameter",
             "parameter_id": "lean_price_change_threshold",
             "market_regime_dependent": true,
@@ -73,19 +73,19 @@
         "accuracy_baseline": ">60%",
         "system_availability": ">99.5%",
         "lean_win_rate_target": 0.58,
-        "lean_expected_return": 0.004217928430962653,
-        "lean_position_multiplier": 0.9648220883169495,
+        "lean_expected_return": 0.003976054957118916,
+        "lean_position_multiplier": 0.9661843423235046,
         "lean_regime_gate_rate": 1.0
       }
     }
   },
-  "rsi_period": 17,
+  "rsi_period": 16,
   "macd_fast": 12,
   "macd_slow": 31,
-  "optimization_timestamp": "2025-08-23T12:41:14.718797",
+  "optimization_timestamp": "2025-08-24T00:39:37.213061",
   "optimized_by": "Phase5_Lean_Optimizer",
   "lean_mode": true,
-  "performance_boost": 1.126607142857143,
+  "performance_boost": 1.1119821428571428,
   "optimization_method": "lean_similarity_matching",
   "lean_backtest_summary": {
     "total_symbols_analyzed": 7,
@@ -94,14 +94,14 @@
     "bearish_consensus": 2,
     "market_sentiment": "BULLISH",
     "market_confidence": 0.571,
-    "avg_lean_confidence": 0.422,
-    "avg_expected_return": 0.0042,
-    "avg_position_sizing": 0.965
+    "avg_lean_confidence": 0.373,
+    "avg_expected_return": 0.004,
+    "avg_position_sizing": 0.966
   },
   "btcusdt_lean_adjustment": {
     "direction_bias": "bullish",
-    "confidence_level": 0.158,
-    "expected_return": 0.002,
+    "confidence_level": 0.18,
+    "expected_return": 0.0019,
     "position_multiplier": 1.0,
     "regime_status": "當前制度: trend_up_mid, W1閘門: 通過",
     "h4_pattern_count": 20,
@@ -109,54 +109,54 @@
   },
   "ethusdt_lean_adjustment": {
     "direction_bias": "bullish",
-    "confidence_level": 0.45,
-    "expected_return": 0.0137,
+    "confidence_level": 0.225,
+    "expected_return": 0.0066,
     "position_multiplier": 1.0,
     "regime_status": "當前制度: trend_up_high, W1閘門: 通過",
     "h4_pattern_count": 2,
     "d1_pattern_count": 0
   },
   "bnbusdt_lean_adjustment": {
-    "direction_bias": "bullish",
-    "confidence_level": 0.524,
-    "expected_return": 0.0205,
+    "direction_bias": "neutral",
+    "confidence_level": 0.502,
+    "expected_return": 0.0189,
     "position_multiplier": 1.0,
     "regime_status": "當前制度: trend_up_mid, W1閘門: 通過",
     "h4_pattern_count": 20,
     "d1_pattern_count": 3
   },
   "adausdt_lean_adjustment": {
-    "direction_bias": "neutral",
-    "confidence_level": 0.523,
-    "expected_return": -0.0111,
-    "position_multiplier": 0.832,
+    "direction_bias": "bearish",
+    "confidence_level": 0.478,
+    "expected_return": -0.0137,
+    "position_multiplier": 0.826,
     "regime_status": "當前制度: range_high, W1閘門: 通過",
     "h4_pattern_count": 20,
     "d1_pattern_count": 6
   },
   "solusdt_lean_adjustment": {
     "direction_bias": "bullish",
-    "confidence_level": 0.5,
-    "expected_return": 0.0008,
+    "confidence_level": 0.425,
+    "expected_return": -0.0036,
     "position_multiplier": 1.0,
     "regime_status": "當前制度: trend_up_high, W1閘門: 通過",
-    "h4_pattern_count": 2,
+    "h4_pattern_count": 3,
     "d1_pattern_count": 4
   },
   "xrpusdt_lean_adjustment": {
     "direction_bias": "bearish",
-    "confidence_level": 0.3,
-    "expected_return": -0.0044,
+    "confidence_level": 0.281,
+    "expected_return": -0.0059,
     "position_multiplier": 1.0,
     "regime_status": "當前制度: range_high, W1閘門: 通過",
-    "h4_pattern_count": 12,
+    "h4_pattern_count": 16,
     "d1_pattern_count": 0
   },
   "dogeusdt_lean_adjustment": {
-    "direction_bias": "bearish",
-    "confidence_level": 0.5,
-    "expected_return": 0.0081,
-    "position_multiplier": 0.922,
+    "direction_bias": "bullish",
+    "confidence_level": 0.523,
+    "expected_return": 0.0236,
+    "position_multiplier": 0.937,
     "regime_status": "當前制度: range_high, W1閘門: 通過",
     "h4_pattern_count": 20,
     "d1_pattern_count": 4

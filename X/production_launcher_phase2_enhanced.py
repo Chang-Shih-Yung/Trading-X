@@ -563,7 +563,10 @@ class ProductionTradingSystemPhase2Enhanced:
                                     decision_result = None
                                     
                                 except Exception as signal_error:
-                                    logger.warning(f"⚠️ {symbol} 信號 {i} Phase3 處理失敗: {signal_error}")
+                                    # 使用模組級 logger 確保變數可用
+                                    import logging
+                                    module_logger = logging.getLogger(__name__)
+                                    module_logger.warning(f"⚠️ {symbol} 信號 {i} Phase3 處理失敗: {signal_error}")
                                     decision_result = None
                                 
                                 if decision_result:

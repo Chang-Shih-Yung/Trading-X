@@ -42,7 +42,7 @@ class ProductionConfig:
     V3_FEE_TIERS = [500, 3000, 10000, 100]  # 0.05%, 0.3%, 1%, 0.01%
     
     # 💰 動態流動性評估配置
-    MIN_LIQUIDITY_THRESHOLD = 1000  # 最低1000 USDT即可接受
+    MIN_LIQUIDITY_THRESHOLD = 10000  # 最低10000 USDT即可接受
     PREFERRED_LIQUIDITY_THRESHOLD = 50000  # 優先選擇5萬USDT以上
     
     # 🌐 產品級 BSC RPC 節點池 (按優先級排序)
@@ -58,8 +58,8 @@ class ProductionConfig:
     ]
     
     # ⏱️ 時間配置
-    PRICE_UPDATE_INTERVAL = 500  # 500ms 更新間隔
-    POOL_DISCOVERY_INTERVAL = 3600  # 1小時重新發現主池
+    PRICE_UPDATE_INTERVAL = 5  # 5ms 更新間隔 (從500ms優化)
+    POOL_DISCOVERY_INTERVAL = 7200  # 2小時重新發現主池
     RPC_TIMEOUT = 10  # RPC 請求超時
     
     # 🔄 重試配置
