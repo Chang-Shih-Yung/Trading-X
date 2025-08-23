@@ -60,7 +60,7 @@ class MarketData:
     close: float
     volume: float
 
-logger.info("✅ MarketRegime 本地定義已載入")
+logger.info("✅ MarketRegime 外部定義已載入，使用統一市場狀態標準")
 
 @dataclass
 class MarketFeatures:

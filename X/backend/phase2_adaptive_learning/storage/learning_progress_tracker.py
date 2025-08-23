@@ -164,9 +164,9 @@ class LearningProgressTracker:
             # 添加到歷史記錄
             self.progress_history.append(snapshot)
             
-            # 保持歷史記錄不超過 1000 條
-            if len(self.progress_history) > 1000:
-                self.progress_history = self.progress_history[-1000:]
+            # 🔧 優化: 保持歷史記錄不超過 500 條 (減少檔案大小)
+            if len(self.progress_history) > 500:
+                self.progress_history = self.progress_history[-500:]
             
             # 檢查里程碑
             self._check_milestones(snapshot)
@@ -455,7 +455,7 @@ class LearningProgressTracker:
             logger.error(f"❌ 進度歷史保存失敗: {e}")
     
     def load_progress_history(self):
-        """載入進度歷史"""
+        """載入進度歷史 (保持最新500筆)"""
         try:
             if self.progress_file.exists():
                 with open(self.progress_file, 'r', encoding='utf-8') as f:

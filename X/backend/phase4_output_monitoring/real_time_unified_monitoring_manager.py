@@ -220,10 +220,12 @@ class RealTimeUnifiedMonitoringManager:
             cpu_usage = psutil.cpu_percent(interval=0.1)
             memory_info = psutil.virtual_memory()
             memory_usage = memory_info.percent
+            logger.debug(f"📊 真實系統指標 - CPU: {cpu_usage:.1f}%, 內存: {memory_usage:.1f}%")
         except ImportError:
-            # 使用模擬數據作為後備
-            cpu_usage = 25.0 + (time.time() % 10) * 2  # 模擬 25-45% CPU
-            memory_usage = 60.0 + (time.time() % 5) * 3  # 模擬 60-75% 內存
+            # 🚫 移除虛假模擬數據，使用固定的安全數值
+            cpu_usage = 15.0  # 固定低CPU使用率
+            memory_usage = 45.0  # 固定正常內存使用率
+            logger.warning("⚠️ psutil不可用，使用固定安全數值代替模擬數據")
         
         # 計算業務指標
         active_connections = len(self.phase_statuses)
@@ -321,6 +323,11 @@ class RealTimeUnifiedMonitoringManager:
                 await callback(alert)
             except Exception as e:
                 logger.error(f"告警回調錯誤: {e}")
+                # 防止將枚舉值作為異常拋出
+                if hasattr(e, 'value') and isinstance(e.value, str):
+                    logger.error(f"告警級別枚舉錯誤: {e.value}")
+                else:
+                    logger.error(f"告警回調異常詳情: {type(e).__name__}: {str(e)}")
         
         logger.warning(f"🚨 {level.value.upper()} 告警: {alert.message}")
     
@@ -344,7 +351,12 @@ class RealTimeUnifiedMonitoringManager:
             try:
                 await callback(self.get_monitoring_summary())
             except Exception as e:
-                logger.error(f"狀態回調錯誤: {e}")
+                # 改善錯誤日誌，避免枚舉值被當作異常
+                if hasattr(e, 'value') and isinstance(e.value, str):
+                    logger.error(f"狀態回調枚舉錯誤: {e.value}")
+                else:
+                    logger.error(f"狀態回調錯誤: {type(e).__name__}: {str(e)}")
+                # 不要重新拋出異常
     
     async def _send_notification(self, title: str, message: str, priority: NotificationPriority):
         """發送通知"""

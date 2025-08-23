@@ -1,0 +1,43 @@
+{
+    "notification_success_rate_monitoring": {
+        "enabled": true,
+        "success_rate_threshold": 0.85,
+        "failure_rate_threshold": 0.15,
+        "monitoring_window_minutes": 60,
+        "alert_thresholds": {
+            "warning": 0.75,
+            "critical": 0.50
+        },
+        "notification_channels": {
+            "email": {
+                "enabled": true,
+                "priority": "high"
+            },
+            "log": {
+                "enabled": true,
+                "priority": "normal"
+            }
+        },
+        "retry_policy": {
+            "max_retries": 3,
+            "retry_delay_seconds": 5,
+            "backoff_factor": 2
+        },
+        "monitoring_metrics": {
+            "track_delivery_time": true,
+            "track_response_rate": true,
+            "track_error_types": true
+        }
+    },
+    "system_performance": {
+        "memory_threshold": 85.0,
+        "cpu_threshold": 80.0,
+        "disk_threshold": 90.0,
+        "network_threshold": 75.0
+    },
+    "alert_configuration": {
+        "cooldown_period_minutes": 15,
+        "escalation_levels": ["warning", "critical", "emergency"],
+        "auto_recovery_enabled": true
+    }
+}

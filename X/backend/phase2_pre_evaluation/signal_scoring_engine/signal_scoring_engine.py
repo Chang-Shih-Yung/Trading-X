@@ -9,6 +9,25 @@ from typing import Dict, Any, List
 import math
 import statistics
 
+# 為了向後兼容，提供 SignalScoringEngine 別名
+class SignalScoringEngine:
+    """向後兼容的信號評分引擎"""
+    
+    def __init__(self):
+        self.enhanced_engine = EnhancedSignalScoringEngine()
+    
+    def calculate_score(self, signal_data: Dict[str, Any]) -> float:
+        """計算信號評分"""
+        try:
+            result = self.enhanced_engine.calculate_enhanced_score(signal_data)
+            return result.get('final_score', 0.0)
+        except Exception as e:
+            return 0.0
+    
+    def evaluate_signal_quality(self, signal_data: Dict[str, Any]) -> Dict[str, Any]:
+        """評估信號品質"""
+        return self.enhanced_engine.calculate_enhanced_score(signal_data)
+
 class EnhancedSignalScoringEngine:
     """
     增強信號評分引擎 v2.1.0

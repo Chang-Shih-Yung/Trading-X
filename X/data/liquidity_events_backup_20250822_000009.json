@@ -1,0 +1,62 @@
+[
+  {
+    "event_id": "liquidity_ADAUSDT_1755761829",
+    "symbol": "ADAUSDT",
+    "crisis_level": "critical",
+    "spread_percentage": 0.011434452003886453,
+    "liquidity_level": "high",
+    "market_data": {
+      "symbol": "ADAUSDT",
+      "timestamp": "2025-08-21 15:37:09.636574",
+      "best_bid": 0.8745,
+      "best_ask": 0.8746,
+      "mid_price": 0.87455,
+      "spread": 9.999999999998899e-05,
+      "spread_percentage": 0.011434452003886453,
+      "volume_24h": 255938619.0,
+      "quote_volume_24h": 222197853.43778,
+      "count_24h": 587796,
+      "bid_depth": 569605.6,
+      "ask_depth": 317517.3,
+      "order_book_imbalance": 0.28416389656946067,
+      "price_change_24h": 2.822
+    },
+    "detected_at": "2025-08-21T15:37:09.636912",
+    "actions_recommended": [
+      "立即暫停 ADAUSDT 交易",
+      "增加風險等級到最高",
+      "通知管理員立即介入",
+      "監控其他相關幣種"
+    ]
+  },
+  {
+    "event_id": "liquidity_SOLUSDT_1755761829",
+    "symbol": "SOLUSDT",
+    "crisis_level": "warning",
+    "spread_percentage": 0.005343450265846979,
+    "liquidity_level": "high",
+    "market_data": {
+      "symbol": "SOLUSDT",
+      "timestamp": "2025-08-21 15:37:09.882244",
+      "best_bid": 187.14,
+      "best_ask": 187.15,
+      "mid_price": 187.14499999999998,
+      "spread": 0.010000000000019327,
+      "spread_percentage": 0.005343450265846979,
+      "volume_24h": 3850831.35,
+      "quote_volume_24h": 710273748.6924,
+      "count_24h": 2614580,
+      "bid_depth": 5256.969,
+      "ask_depth": 4125.902,
+      "order_book_imbalance": 0.12054593951041212,
+      "price_change_24h": 3.53
+    },
+    "detected_at": "2025-08-21T15:37:09.882483",
+    "actions_recommended": [
+      "提高 SOLUSDT 風險監控",
+      "降低該幣種倉位",
+      "增加監控頻率",
+      "準備暫停交易"
+    ]
+  }
+]

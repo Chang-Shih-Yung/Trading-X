@@ -340,6 +340,86 @@ class BasicSignal:
             result['timestamp'] = self.timestamp.isoformat()
             
         return result
+    
+    def format_for_display(self, tier: 'SignalTier' = None) -> Dict[str, Any]:
+        """格式化信號以供用戶顯示"""
+        # 信號類型友好顯示映射
+        signal_type_mapping = {
+            'MOMENTUM': '動量突破',
+            'momentum': '動量突破',
+            'REVERSAL': '反轉信號',
+            'reversal': '反轉信號',
+            'BREAKOUT': '突破信號',
+            'breakout': '突破信號',
+            'HOLD': '持有觀望',
+            'hold': '持有觀望',
+            'BUY': '買入信號',
+            'buy': '買入信號',
+            'SELL': '賣出信號',
+            'sell': '賣出信號',
+            'LONG': '做多信號',
+            'long': '做多信號',
+            'SHORT': '做空信號',
+            'short': '做空信號',
+            'PRICE_ACTION': '價格行為',
+            'price_action': '價格行為'
+        }
+        
+        # 獲取信號類型顯示文字
+        signal_type_str = self.signal_type.value if hasattr(self.signal_type, 'value') else str(self.signal_type)
+        friendly_signal_type = signal_type_mapping.get(signal_type_str, signal_type_str)
+        
+        # 計算建議倉位 (更保守的策略)
+        tier_name = tier.value if tier and hasattr(tier, 'value') else 'MEDIUM'
+        position_base_multipliers = {"CRITICAL": 0.5, "HIGH": 0.4, "MEDIUM": 0.3, "LOW": 0.2}
+        
+        confidence_factor = min(self.strength, 1.0)
+        base_position = position_base_multipliers.get(tier_name, 0.3)
+        suggested_position = base_position * confidence_factor
+        
+        # 最小倉位閾值
+        min_position = 0.05
+        if suggested_position < min_position:
+            suggested_position = min_position
+        
+        # 計算止盈止損
+        profit_pct = max(self.strength * 0.05, 0.015)  # 最少1.5%止盈
+        loss_pct = max(self.strength * 0.03, 0.010)    # 最少1.0%止損
+        
+        if 'MOMENTUM' in signal_type_str or 'BUY' in signal_type_str or 'LONG' in signal_type_str:
+            take_profit = self.price * (1 + profit_pct)
+            stop_loss = self.price * (1 - loss_pct)
+        elif 'SELL' in signal_type_str or 'SHORT' in signal_type_str:
+            take_profit = self.price * (1 - profit_pct)
+            stop_loss = self.price * (1 + loss_pct)
+        else:
+            take_profit = self.price * (1 + profit_pct)
+            stop_loss = self.price * (1 - loss_pct)
+        
+        # 建議持倉時間
+        holding_hours = {"CRITICAL": 4, "HIGH": 8, "MEDIUM": 24, "LOW": 72}
+        suggested_holding = holding_hours.get(tier_name, 24)
+        
+        return {
+            "symbol": self.symbol,
+            "timestamp": self.timestamp.isoformat(),
+            "signal_type": friendly_signal_type,
+            "confidence": self.confidence,
+            "tier": tier_name,
+            "suggested_position_size": f"{suggested_position:.1%}",
+            "current_price": self.price,
+            "take_profit": f"{take_profit:.4f}",
+            "stop_loss": f"{stop_loss:.4f}",
+            "suggested_holding_hours": suggested_holding,
+            "raw_signal_data": {
+                "signal_id": self.signal_id,
+                "strength": self.strength,
+                "direction": self.direction,
+                "layer_source": self.layer_source,
+                "market_regime": self.market_regime,
+                "trading_session": self.trading_session
+            }
+        }
 
 @dataclass
 @dataclass
@@ -1930,8 +2010,11 @@ class Phase1ABasicSignalGeneration:
             if layer_3_result.signals:
                 signals.extend(layer_3_result.signals)
             
-            logger.debug(f"✅ {symbol}: 生成 {len(signals)} 個信號")
-            return signals
+            # 🔥 新增：信號品質篩選和去重
+            filtered_signals = await self._filter_and_prioritize_signals(signals, symbol, dynamic_params)
+            
+            logger.debug(f"✅ {symbol}: 原始信號 {len(signals)} 個，篩選後 {len(filtered_signals)} 個")
+            return filtered_signals
             
         except Exception as e:
             logger.error(f"❌ {symbol}: 信號生成失敗 - {e}")
@@ -3865,6 +3948,50 @@ class Phase1ABasicSignalGeneration:
             except Exception as e:
                 logger.error(f"協調器失敗: {e}")
                 await asyncio.sleep(60)
+    
+    async def _filter_and_prioritize_signals(self, signals: List[BasicSignal], symbol: str, dynamic_params: Dict[str, Any]) -> List[BasicSignal]:
+        """信號品質篩選和優先級排序"""
+        if not signals:
+            return signals
+        
+        try:
+            # 1. 基礎品質篩選
+            min_confidence = dynamic_params.get('confidence_threshold', 0.6)
+            quality_filtered = []
+            
+            for signal in signals:
+                # 篩選條件 - 完全禁用 price_action 信號
+                if (signal.confidence >= min_confidence and 
+                    signal.strength > 0.3 and 
+                    signal.signal_type != SignalType.PRICE_ACTION):  # � 完全禁用 price_action 雜訊信號
+                    quality_filtered.append(signal)
+                elif signal.signal_type == SignalType.PRICE_ACTION:
+                    # 🚫 完全禁用所有 price_action 信號（太多雜訊）
+                    logger.debug(f"🚫 {symbol}: 過濾掉 price_action 信號 (confidence: {signal.confidence:.3f}, strength: {signal.strength:.3f})")
+                    continue  # 跳過所有 price_action 信號
+            
+            # 2. 去重：相同方向和類型的信號只保留最高品質
+            deduplicated = {}
+            for signal in quality_filtered:
+                key = f"{signal.symbol}_{signal.direction}_{signal.signal_type.value}"
+                if key not in deduplicated or signal.confidence > deduplicated[key].confidence:
+                    deduplicated[key] = signal
+            
+            # 3. 按優先級和品質排序
+            final_signals = list(deduplicated.values())
+            final_signals.sort(key=lambda x: (x.priority.value, -x.confidence, -x.strength))
+            
+            # 4. 限制每個符號的信號數量
+            max_signals_per_symbol = 3
+            if len(final_signals) > max_signals_per_symbol:
+                final_signals = final_signals[:max_signals_per_symbol]
+                logger.info(f"📊 {symbol}: 信號數量限制為 {max_signals_per_symbol} 個")
+            
+            return final_signals
+            
+        except Exception as e:
+            logger.error(f"❌ {symbol}: 信號篩選失敗 - {e}")
+            return signals  # 篩選失敗時返回原始信號
     
     async def get_recent_signals(self, symbol: str = None, limit: int = 100) -> List[BasicSignal]:
         """獲取最近信號"""

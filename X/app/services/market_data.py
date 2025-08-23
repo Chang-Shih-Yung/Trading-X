@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor
 import threading
 
 # 導入 WebSocket 數據結構
-from X.app.services.binance_websocket import BinanceDataCollector, TickerData, KlineData, DepthData
+from app.services.binance_websocket import BinanceDataCollector, TickerData, KlineData, DepthData
 from sqlalchemy import desc, select
 import logging
 import json

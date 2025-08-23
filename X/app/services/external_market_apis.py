@@ -13,7 +13,7 @@ from dataclasses import dataclass
 import json
 
 from app.utils.time_utils import get_taiwan_now_naive
-from X.app.services.market_data import MarketDataService
+from app.services.market_data import MarketDataService
 from app.services.bull_bear_weight_manager import bull_bear_weight_manager
 
 logger = logging.getLogger(__name__)

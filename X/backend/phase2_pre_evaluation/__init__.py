@@ -29,7 +29,7 @@ Phase2 Pre-Evaluation是Trading-X系統的核心預評估處理層，負責將Ph
 最後更新: 2025-08-07
 """
 
-from .epl_pre_processing_system.epl_pre_processing_system import EPLPreProcessingSystem
+from .epl_pre_processing_system.epl_pre_processing_system import EnhancedPreEvaluationLayer as EPLPreProcessingSystem
 from .signal_scoring_engine.signal_scoring_engine import SignalScoringEngine  
 from .real_data_signal_quality_engine.real_data_signal_quality_engine import RealDataSignalQualityEngine
 

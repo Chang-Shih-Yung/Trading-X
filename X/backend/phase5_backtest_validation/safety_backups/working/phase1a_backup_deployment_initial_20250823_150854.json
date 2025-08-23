@@ -1,0 +1,164 @@
+{
+  "input_specifications": {
+    "real_time_data_sources": {
+      "binance_websocket": {
+        "price_stream": "real_time",
+        "volume_stream": "real_time",
+        "orderbook_stream": "real_time",
+        "funding_rate_api": "periodic"
+      }
+    },
+    "required_parameters": {
+      "dynamic_parameters": [
+        "market_regime",
+        "trading_session"
+      ],
+      "orderbook_integration": [
+        "spread_calculation",
+        "depth_analysis",
+        "liquidity_ratio"
+      ],
+      "signal_thresholds": [
+        "strength_minimum",
+        "confidence_threshold"
+      ]
+    }
+  },
+  "output_specifications": {
+    "signal_format": "BasicSignal",
+    "market_data_format": "MarketData",
+    "output_channels": [
+      "phase1b_volatility",
+      "phase1c_coordination",
+      "phase2_pre_evaluation"
+    ]
+  },
+  "phase1a_basic_signal_generation_dependency": {
+    "version": "2.0.0-lean",
+    "created_date": "2025-08-23",
+    "description": "Phase1A Lean 相似度回測優化配置 - 僅形狀比較，避免過擬合",
+    "module_type": "lean_signal_generation_foundation",
+    "lean_optimization": {
+      "enabled": true,
+      "methodology": "shape_comparison_only",
+      "feature_count": 3,
+      "timeframe_strategy": "h4_d1_voting_w1_gate",
+      "regime_filtering": "same_regime_comparison",
+      "execution_filter": "triple_filter_mechanism"
+    },
+    "configuration": {
+      "signal_generation_params": {
+        "basic_mode": {
+          "price_change_threshold": {
+            "base_value": 0.0011561220110332144,
+            "type": "dynamic_parameter",
+            "parameter_id": "lean_price_change_threshold",
+            "market_regime_dependent": true,
+            "lean_optimization": true,
+            "description": "Lean 優化：基於歷史相似度的價格變化閾值"
+          },
+          "confidence_threshold": {
+            "base_value": 0.7,
+            "type": "dynamic_parameter",
+            "parameter_id": "lean_confidence_threshold",
+            "market_regime_dependent": true,
+            "lean_optimization": true,
+            "description": "Lean 優化：基於多時間框架共識的信心度閾值"
+          }
+        }
+      },
+      "performance_targets": {
+        "processing_latency_p99": "<30ms",
+        "signal_generation_rate": "5-25 signals/minute",
+        "accuracy_baseline": ">60%",
+        "system_availability": ">99.5%",
+        "lean_win_rate_target": 0.58,
+        "lean_expected_return": 0.0023122440220664287,
+        "lean_position_multiplier": 0.9605063464248821,
+        "lean_regime_gate_rate": 1.0
+      }
+    }
+  },
+  "rsi_period": 17,
+  "macd_fast": 12,
+  "macd_slow": 31,
+  "optimization_timestamp": "2025-08-23T15:08:54.907840",
+  "optimized_by": "Phase5_Lean_Optimizer",
+  "lean_mode": true,
+  "performance_boost": 1.1217142857142857,
+  "optimization_method": "lean_similarity_matching",
+  "lean_backtest_summary": {
+    "total_symbols_analyzed": 7,
+    "regime_gate_passed": 7,
+    "bullish_consensus": 4,
+    "bearish_consensus": 1,
+    "market_sentiment": "BULLISH",
+    "market_confidence": 0.571,
+    "avg_lean_confidence": 0.406,
+    "avg_expected_return": 0.0023,
+    "avg_position_sizing": 0.961
+  },
+  "btcusdt_lean_adjustment": {
+    "direction_bias": "bullish",
+    "confidence_level": 0.158,
+    "expected_return": 0.002,
+    "position_multiplier": 1.0,
+    "regime_status": "當前制度: trend_up_mid, W1閘門: 通過",
+    "h4_pattern_count": 20,
+    "d1_pattern_count": 0
+  },
+  "ethusdt_lean_adjustment": {
+    "direction_bias": "bullish",
+    "confidence_level": 0.45,
+    "expected_return": 0.0137,
+    "position_multiplier": 1.0,
+    "regime_status": "當前制度: trend_up_high, W1閘門: 通過",
+    "h4_pattern_count": 2,
+    "d1_pattern_count": 0
+  },
+  "bnbusdt_lean_adjustment": {
+    "direction_bias": "bullish",
+    "confidence_level": 0.432,
+    "expected_return": 0.0033,
+    "position_multiplier": 1.0,
+    "regime_status": "當前制度: trend_up_mid, W1閘門: 通過",
+    "h4_pattern_count": 20,
+    "d1_pattern_count": 4
+  },
+  "adausdt_lean_adjustment": {
+    "direction_bias": "neutral",
+    "confidence_level": 0.523,
+    "expected_return": -0.0111,
+    "position_multiplier": 0.816,
+    "regime_status": "當前制度: range_high, W1閘門: 通過",
+    "h4_pattern_count": 20,
+    "d1_pattern_count": 6
+  },
+  "solusdt_lean_adjustment": {
+    "direction_bias": "bullish",
+    "confidence_level": 0.5,
+    "expected_return": 0.0008,
+    "position_multiplier": 0.999,
+    "regime_status": "當前制度: trend_up_high, W1閘門: 通過",
+    "h4_pattern_count": 2,
+    "d1_pattern_count": 4
+  },
+  "xrpusdt_lean_adjustment": {
+    "direction_bias": "bearish",
+    "confidence_level": 0.3,
+    "expected_return": -0.0044,
+    "position_multiplier": 1.0,
+    "regime_status": "當前制度: range_high, W1閘門: 通過",
+    "h4_pattern_count": 12,
+    "d1_pattern_count": 0
+  },
+  "dogeusdt_lean_adjustment": {
+    "direction_bias": "neutral",
+    "confidence_level": 0.478,
+    "expected_return": 0.0119,
+    "position_multiplier": 0.908,
+    "regime_status": "當前制度: range_high, W1閘門: 通過",
+    "h4_pattern_count": 20,
+    "d1_pattern_count": 4
+  }
+}

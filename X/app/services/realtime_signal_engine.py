@@ -12,8 +12,8 @@ from dataclasses import dataclass, asdict
 import pandas as pd
 import numpy as np
 
-from X.app.services.market_data import MarketDataService
-from app.services.pandas_ta_indicators import PandasTAIndicators
+from app.services.market_data import MarketDataService
+from app.services.pandas_ta_indicators import TechnicalIndicatorEngine
 from app.services.pandas_ta_trading_signal_parser import PandasTATradingSignals
 from app.services.realtime_technical_analysis import RealTimeTechnicalAnalysis
 from app.services.candlestick_patterns import analyze_candlestick_patterns
@@ -44,10 +44,17 @@ logger = logging.getLogger(__name__)
 
 # 🎯 Phase1 整合模組
 try:
-    from X.backend.phase1_signal_generation.phase1_main_coordinator import Phase1MainCoordinator
-    from X.backend.phase1_signal_generation.phase1a_basic_signal_generation.phase1a_basic_signal_generation import Phase1ABasicSignalGeneration
-    from X.backend.phase1_signal_generation.phase1b_volatility_adaptation.phase1b_volatility_adaptation import Phase1BVolatilityAdaptationEngine
-    from X.backend.phase1_signal_generation.phase1c_signal_standardization.phase1c_signal_standardization import Phase1CSignalStandardizationEngine
+    import sys
+    import os
+    # 加入 X 目錄到路徑
+    x_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+    if x_dir not in sys.path:
+        sys.path.insert(0, x_dir)
+    
+    from backend.phase1_signal_generation.phase1_main_coordinator import Phase1MainCoordinator
+    from backend.phase1_signal_generation.phase1a_basic_signal_generation.phase1a_basic_signal_generation import Phase1ABasicSignalGeneration
+    from backend.phase1_signal_generation.phase1b_volatility_adaptation.phase1b_volatility_adaptation import Phase1BVolatilityAdaptationEngine
+    from backend.phase1_signal_generation.phase1c_signal_standardization.phase1c_signal_standardization import Phase1CSignalStandardizationEngine
     PHASE1_AVAILABLE = True
     logger.info("✅ Phase1 信號生成模組載入成功")
 except ImportError as e:
@@ -87,7 +94,7 @@ class RealtimeSignalEngine:
     
     def __init__(self):
         self.market_service: Optional[MarketDataService] = None
-        self.pandas_ta_indicators = PandasTAIndicators()
+        self.pandas_ta_indicators = TechnicalIndicatorEngine()
         self.signal_parser = PandasTATradingSignals()
         self.technical_analysis: Optional[RealTimeTechnicalAnalysis] = None
         # 配置參數
@@ -1005,6 +1012,10 @@ class RealtimeSignalEngine:
             # 🎯 第一優先：立即儲存到狙擊手資料庫 (持久化 + 郵件自動發送)
             db_signal_id = await self._save_to_sniper_database(signal)
             
+            if db_signal_id is None:
+                logger.warning(f"⚠️ 信號因重複檢測被跳過: {signal.symbol} {signal.signal_type}")
+                return
+            
             if not db_signal_id:
                 logger.error(f"❌ 信號儲存失敗，跳過後續處理: {signal.symbol}")
                 return
@@ -1048,38 +1059,49 @@ class RealtimeSignalEngine:
             confidence_hash = str(int(signal.confidence * 1000))  # 信心度特徵
             signal_id = f"{signal.symbol}_{signal.timeframe}_{price_hash}_{confidence_hash}_{int(signal.timestamp.timestamp())}"
             
-            # 防重複檢查 - 檢查信號ID和相似價格
+            # 🎯 防重複檢查 - 多維度相似度檢測
             async with AsyncSessionLocal() as session:
-                # 檢查相同信號ID
-                existing = await session.execute(
-                    select(SniperSignalDetails).where(
-                        SniperSignalDetails.signal_id == signal_id
-                    )
-                )
-                if existing.scalar_one_or_none():
-                    logger.warning(f"⚠️ 信號ID已存在，跳過: {signal_id}")
-                    return signal_id
-                
-                # 🎯 檢查相同幣種和相近價格的信號（最近10分鐘內）
+                # 🎯 檢查相同幣種的相似信號（最近30分鐘內）
                 from app.utils.timezone_utils import get_taiwan_now
-                ten_minutes_ago = get_taiwan_now() - timedelta(minutes=10)
-                price_tolerance = 0.02  # 2%價格容忍度（更寬鬆）
+                thirty_minutes_ago = get_taiwan_now() - timedelta(minutes=30)
+                price_tolerance = 0.001  # 0.1%價格容忍度（更嚴格）
+                confidence_tolerance = 0.05  # 5%信心度容忍度
                 
                 similar_signals = await session.execute(
                     select(SniperSignalDetails).where(
                         SniperSignalDetails.symbol == signal.symbol,
                         SniperSignalDetails.signal_type == signal.signal_type,
-                        SniperSignalDetails.created_at >= ten_minutes_ago,
+                        SniperSignalDetails.created_at >= thirty_minutes_ago,
                         SniperSignalDetails.status == SignalStatus.ACTIVE
                     )
                 )
                 
-                # 手動檢查價格相似度
+                # 多維度相似度檢查
                 for existing_signal in similar_signals.scalars():
+                    # 價格相似度檢查
                     price_diff = abs(existing_signal.entry_price - signal.entry_price) / signal.entry_price
-                    if price_diff <= price_tolerance:
-                        logger.warning(f"⚠️ 發現相似信號，跳過重複: {signal.symbol} 新價格:{signal.entry_price} vs 已有:{existing_signal.entry_price} (差異:{price_diff:.4f})")
-                        return signal_id
+                    
+                    # 信心度相似度檢查
+                    confidence_diff = abs(existing_signal.signal_strength - signal.confidence)
+                    
+                    # 止盈止損相似度檢查
+                    stop_loss_diff = abs(existing_signal.stop_loss_price - signal.stop_loss) / signal.stop_loss if signal.stop_loss > 0 else 0
+                    take_profit_diff = abs(existing_signal.take_profit_price - signal.take_profit) / signal.take_profit if signal.take_profit > 0 else 0
+                    
+                    # 綜合相似度判斷
+                    is_similar = (
+                        price_diff <= price_tolerance and
+                        confidence_diff <= confidence_tolerance and
+                        stop_loss_diff <= price_tolerance and
+                        take_profit_diff <= price_tolerance
+                    )
+                    
+                    if is_similar:
+                        logger.warning(f"⚠️ 發現高度相似信號，跳過重複: {signal.symbol}")
+                        logger.warning(f"   價格差異: {price_diff:.4f} (<= {price_tolerance})")
+                        logger.warning(f"   信心度差異: {confidence_diff:.4f} (<= {confidence_tolerance})")
+                        logger.warning(f"   止損差異: {stop_loss_diff:.4f}, 止盈差異: {take_profit_diff:.4f}")
+                        return None  # 🎯 修正：返回None而不是signal_id
                 
                 # 🎯 動態時間計算 - 整合 Phase 1ABC + Phase 1+2+3 系統
                 logger.info(f"🎯 開始為 {signal.symbol} 計算動態過期時間...")
