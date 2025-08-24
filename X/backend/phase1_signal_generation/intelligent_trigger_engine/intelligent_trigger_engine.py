@@ -1617,29 +1617,34 @@ class IntelligentTriggerEngine:
             
             indicator_state = self.indicator_cache[symbol]
             
-            # 檢查數據新鮮度 (不超過5分鐘) - 嚴格模式：過期就強制更新
+            # 🎯 【產品等級優化】智能數據新鮮度檢查 - 配合同步機制優化
             if symbol in self.price_cache and len(self.price_cache[symbol]) > 0:
                 latest_timestamp = self.price_cache[symbol][-1].timestamp
                 age_minutes = (datetime.now() - latest_timestamp).total_seconds() / 60
                 
-                if age_minutes > 5:
-                    logger.warning(f"⚠️ {symbol} 技術指標數據已過期 ({age_minutes:.1f} 分鐘)，強制更新中...")
-                    # 🔧 直接調用強制重新計算 - 修復方法不存在問題
+                # 調整檢查策略：由於現在有同步機制，放寬檢查條件
+                if age_minutes > 10:  # 從5分鐘放寬到10分鐘
+                    logger.info(f"📊 {symbol} 技術指標數據較舊 ({age_minutes:.1f} 分鐘)，執行自動更新...")
+                    # 🔧 智能更新策略 - 優先使用增量更新而非強制重算
                     try:
-                        await self.force_recalculate_indicators(symbol)
-                        logger.info(f"✅ {symbol} 技術指標已強制更新")
-                    except Exception as force_e:
-                        logger.error(f"❌ {symbol} 強制更新失敗: {force_e}")
-                        # 🔧 替代方案：直接重新計算技術指標
+                        # 先嘗試使用現有的更新機制
+                        await self._update_technical_indicators(symbol)
+                        logger.info(f"✅ {symbol} 技術指標自動更新完成")
+                    except Exception as update_e:
+                        logger.warning(f"⚠️ {symbol} 自動更新失敗，嘗試強制重算: {update_e}")
+                        # 備用方案：強制重新計算
                         try:
-                            if symbol in self.price_cache and len(self.price_cache[symbol]) >= 50:
-                                await self._update_technical_indicators(symbol)
-                                logger.info(f"✅ {symbol} 使用替代方案重新計算技術指標成功")
-                            else:
-                                logger.warning(f"⚠️ {symbol} 數據不足，跳過技術指標更新")
-                        except Exception as alt_e:
-                            logger.error(f"❌ {symbol} 替代方案也失敗: {alt_e}")
-                            # 繼續使用現有數據
+                            await self.force_recalculate_indicators(symbol)
+                            logger.info(f"✅ {symbol} 技術指標強制重算完成")
+                        except Exception as force_e:
+                            logger.warning(f"⚠️ {symbol} 強制重算失敗，使用現有數據: {force_e}")
+                            # 繼續使用現有數據，但記錄這個情況
+                elif age_minutes > 3:  # 3-10分鐘：提示但不強制更新
+                    logger.debug(f"🕒 {symbol} 技術指標數據略舊 ({age_minutes:.1f} 分鐘)，考慮同步機制已優化")
+                else:
+                    logger.debug(f"✅ {symbol} 技術指標數據新鮮 ({age_minutes:.1f} 分鐘)")
+            else:
+                logger.warning(f"⚠️ {symbol} 無價格數據快取，技術指標可能不準確")
             
             logger.info(f"✅ 返回 {symbol} 產品等級技術指標，收斂分數: {indicator_state.overall_convergence_score:.3f}")
             return indicator_state

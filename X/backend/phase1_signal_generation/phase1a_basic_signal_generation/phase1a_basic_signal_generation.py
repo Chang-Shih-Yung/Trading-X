@@ -2197,6 +2197,15 @@ class Phase1ABasicSignalGeneration:
                         'open_time': int(datetime.now().timestamp() * 1000)
                     }
                     self.kline_buffers[symbol]['1m'].append(current_kline)
+                
+                # 🎯 【產品等級優化】同步更新 intelligent_trigger_engine - 修復技術指標自動更新機制
+                try:
+                    await process_realtime_price_update(symbol, current_price, current_volume)
+                    logger.debug(f"✅ {symbol} intelligent_trigger_engine 數據同步成功 - 價格: ${current_price:.4f}")
+                except Exception as sync_e:
+                    # 同步失敗不影響主流程，但會記錄以便監控
+                    logger.debug(f"⚠️ {symbol} intelligent_trigger_engine 數據同步失敗: {sync_e}")
+                    # 不拋出異常，確保主要的緩衝區更新流程不受影響
         
         except Exception as e:
             logger.error(f"❌ 緩衝區更新失敗: {e}")
