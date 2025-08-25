@@ -1,0 +1,12 @@
+# Trading X 系統資訊
+生成時間: 2025年 8月25日 週一 16時33分21秒 CST
+作業系統: Darwin 24.0.0
+主機名稱: ITTSdeMacBook-Pro.local
+Python 命令: python3
+Python 版本: 3.9.6
+Python 路徑: /Users/itts/Desktop/Trading X/venv/bin/python3
+虛擬環境路徑: ./venv/bin/python
+專案路徑: /Users/itts/Desktop/Trading X
+虛擬環境狀態: 已啟用
+Pylance 設定: 完全關閉所有類型檢查
+設備兼容性: ✅ 支援 python 和 python3 命令

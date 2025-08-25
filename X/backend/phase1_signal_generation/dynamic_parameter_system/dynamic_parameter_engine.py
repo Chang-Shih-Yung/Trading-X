@@ -794,10 +794,16 @@ class DynamicParameterEngine:
 
 # 輔助函數
 async def create_dynamic_parameter_engine(
-    config_path: str = "/Users/itts/Desktop/Trading X/X/backend/phase1_signal_generation/dynamic_parameter_system/dynamic_parameter_config.json",
+    config_path: Optional[str] = None,
     market_data_source: Optional[MarketDataSource] = None
 ) -> DynamicParameterEngine:
     """創建動態參數引擎實例"""
+    
+    # 如果沒有提供配置路徑，使用相對路徑
+    if config_path is None:
+        from pathlib import Path
+        current_dir = Path(__file__).parent
+        config_path = str(current_dir / "dynamic_parameter_config.json")
     return DynamicParameterEngine(config_path, market_data_source)
 
 # 配置日誌

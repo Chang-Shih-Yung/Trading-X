@@ -1,19 +1,19 @@
 {
   "version": "2.0.0",
-  "generation_time": "20250824_172051",
+  "generation_time": "20250825_160740",
   "config_name": "Phase2 自適應優化參數",
   "description": "Phase2 學習引擎生成的優化參數",
   "parameters": {
-    "signal_threshold": 0.5646,
+    "signal_threshold": 0.577,
     "momentum_weight": 1.0,
     "volatility_adjustment": 1.0,
     "trend_sensitivity": 1.0,
-    "risk_multiplier": 1.105,
-    "position_sizing_factor": 0.9856,
+    "risk_multiplier": 1.1722,
+    "position_sizing_factor": 0.9752000000000001,
     "volume_weight": 0.8
   },
   "generation_metrics": {
-    "generation_time": "2025-08-24 17:20:51.471293",
+    "generation_time": "2025-08-25 16:07:40.199393",
     "trigger_type": "time_based",
     "signal_count_since_last": 0,
     "hours_since_last": 0.0,
@@ -25,9 +25,9 @@
     {
       "parameter_name": "signal_threshold",
       "phase2_value": 0.6,
-      "phase5_value": 0.423,
+      "phase5_value": 0.485,
       "fusion_weight": 0.8,
-      "final_value": 0.5646,
+      "final_value": 0.577,
       "resolution_method": "weighted_average",
       "confidence_score": 0.8
     }

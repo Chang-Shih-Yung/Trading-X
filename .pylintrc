@@ -1,0 +1,80 @@
+[MASTER]
+# Python code to execute, usually for sys.path manipulation such as pygtk.require().
+init-hook='import sys; sys.path.append("./X"); sys.path.append("./app")'
+
+# Use multiple processes to speed up Pylint.
+jobs=1
+
+# Allow loading of arbitrary C extensions.
+unsafe-load-any-extension=no
+
+[MESSAGES CONTROL]
+# Disable specific warnings that are common in trading systems
+disable=
+    C0103,  # Invalid name (for trading variables like df, ta, etc.)
+    C0111,  # Missing module docstring
+    C0112,  # Missing class docstring  
+    C0115,  # Missing function docstring
+    R0903,  # Too few public methods
+    R0913,  # Too many arguments
+    R0914,  # Too many local variables
+    R0915,  # Too many statements
+    W0613,  # Unused argument
+    W0621,  # Redefining name from outer scope
+    E1101,  # Instance has no member (for dynamic attributes)
+    E1102,  # Not callable
+    I1101,  # Import error
+    
+[REPORTS]
+# Set the output format.
+output-format=text
+
+# Tells whether to display a full report or only the messages
+reports=no
+
+[REFACTORING]
+# Maximum number of nested blocks for function / method body
+max-nested-blocks=5
+
+[BASIC]
+# Good variable names which should always be accepted
+good-names=i,j,k,ex,Run,_,df,ta,db,id
+
+# Regular expression matching correct function names
+function-rgx=[a-z_][a-z0-9_]{2,30}$
+
+# Regular expression matching correct variable names
+variable-rgx=[a-z_][a-z0-9_]{2,30}$
+
+# Regular expression matching correct constant names
+const-rgx=(([A-Z_][A-Z0-9_]*)|(__.*__))$
+
+# Regular expression matching correct attribute names
+attr-rgx=[a-z_][a-z0-9_]{2,30}$
+
+# Regular expression matching correct argument names
+argument-rgx=[a-z_][a-z0-9_]{2,30}$
+
+# Regular expression matching correct class attribute names
+class-attribute-rgx=([A-Za-z_][A-Za-z0-9_]{2,30}|(__.*__))$
+
+# Regular expression matching correct method names
+method-rgx=[a-z_][a-z0-9_]{2,30}$
+
+# Regular expression matching correct class names
+class-rgx=[A-Z_][a-zA-Z0-9]+$
+
+[FORMAT]
+# Maximum number of characters on a single line.
+max-line-length=88
+
+# Maximum number of lines in a module
+max-module-lines=1000
+
+[VARIABLES]
+# Tells whether we should check for unused import in __init__ files.
+init-import=no
+
+[IMPORTS]
+# Allow wildcard imports from modules that define __all__.
+allow-wildcard-with-all=no

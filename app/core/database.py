@@ -5,8 +5,10 @@ from app.core.config import settings
 import os
 from pathlib import Path
 
-# 三個獨立資料庫配置
-DB_BASE_PATH = Path("/Users/itts/Desktop/Trading X/data/databases")
+# 三個獨立資料庫配置 - 修正硬編碼路徑
+current_file_dir = Path(__file__).parent
+project_root = current_file_dir.parent.parent  # 回到專案根目錄
+DB_BASE_PATH = project_root / "data" / "databases"
 DB_BASE_PATH.mkdir(parents=True, exist_ok=True)
 
 # 市場數據庫引擎

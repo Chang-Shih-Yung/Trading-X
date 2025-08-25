@@ -223,7 +223,7 @@ class AutoBacktestValidator:
                 current_dir.parent.parent.parent / "auto_backtest_config.json",              # 項目根目錄 (X/)
                 current_dir.parent.parent.parent.parent / "auto_backtest_config.json",       # Trading X 根目錄
                 Path.cwd() / "auto_backtest_config.json",                                     # 當前工作目錄
-                Path("/Users/itts/Desktop/Trading X/X/auto_backtest_config.json")            # 絕對路徑
+                current_dir.parent.parent.parent / "auto_backtest_config.json"               # X 目錄
             ]
             
             config_path = None

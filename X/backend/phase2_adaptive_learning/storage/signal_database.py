@@ -58,7 +58,11 @@ class SignalDatabase:
     def __init__(self, db_path: str = None):
         """初始化資料庫"""
         if db_path is None:
-            db_dir = Path(__file__).parent
+            # 修改為統一的 databases 目錄
+            # 從當前位置 X/backend/phase2_adaptive_learning/storage/ 導航到 X/databases/
+            current_file = Path(__file__)
+            x_dir = current_file.parent.parent.parent.parent  # 到達 X/ 目錄
+            db_dir = x_dir / "databases"
             db_dir.mkdir(exist_ok=True)
             db_path = db_dir / "signals.db"
         

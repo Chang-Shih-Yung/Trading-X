@@ -178,7 +178,7 @@ async def main():
         
         print(f"\n🎉 所有演示完成!")
         print(f"📁 生成的配置文件可在以下路徑找到:")
-        print(f"   /Users/itts/Desktop/Trading X/X/backend/phase5_backtest_validation/safety_backups/working/")
+        print(f"   {Path(__file__).parent}/safety_backups/working/")
         print(f"🔄 Phase1A 將在下次啟動時自動讀取最新的 Lean 優化配置")
     else:
         print(f"❌ 演示未完成，請檢查錯誤信息")

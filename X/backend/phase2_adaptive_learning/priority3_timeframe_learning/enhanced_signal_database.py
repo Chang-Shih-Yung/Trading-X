@@ -46,21 +46,25 @@ class SignalStatus(Enum):
 class EnhancedSignalDatabase:
     """增強版信號資料庫 - 支援優先級3"""
     
-    def __init__(self, db_path: str = None):
+    def __init__(self, db_path: Optional[str] = None):
         """初始化增強版信號資料庫"""
         if db_path is None:
-            # 使用新的標準三分類資料庫架構
-            if os.path.exists("./X"):
-                # 如果在 Trading-X 目錄運行
-                project_db_path = os.path.join(os.getcwd(), "X", "databases", "learning_records.db")
-            else:
-                # 如果在 X 目錄運行
-                project_db_path = os.path.join(os.getcwd(), "databases", "learning_records.db")
+            # 🔧 修復：使用檔案相對路徑，避免硬編碼
+            current_file_dir = os.path.dirname(os.path.abspath(__file__))
+            # 從當前檔案路徑推導出專案根目錄
+            # enhanced_signal_database.py 位於 X/backend/phase2_adaptive_learning/priority3_timeframe_learning/
+            # 需要回到 X/ 目錄
+            x_dir = os.path.join(current_file_dir, "..", "..", "..", "..")
+            x_dir = os.path.normpath(x_dir)  # 正規化路徑
+            
+            # 確保 databases 目錄在 X/ 下
+            databases_dir = os.path.join(x_dir, "X", "databases")
+            project_db_path = os.path.join(databases_dir, "learning_records.db")
             
             # 檢查標準資料庫路徑是否存在和可寫
             try:
                 # 確保目錄存在
-                os.makedirs(os.path.dirname(project_db_path), exist_ok=True)
+                os.makedirs(databases_dir, exist_ok=True)
                 
                 # 測試寫入權限
                 test_file = project_db_path + ".test"
@@ -73,10 +77,11 @@ class EnhancedSignalDatabase:
             except (OSError, PermissionError) as e:
                 # 如果標準路徑不可用，使用臨時目錄
                 logger.warning(f"⚠️ 標準資料庫路徑不可用: {e}")
+                import tempfile
                 db_path = os.path.join(tempfile.gettempdir(), "learning_records.db")
         
         self.db_path = str(db_path)
-        self.connection = None
+        self.connection: Optional[aiosqlite.Connection] = None
         
         logger.info(f"🗄️ 初始化增強版信號資料庫: {self.db_path}")
         
@@ -175,8 +180,8 @@ class EnhancedSignalDatabase:
     async def _create_tables(self):
         """創建增強版信號表結構"""
         
-        # 🔧 實現資料庫版本檢查與自動升級
-        await self._check_and_upgrade_database()
+        if not self.connection:
+            raise RuntimeError("Database connection not initialized")
         
         # 主要增強信號表
         await self.connection.execute("""
@@ -257,6 +262,10 @@ class EnhancedSignalDatabase:
         await self.connection.execute("CREATE INDEX IF NOT EXISTS idx_final_weight ON enhanced_signals(final_learning_weight)")
         
         await self.connection.commit()
+        
+        # 🔧 表格創建完成後，進行資料庫版本檢查與升級
+        await self._check_and_upgrade_database()
+        
         logger.info("✅ 增強版信號表結構創建完成")
     
     async def store_enhanced_signal(self, signal) -> bool:
@@ -611,14 +620,14 @@ class EnhancedSignalDatabase:
             # 定義最新版本
             LATEST_VERSION = 4
             
-            # 🔧 產品級修正：檢查 enhanced_signals 表是否缺少必需欄位
-            await self._validate_and_fix_table_structure()
-            
             if current_version < LATEST_VERSION:
                 logger.info(f"🔄 檢測到資料庫需要升級: {current_version} → {LATEST_VERSION}")
                 await self._perform_database_upgrade(current_version, LATEST_VERSION)
             else:
                 logger.debug(f"✅ 資料庫版本已是最新: {current_version}")
+                
+            # 🔧 產品級修正：升級完成後檢查表結構
+            await self._validate_and_fix_table_structure()
                 
         except Exception as e:
             logger.error(f"❌ 資料庫版本檢查失敗: {e}")
@@ -724,6 +733,19 @@ class EnhancedSignalDatabase:
     async def _upgrade_to_version_2(self):
         """升級到版本2: 添加幣種分類支援和缺失欄位"""
         try:
+            # 🔧 首先檢查 enhanced_signals 表是否存在
+            cursor = await self.connection.execute("""
+                SELECT name FROM sqlite_master 
+                WHERE type='table' AND name='enhanced_signals'
+            """)
+            table_exists = await cursor.fetchone()
+            await cursor.close()
+            
+            if not table_exists:
+                # 如果表不存在，跳過此升級（表將在 _create_tables 中創建）
+                logger.info("🔧 enhanced_signals 表不存在，跳過版本2升級")
+                return
+            
             # 檢查所有必需欄位是否存在
             cursor = await self.connection.execute("PRAGMA table_info(enhanced_signals)")
             columns = await cursor.fetchall()

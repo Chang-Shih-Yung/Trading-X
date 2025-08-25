@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Trading X 三資料庫分離系統
+Trading X 四資料庫分離系統
 - market_data.db: 市場數據 (K線、指標、價格警報)
 - learning_records.db: 學習記錄 (Phase2參數、Phase5回測)
 - extreme_events.db: 極端事件 (閃崩、系統保護、流動性事件)
+- signals.db: 信號歷史 (Phase2信號存儲、學習進度追蹤)
 """
 
 import asyncio
@@ -18,7 +19,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 class SeparatedDatabaseManager:
-    """三資料庫分離管理器"""
+    """四資料庫分離管理器"""
     
     def __init__(self, base_dir: str = None):
         # 修正為動態路徑
@@ -33,7 +34,8 @@ class SeparatedDatabaseManager:
         self.databases = {
             "market_data": self.db_dir / "market_data.db",
             "learning_records": self.db_dir / "learning_records.db", 
-            "extreme_events": self.db_dir / "extreme_events.db"
+            "extreme_events": self.db_dir / "extreme_events.db",
+            "signals": self.db_dir / "signals.db"
         }
         
         # 建立引擎
@@ -173,9 +175,14 @@ async def get_extreme_db():
     async for session in db_manager.get_db_session("extreme_events"):
         yield session
 
+async def get_signals_db():
+    """獲取信號歷史資料庫會話"""
+    async for session in db_manager.get_db_session("signals"):
+        yield session
+
 async def test_database_separation():
-    """測試三資料庫分離系統"""
-    print("🔍 測試三資料庫分離系統...")
+    """測試四資料庫分離系統"""
+    print("🔍 測試四資料庫分離系統...")
     
     try:
         # 創建所有表格
@@ -194,7 +201,7 @@ async def test_database_separation():
         
         # 測試會話創建
         print(f"\n🔗 測試資料庫連接...")
-        for db_name in ["market_data", "learning_records", "extreme_events"]:
+        for db_name in ["market_data", "learning_records", "extreme_events", "signals"]:
             session = await db_manager.create_session(db_name)
             await session.close()
             print(f"   {db_name}: ✅ 連接成功")

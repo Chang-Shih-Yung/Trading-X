@@ -1,0 +1,65 @@
+[tool.pylsp-mypy]
+enabled = false
+
+[tool.pyright]
+include = ["X", "app"]
+exclude = [
+    "**/__pycache__",
+    "**/venv",
+    "**/node_modules",
+    "**/.pytest_cache",
+    "**/.mypy_cache"
+]
+typeCheckingMode = "off"
+reportMissingImports = false
+reportMissingTypeStubs = false
+reportOptionalMemberAccess = false
+reportOptionalCall = false
+reportOptionalIterable = false
+reportOptionalContextManager = false
+reportOptionalOperand = false
+reportTypedDictNotRequiredAccess = false
+reportPrivateImportUsage = false
+reportUnknownArgumentType = false
+reportUnknownVariableType = false
+reportUnknownMemberType = false
+reportUnknownLambdaType = false
+reportUnknownParameterType = false
+reportMissingParameterType = false
+reportCallInDefaultInitializer = false
+reportUnnecessaryIsInstance = false
+reportUnnecessaryCast = false
+reportImplicitStringConcatenation = false
+pythonVersion = "3.9"
+pythonPlatform = "Darwin"
+
+[tool.pylint]
+disable = [
+    "C0103",  # Invalid name
+    "C0111",  # Missing docstring
+    "R0903",  # Too few public methods
+    "R0913",  # Too many arguments
+    "W0613",  # Unused argument
+    "E1101",  # Instance has no member
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py39']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
