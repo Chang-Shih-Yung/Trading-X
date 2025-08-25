@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Union, Callable
+import sys
+sys.path.append('../../..')
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.models.models import MarketData
