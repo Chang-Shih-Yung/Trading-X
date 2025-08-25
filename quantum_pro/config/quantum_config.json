@@ -1,0 +1,216 @@
+{
+  "quantum_decision_config": {
+    "description": "Trading X 量子決策系統生產配置",
+    "version": "1.0.0",
+    "sprt_parameters": {
+      "alpha": 0.03,
+      "beta": 0.15,
+      "confidence_threshold": 2.94
+    },
+    "belief_update": {
+      "forgetting_factor": 0.98,
+      "regime_update_frequency_minutes": 1,
+      "max_belief_history": 1000
+    },
+    "kelly_management": {
+      "kelly_multiplier": 0.2,
+      "max_position_cap": 0.08,
+      "min_expected_return_threshold": 0.0015,
+      "transaction_cost_bps": 5
+    },
+    "risk_control": {
+      "max_drawdown": 0.03,
+      "volatility_lookback_minutes": 30,
+      "position_size_scale_factor": 1.0,
+      "emergency_stop_loss": 0.05
+    },
+    "market_regime": {
+      "n_regimes": 6,
+      "regime_features": ["slope", "volatility", "orderbook"],
+      "regime_confidence_threshold": 0.6,
+      "transition_smoothing": 0.1
+    },
+    "data_processing": {
+      "buffer_size": 200,
+      "technical_indicator_periods": {
+        "rsi_period": 14,
+        "volatility_window": 20,
+        "slope_window": 5,
+        "volume_ma_period": 10
+      },
+      "data_quality_threshold": 0.95
+    },
+    "execution": {
+      "min_order_size_usd": 10.0,
+      "max_order_size_usd": 10000.0,
+      "order_timeout_seconds": 30,
+      "slippage_tolerance_bps": 10
+    },
+    "monitoring": {
+      "health_check_interval_seconds": 60,
+      "performance_calculation_window_hours": 24,
+      "alert_thresholds": {
+        "decision_accuracy_min": 0.55,
+        "regime_stability_min": 0.7,
+        "data_latency_max_seconds": 5
+      }
+    }
+  },
+  "active_symbols": [
+    {
+      "symbol": "BTCUSDT",
+      "weight": 0.3,
+      "max_position": 0.15,
+      "min_volume_24h": 1000000000
+    },
+    {
+      "symbol": "ETHUSDT", 
+      "weight": 0.25,
+      "max_position": 0.12,
+      "min_volume_24h": 500000000
+    },
+    {
+      "symbol": "BNBUSDT",
+      "weight": 0.15,
+      "max_position": 0.08,
+      "min_volume_24h": 200000000
+    },
+    {
+      "symbol": "ADAUSDT",
+      "weight": 0.1,
+      "max_position": 0.06,
+      "min_volume_24h": 100000000
+    },
+    {
+      "symbol": "DOTUSDT",
+      "weight": 0.08,
+      "max_position": 0.05,
+      "min_volume_24h": 80000000
+    },
+    {
+      "symbol": "LINKUSDT",
+      "weight": 0.07,
+      "max_position": 0.04,
+      "min_volume_24h": 60000000
+    },
+    {
+      "symbol": "SOLUSDT",
+      "weight": 0.05,
+      "max_position": 0.03,
+      "min_volume_24h": 50000000
+    }
+  ],
+  "regime_definitions": {
+    "0": {
+      "name": "BULL_TREND",
+      "description": "強勢上升趨勢",
+      "characteristics": {
+        "slope_threshold": 0.002,
+        "volatility_max": 0.04,
+        "volume_factor": 1.2
+      }
+    },
+    "1": {
+      "name": "BEAR_TREND", 
+      "description": "強勢下降趨勢",
+      "characteristics": {
+        "slope_threshold": -0.002,
+        "volatility_max": 0.04,
+        "volume_factor": 1.2
+      }
+    },
+    "2": {
+      "name": "RANGE_BOUND",
+      "description": "區間震盪",
+      "characteristics": {
+        "slope_threshold": 0.0005,
+        "volatility_max": 0.02,
+        "volume_factor": 0.8
+      }
+    },
+    "3": {
+      "name": "HIGH_VOLATILITY",
+      "description": "高波動市場",
+      "characteristics": {
+        "volatility_min": 0.05,
+        "volume_factor": 1.5,
+        "uncertainty_high": true
+      }
+    },
+    "4": {
+      "name": "LOW_VOLATILITY",
+      "description": "低波動市場", 
+      "characteristics": {
+        "volatility_max": 0.01,
+        "volume_factor": 0.6,
+        "stability_high": true
+      }
+    },
+    "5": {
+      "name": "TRANSITION",
+      "description": "制度轉換期",
+      "characteristics": {
+        "uncertainty_moderate": true,
+        "regime_confidence_low": true,
+        "conservative_mode": true
+      }
+    }
+  },
+  "hypothesis_templates": {
+    "BULL_BREAKOUT": {
+      "direction": 1,
+      "base_expected_return": 0.02,
+      "base_risk": 0.01,
+      "time_horizon_minutes": 15,
+      "confidence_factors": {
+        "slope_weight": 2.0,
+        "volume_weight": 1.5,
+        "rsi_weight": 1.0
+      }
+    },
+    "BEAR_BREAKDOWN": {
+      "direction": -1,
+      "base_expected_return": 0.018,
+      "base_risk": 0.009,
+      "time_horizon_minutes": 12,
+      "confidence_factors": {
+        "slope_weight": 2.0,
+        "volume_weight": 1.5,
+        "rsi_weight": 1.0
+      }
+    },
+    "RANGE_BOUND": {
+      "direction": 0,
+      "base_expected_return": 0.005,
+      "base_risk": 0.003,
+      "time_horizon_minutes": 5,
+      "confidence_factors": {
+        "stability_weight": 2.0,
+        "volume_weight": 0.5
+      }
+    },
+    "FUNDING_ARBITRAGE": {
+      "direction": 0,
+      "base_expected_return": 0.001,
+      "base_risk": 0.0005,
+      "time_horizon_minutes": 480,
+      "confidence_factors": {
+        "funding_rate_weight": 3.0,
+        "stability_weight": 1.5
+      }
+    }
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "file_rotation": {
+      "max_size_mb": 100,
+      "backup_count": 10
+    },
+    "performance_logging": {
+      "enabled": true,
+      "detailed_metrics": true,
+      "decision_tracking": true
+    }
+  }
+}
