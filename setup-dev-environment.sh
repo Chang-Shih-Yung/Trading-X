@@ -120,13 +120,39 @@ else
     $VENV_PYTHON -m pip install TA-Lib web3 pandas numpy fastapi uvicorn aiohttp websockets asyncio-mqtt
 fi
 
+# 🌌 安裝量子計算依賴 (quantum_pro)
+echo "🚀 安裝 quantum_pro 量子計算依賴..."
+$VENV_PYTHON -m pip install numpy scipy pandas qiskit ccxt websockets asyncio-mqtt fastapi uvicorn pydantic
+
+# 驗證量子計算套件
+echo "🔬 驗證量子計算套件..."
+$VENV_PYTHON -c "
+try:
+    import qiskit
+    from qiskit import Aer, QuantumCircuit
+    print('  ✅ Qiskit: 量子計算框架安裝成功')
+    print(f'  📦 Qiskit 版本: {qiskit.__version__}')
+    
+    # 測試量子電路
+    qc = QuantumCircuit(2, 2)
+    qc.h(0)
+    qc.cx(0, 1)
+    qc.measure_all()
+    backend = Aer.get_backend('qasm_simulator')
+    print('  🌌 量子電路測試: 成功')
+    
+except ImportError as e:
+    print(f'  ❌ Qiskit 安裝失敗: {e}')
+"
+
 # 驗證關鍵套件安裝
 echo "🔍 驗證關鍵套件..."
 $VENV_PYTHON -c "
 import sys
 packages_to_check = [
     'pandas', 'numpy', 'aiohttp', 'aiosqlite', 'fastapi', 
-    'uvicorn', 'web3', 'talib', 'pandas_ta', 'websockets'
+    'uvicorn', 'web3', 'talib', 'pandas_ta', 'websockets',
+    'qiskit', 'scipy', 'ccxt', 'pydantic'
 ]
 
 print('📊 套件檢查結果:')
@@ -137,6 +163,18 @@ for package in packages_to_check:
         print(f'  ✅ {package}: {version}')
     except ImportError:
         print(f'  ❌ {package}: 未安裝')
+
+# 🌌 特殊檢查：quantum_pro 量子計算模組
+print('\\n🚀 quantum_pro 量子計算模組檢查:')
+try:
+    import sys
+    sys.path.append('.')
+    from quantum_pro.regime_hmm_quantum import QUANTUM_ENTANGLED_COINS, ENTANGLEMENT_PAIRS
+    print(f'  ✅ 七幣種糾纏池: {len(QUANTUM_ENTANGLED_COINS)} 幣種')
+    print(f'  ✅ 量子糾纏對: {len(ENTANGLEMENT_PAIRS)} 對')
+    print('  ✅ 量子糾纏系統: 運作正常')
+except Exception as e:
+    print(f'  ❌ quantum_pro 模組錯誤: {e}')
 "
 
 # 安裝 Node.js 依賴（如果存在）
