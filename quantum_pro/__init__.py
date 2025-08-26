@@ -1,23 +1,33 @@
 """
-Trading X 量子決策系統 - 生產級優化版本
+Trading X 量子決策系統 - 獨立版本
 
-基於 ChatGPT 建議的向量化計算優化，專為加密貨幣交易設計的量子決策引擎。
+這是一個完全獨立的量子交易決策系統，專注於加密貨幣市場的技術分析和自動化交易信號生成。
 
 主要特色:
-- 向量化前向-後向算法 (10-50x 性能提升)
-- 轉移矩陣智能快取
-- 生產級數值穩定性
-- 七大幣種即時監控: BTC/ETH/BNB/SOL/XRP/DOGE/ADA
-- 無模擬數據，純真實API整合
+- 🔬 量子增強的隱藏馬可夫模型 (HMM)
+- 📡 即時幣安 API 數據整合 (WebSocket)
+- ⚡ 統計優勢最大化算法
+- 🎯 Trading X 標準信號輸出
+- 🚀 完全獨立運作，無外部依賴
 
-版本: 2.0.0 (ChatGPT 優化版)
+支援交易對: BTC/ETH/BNB/SOL/XRP/DOGE/ADA
+
+快速開始:
+    from quantum_pro import QuantumStandaloneLauncher
+    launcher = QuantumStandaloneLauncher()
+    await launcher.run()
+
+版本: 2.0.0 (獨立版)
 作者: Trading X Quantum Team
 """
 
 __version__ = "2.0.0"
 __author__ = "Trading X Quantum Team"
 
-# 生產級啟動器
+# 主要啟動器 (推薦)
+from .quantum_standalone_launcher import QuantumStandaloneLauncher
+
+# 已棄用啟動器 (保留向後兼容)
 from .production_launcher import ProductionQuantumLauncher
 from .quantum_decision_optimizer import (
     CryptoMarketObservation,
@@ -25,38 +35,45 @@ from .quantum_decision_optimizer import (
     ProductionQuantumEngine,
     ProductionTradingHypothesis,
 )
+# 已棄用組件 (保留向後兼容)
 from .quantum_production_extension import (
-    AlertManager,
-    PerformanceMonitor,
     TradingXQuantumProcessor,
+    PerformanceMonitor,
+    AlertManager,
 )
 
 # 核心組件導入
 from .regime_hmm_quantum import (
-    ProductionQuantumRegimeHMM,
-    QuantumObservation,
-    RegimeState,
+    TimeVaryingHMM,
+    即時幣安數據收集器,
+    TradingX信號輸出器,
+    即時市場觀測,
+    TradingX信號,
+    QuantumSignalSelector,
+    OnlineEMAdaptor,
+    RegimeShiftDetector
 )
 
 # 系統配置
 QUANTUM_PRO_CONFIG = {
     "version": __version__,
     "name": "Trading X Quantum Pro",
-    "description": "生產級量子決策交易系統",
+    "description": "獨立量子決策交易系統",
     "supported_symbols": ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT", "ADAUSDT"],
-    "optimization_features": [
-        "向量化前向-後向算法",
-        "轉移矩陣快取",
-        "逐行多項式邏輯優化",
-        "加權Student-t參數估計",
-        "系統重採樣粒子濾波"
+    "key_features": [
+        "量子增強隱藏馬可夫模型",
+        "即時幣安 API 整合", 
+        "統計優勢最大化算法",
+        "Trading X 標準信號輸出",
+        "完全獨立運作"
     ],
     "data_sources": [
-        "Binance WebSocket",
-        "Trading X Market Data Service",
-        "Real-time Order Book",
-        "Funding Rate API"
-    ]
+        "Binance WebSocket (即時價格流)",
+        "Binance REST API (資金費率/OI)",
+        "即時訂單簿分析",
+        "交易流統計"
+    ],
+    "recommended_launcher": "QuantumStandaloneLauncher"
 }
 
 def get_system_info():
@@ -65,31 +82,47 @@ def get_system_info():
         "name": QUANTUM_PRO_CONFIG["name"],
         "version": __version__,
         "supported_symbols": QUANTUM_PRO_CONFIG["supported_symbols"],
-        "optimization_level": "Production Grade with ChatGPT Vectorization"
+        "optimization_level": "Production Grade with Quantum Enhancement",
+        "recommended_launcher": QUANTUM_PRO_CONFIG["recommended_launcher"],
+        "status": "Independent Operation Ready"
     }
 
 def create_production_config(**kwargs):
     """創建生產級配置"""
     return ProductionQuantumConfig(**kwargs)
 
-def create_quantum_processor(config: ProductionQuantumConfig):
-    """創建量子處理器"""
+def create_quantum_processor(config=None):
+    """
+    創建量子處理器 (推薦使用獨立啟動器)
+    
+    ⚠️ DEPRECATED: 建議使用 QuantumStandaloneLauncher
+    """
     return TradingXQuantumProcessor(config)
 
 # 公開API
 __all__ = [
     # 核心類別
-    'ProductionQuantumRegimeHMM',
+    'TimeVaryingHMM',
     'ProductionQuantumEngine', 
     'ProductionQuantumConfig',
     'TradingXQuantumProcessor',
     'ProductionQuantumLauncher',
+    'QuantumStandaloneLauncher',
+    
+    # 即時API整合
+    '即時幣安數據收集器',
+    'TradingX信號輸出器',
+    '即時市場觀測',
+    'TradingX信號',
+    
+    # 量子組件
+    'QuantumSignalSelector',
+    'OnlineEMAdaptor', 
+    'RegimeShiftDetector',
     
     # 數據模型
     'CryptoMarketObservation',
     'ProductionTradingHypothesis',
-    'RegimeState',
-    'QuantumObservation',
     
     # 輔助工具
     'PerformanceMonitor',

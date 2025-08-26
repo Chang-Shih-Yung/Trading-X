@@ -33,11 +33,27 @@ except ImportError:
     MarketDataService = None
     settings = None
 
-# 修正導入路徑
+# 修正導入路徑 - 導入新的類別
 try:
-    from .regime_hmm_quantum import EmissionParams, TimeVaryingHMM
+    from .regime_hmm_quantum import (
+        EmissionParams, 
+        TimeVaryingHMM,
+        即時幣安數據收集器,
+        TradingX信號輸出器,
+        即時市場觀測,
+        TradingX信號,
+        QuantumSignalSelector
+    )
 except ImportError:
-    from regime_hmm_quantum import EmissionParams, TimeVaryingHMM
+    from regime_hmm_quantum import (
+        EmissionParams, 
+        TimeVaryingHMM,
+        即時幣安數據收集器,
+        TradingX信號輸出器,
+        即時市場觀測,
+        TradingX信號,
+        QuantumSignalSelector
+    )
 
 # 配置專業級日誌
 logging.basicConfig(
