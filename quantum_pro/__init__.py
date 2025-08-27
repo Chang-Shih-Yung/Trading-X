@@ -24,8 +24,13 @@ Trading X 量子決策系統 - 獨立版本
 __version__ = "2.0.0"
 __author__ = "Trading X Quantum Team"
 
-# 主要啟動器 (推薦)
-from .quantum_ultimate_launcher import QuantumUltimateLauncher
+# 主要啟動器 (使用實際存在的啟動器)
+from .launcher.quantum_adaptive_trading_launcher import QuantumAdaptiveTradingLauncher
+
+# 量子符號定義
+from .regime_hmm_quantum import QUANTUM_ENTANGLED_COINS
+
+QUANTUM_SYMBOLS = [f"{coin}USDT" for coin in QUANTUM_ENTANGLED_COINS]
 
 # 已棄用啟動器 (保留向後兼容)
 try:
@@ -33,13 +38,8 @@ try:
 except ImportError:
     ProductionQuantumLauncher = None
 
-# 已棄用 quantum_decision_optimizer (功能已整合到其他模組)
-# from .quantum_decision_optimizer import (
-#     CryptoMarketObservation,
-#     ProductionQuantumConfig,
-#     ProductionQuantumEngine,
-#     ProductionTradingHypothesis,
-# )
+# 配置類別
+from .blockchain_unlimited_extractor import ProductionConfig as ProductionQuantumConfig
 
 # 已棄用組件 (保留向後兼容)
 try:
@@ -62,9 +62,6 @@ from .btc_quantum_ultimate_model import (
     feature_to_hJ_advanced,
 )
 
-# 量子終極啟動器組件
-from .quantum_ultimate_launcher import QUANTUM_SYMBOLS, QuantumUltimateLauncher
-
 # 核心組件導入
 from .regime_hmm_quantum import (
     OnlineEMAdaptor,
@@ -76,6 +73,11 @@ from .regime_hmm_quantum import (
     即時市場觀測,
     即時幣安數據收集器,
 )
+
+# 量子終極啟動器組件 (使用實際存在的組件)
+# from .quantum_ultimate_launcher import QUANTUM_SYMBOLS, QuantumUltimateLauncher
+# 改為使用實際存在的啟動器和符號定義 (已在上面定義)
+
 
 # 系統配置
 QUANTUM_PRO_CONFIG = {
@@ -127,11 +129,12 @@ def create_quantum_processor(config=None):
 
 # 公開API
 __all__ = [
-    # 核心類別
-    'TimeVaryingHMM',
-    'ProductionQuantumEngine', 
+    # 推薦啟動器
+    'QuantumAdaptiveTradingLauncher',
+    'QUANTUM_SYMBOLS',
+    
+    # 配置
     'ProductionQuantumConfig',
-    'QuantumUltimateLauncher',
     
     # BTC 量子終極模型
     'BTCQuantumUltimateModel',
@@ -139,6 +142,10 @@ __all__ = [
     'evaluate_quantum_circuit',
     'feature_to_hJ_advanced',
     'QUANTUM_CONFIG',
+    
+    # 區塊鏈數據撷取器
+    'QuantumBlockchainExtractor',
+    'ProductionConfig',
     
     # 即時API整合
     '即時幣安數據收集器',

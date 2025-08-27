@@ -20,11 +20,12 @@
 
 import asyncio
 import logging
-import numpy as np
 import math
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +78,7 @@ class QuantumAdaptiveSignalEngine:
         """🔮 從量子物理定律推導自然常數 - 非人為設定"""
         
         import math
-        
+
         # 基本物理常數
         planck_constant = 6.62607015e-34  # 普朗克常數
         boltzmann_constant = 1.380649e-23  # 玻爾茲曼常數
@@ -601,16 +602,79 @@ class QuantumAdaptiveSignalEngine:
         return max(0.1, min(next_interval, 3600.0))
     
     async def _display_quantum_triggered_signals(self, signals_data: List[Tuple]):
-        """顯示量子觸發的信號"""
+        """顯示量子觸發的真實信號"""
         
-        logger.info("🎯 量子觸發信號生成:")
+        logger.info("🎯 量子自適應交易信號生成:")
         logger.info("=" * 80)
         
         for symbol, signal, trigger_reason in signals_data:
+            if signal is None:
+                continue
+                
+            # 獲取量子狀態摘要
+            quantum_state_summary = self._get_quantum_state_summary(symbol)
+            
+            # 顯示完整的量子信號
             logger.info(f"💎 {symbol}")
-            logger.info(f"   ⚡ 量子觸發原因: {trigger_reason}")
-            logger.info(f"   🔮 量子狀態: {self._get_quantum_state_summary(symbol)}")
-            # 這裡可以添加更多信號詳情
+            logger.info(f"   ⚡ 量子觸發: {trigger_reason}")
+            
+            # 信號類型和信心度
+            signal_emoji = {
+                'BULL': '🟢', 'BUY': '🟢',
+                'BEAR': '🔴', 'SELL': '🔴', 
+                'SIDE': '🟡', 'HOLD': '🟡'
+            }
+            signal_name = signal.get('signal', 'UNKNOWN')
+            confidence = signal.get('confidence', 0.0)
+            
+            # 信心度條
+            confidence_bar = "█" * int(confidence * 10) + "░" * (10 - int(confidence * 10))
+            
+            logger.info(f"   {signal_emoji.get(signal_name, '⚪')} 信號: {signal_name} | 信心度: {confidence:.2%} [{confidence_bar}]")
+            logger.info(f"   🔮 量子狀態: {quantum_state_summary}")
+            
+            # 顯示量子計算詳情
+            if 'quantum_backend' in signal:
+                logger.info(f"   🖥️ 量子後端: {signal['quantum_backend']}")
+            
+            if 'model_status' in signal:
+                status_emoji = "✅" if signal['model_status'] == 'trained' else "⚡"
+                logger.info(f"   {status_emoji} 模型狀態: {signal['model_status']}")
+            
+            # 顯示機率分佈
+            if 'probabilities' in signal:
+                probs = signal['probabilities']
+                logger.info(f"   📊 機率分佈:")
+                logger.info(f"      🔴 熊市: {probs.get('bear', 0):.3f}")
+                logger.info(f"      🟡 震盪: {probs.get('side', 0):.3f}")
+                logger.info(f"      🟢 牛市: {probs.get('bull', 0):.3f}")
+            
+            # 計算預期收益和風險
+            if 'probabilities' in signal:
+                probs = signal['probabilities']
+                expected_return = probs.get('bull', 0) - probs.get('bear', 0)
+                risk_level = 1.0 - confidence
+                
+                logger.info(f"   💰 預期收益: {expected_return:.1%}")
+                
+                risk_emoji = "🟢" if risk_level < 0.3 else "🟡" if risk_level < 0.6 else "🔴"
+                risk_text = "低風險" if risk_level < 0.3 else "中風險" if risk_level < 0.6 else "高風險"
+                logger.info(f"   🛡️ 風險評估: {risk_emoji} {risk_text} ({risk_level:.1%})")
+                
+                # 建議倉位
+                if signal_name in ['BULL', 'BUY'] and confidence > 0.7:
+                    position_size = min(confidence * 40, 30)  # 最多30%
+                    logger.info(f"   📊 建議倉位: {position_size:.1f}%")
+                elif signal_name in ['BEAR', 'SELL'] and confidence > 0.7:
+                    logger.info(f"   📊 建議操作: 減倉或做空")
+                else:
+                    logger.info(f"   📊 建議操作: 保持觀望")
+            
+            # 顯示觸發間隔
+            next_interval = self.calculate_natural_quantum_interval(symbol)
+            logger.info(f"   🕐 觸發間隔: {next_interval:.1f}秒 (量子驅動)")
+            
+            logger.info("")  # 空行分隔
         
         logger.info("=" * 80)
     

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-量子級區塊鏈主池歷史數據撈取器
+量子級區塊鏈主池歷史數據撈取器：目前暫時停用，因為撈取太久太分散
 基於 phase1a_basic_signal_generation.py 成功的BSC主池實現
 直接從PancakeSwap V2/V3主池撈取創世以來的所有歷史數據
 無API限制，使用多節點冗餘確保數據完整性
