@@ -25,6 +25,7 @@ BTC 量子終極模型 - 整合到 Trading X 量子系統
 """
 
 import datetime
+from datetime import timedelta
 import json
 import logging
 import math
@@ -40,6 +41,9 @@ from sklearn.decomposition import PCA
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+
+# 🔮 量子級區塊鏈歷史數據撷取器 - 從真實創世開始
+from blockchain_unlimited_extractor import QuantumBlockchainExtractor, ProductionConfig
 
 # Qiskit 量子計算
 try:
@@ -347,14 +351,33 @@ def evaluate_quantum_circuit(theta: np.ndarray, feature_vec: np.ndarray, h: np.n
         
         # 參數化 ansatz
         ansatz, params = build_param_ansatz(n_readout, n_ansatz_layers)
-        if ansatz is not None:
-            param_dict = {params[i]: theta[i] if i < len(theta) else 0.0 for i in range(len(params))}
-            bound_ansatz = ansatz.bind_parameters(param_dict)
-            
-            # 將 ansatz 應用到讀出量子位
-            for i, gate in enumerate(bound_ansatz.data):
-                if i < len(read_idx):
-                    qc.append(gate[0], [read_idx[i % len(read_idx)]])
+        if ansatz is not None and params is not None:
+            try:
+                # 新版 Qiskit 的參數綁定方式
+                param_dict = {params[i]: theta[i] if i < len(theta) else 0.0 for i in range(len(params))}
+                
+                # 檢查是否有 assign_parameters 方法（新版）
+                if hasattr(ansatz, 'assign_parameters'):
+                    bound_ansatz = ansatz.assign_parameters(param_dict)
+                elif hasattr(ansatz, 'bind_parameters'):
+                    bound_ansatz = ansatz.bind_parameters(param_dict)
+                else:
+                    # 如果都沒有，直接使用原始 ansatz
+                    bound_ansatz = ansatz
+                
+                # 將 ansatz 添加到主電路
+                if hasattr(qc, 'compose'):
+                    qc = qc.compose(bound_ansatz, qubits=list(range(n_readout)))
+                else:
+                    # 舊版本的添加方式
+                    qc += bound_ansatz
+                    
+            except Exception as e:
+                logger.warning(f"參數綁定失敗，使用默認 ansatz: {e}")
+                # 簡單的默認 ansatz
+                for q in range(n_readout):
+                    qc.ry(0.1, q)
+                    qc.rz(0.1, q)
         
         # 測量
         if use_statevector:
@@ -481,23 +504,31 @@ class QuantumBackendManager:
         noise_model = NoiseModel()
         
         # 基於真實量子設備的錯誤率
-        # 單量子位錯誤
+        # 單量子位錯誤 - 使用複合錯誤模型
         error_1q = depolarizing_error(0.001, 1)  # 0.1% 錯誤率
         
         # 雙量子位錯誤
         error_2q = depolarizing_error(0.01, 2)   # 1% 錯誤率
         
-        # 熱弛豫錯誤
+        # 熱弛豫錯誤 - 與去極化錯誤整合，避免重複
         if thermal_relaxation_error:
-            thermal_error = thermal_relaxation_error(
-                t1=50e3,  # T1 時間 50微秒
-                t2=70e3,  # T2 時間 70微秒  
-                time=50   # 門時間 50納秒
-            )
-            noise_model.add_all_qubit_quantum_error(thermal_error, ['u1', 'u2', 'u3'])
+            try:
+                thermal_error = thermal_relaxation_error(
+                    t1=50e3,  # T1 時間 50微秒
+                    t2=70e3,  # T2 時間 70微秒  
+                    time=50   # 門時間 50納秒
+                )
+                # 將熱弛豫錯誤與去極化錯誤組合
+                combined_error_1q = error_1q.compose(thermal_error)
+                noise_model.add_all_qubit_quantum_error(combined_error_1q, ['u1', 'u2', 'u3'])
+            except Exception:
+                # 如果組合失敗，只使用去極化錯誤
+                noise_model.add_all_qubit_quantum_error(error_1q, ['u1', 'u2', 'u3'])
+        else:
+            # 只添加去極化錯誤
+            noise_model.add_all_qubit_quantum_error(error_1q, ['u1', 'u2', 'u3'])
         
-        # 添加錯誤到所有量子位和門
-        noise_model.add_all_qubit_quantum_error(error_1q, ['u1', 'u2', 'u3'])
+        # 添加雙量子位錯誤
         noise_model.add_all_qubit_quantum_error(error_2q, ['cx'])
         
         return noise_model
@@ -750,7 +781,10 @@ class BTCQuantumUltimateModel:
         self.data_collector = None
         self.signal_history = []
         
-        # 區塊鏈主池數據連接器
+        # 🔮 量子級區塊鏈數據撷取器
+        self.quantum_extractor = None  # 將在需要時初始化
+        
+        # 傳統區塊鏈主池數據連接器（備用）
         self.blockchain_connector = None
         if TRADING_X_AVAILABLE and BinanceDataConnector:
             self.blockchain_connector = BinanceDataConnector()
@@ -788,8 +822,110 @@ class BTCQuantumUltimateModel:
             logger.error(f"❌ 量子後端初始化失敗: {e}")
             raise RuntimeError(f"無法初始化量子後端: {e}")
     
+    async def _initialize_quantum_extractor(self):
+        """初始化量子級數據撷取器"""
+        if self.quantum_extractor is None:
+            self.quantum_extractor = QuantumBlockchainExtractor()
+            await self.quantum_extractor.initialize()
+            logger.info("✅ 量子級區塊鏈數據撷取器初始化完成")
+    
+    async def generate_unlimited_market_data(self, symbol: str, timeframe: str = '1d', days_back: int = None) -> pd.DataFrame:
+        """
+        🔮 從量子級數據撷取器獲取無限制歷史數據
+        支援從創世日期開始的完整歷史數據
+        """
+        await self._initialize_quantum_extractor()
+        
+        try:
+            # 使用量子級撷取器獲取完整歷史數據
+            config = ProductionConfig()
+            end_time = datetime.now()
+            
+            if days_back:
+                start_time = end_time - timedelta(days=days_back)
+            else:
+                # 使用真實創世日期
+                genesis_dates = config.REAL_GENESIS_DATES
+                symbol_key = symbol.replace('USDT', '').upper()
+                if symbol_key in genesis_dates:
+                    start_time = genesis_dates[symbol_key]
+                    logger.info(f"🚀 使用真實創世日期: {symbol} 從 {start_time.strftime('%Y-%m-%d')} 開始")
+                else:
+                    # 默認使用 BSC 部署日期
+                    start_time = config.BSC_DEPLOYMENT_DATES.get(symbol_key, end_time - timedelta(days=365))
+                    logger.warning(f"⚠️ 未找到 {symbol} 的創世日期，使用 BSC 部署日期")
+            
+            # 使用量子級數據撷取器
+            market_data = await self.quantum_extractor.extract_unlimited_historical_data(
+                symbol=symbol,
+                start_date=start_time,
+                end_date=end_time,
+                interval=timeframe
+            )
+            
+            if market_data is not None and not market_data.empty:
+                logger.info(f"✅ 量子級數據獲取成功: {symbol}")
+                logger.info(f"   數據範圍: {market_data.index[0]} 至 {market_data.index[-1]}")
+                logger.info(f"   總天數: {len(market_data)} 條記錄")
+                return market_data
+            else:
+                logger.warning(f"⚠️ 量子級數據撷取器無數據，回退至傳統方法")
+                return await self._fallback_to_traditional_data(symbol, timeframe, days_back or 1000)
+                
+        except Exception as e:
+            logger.error(f"❌ 量子級數據獲取失敗: {e}")
+            logger.info("🔄 回退至傳統區塊鏈數據源...")
+            return await self._fallback_to_traditional_data(symbol, timeframe, days_back or 1000)
+    
+    async def _fallback_to_traditional_data(self, symbol: str, timeframe: str, limit: int) -> pd.DataFrame:
+        """回退至傳統區塊鏈數據源"""
+        if not self.blockchain_connector:
+            raise RuntimeError("❌ 無可用數據源 - 量子級撷取器和傳統連接器都不可用")
+        
+        try:
+            market_data = self.blockchain_connector.get_historical_klines(
+                symbol=symbol,
+                interval=timeframe,
+                limit=limit
+            )
+            
+            df = pd.DataFrame(market_data, columns=[
+                'timestamp', 'open', 'high', 'low', 'close', 'volume',
+                'close_time', 'quote_asset_volume', 'number_of_trades',
+                'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'
+            ])
+            
+            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+            df['close'] = df['close'].astype(float)
+            df.set_index('timestamp', inplace=True)
+            
+            logger.info(f"✅ 傳統數據獲取成功: {symbol} - {len(df)} 條記錄")
+            return df[['close']].rename(columns={'close': 'price'})
+            
+        except Exception as e:
+            logger.error(f"❌ 傳統數據獲取失敗: {e}")
+            raise RuntimeError(f"所有數據源都無法獲取數據: {e}")
+    
     def generate_realistic_market_data(self, symbol: str, timeframe: str = '1m', limit: int = 1000) -> pd.DataFrame:
-        """從真實區塊鏈數據源生成市場數據（移除合成數據生成）"""
+        """
+        🔮 生成真實市場數據 - 優先使用量子級撷取器
+        
+        此方法保持同步接口兼容性，內部調用異步量子級撷取器
+        """
+        import asyncio
+        
+        # 檢查是否有運行中的事件循環
+        try:
+            loop = asyncio.get_running_loop()
+            # 如果有運行中的事件循環，創建任務
+            task = loop.create_task(self.generate_unlimited_market_data(symbol, timeframe, limit))
+            return asyncio.run_coroutine_threadsafe(task, loop).result()
+        except RuntimeError:
+            # 沒有運行中的事件循環，直接運行
+            return asyncio.run(self.generate_unlimited_market_data(symbol, timeframe, limit))
+    
+    def generate_realistic_market_data_legacy(self, symbol: str, timeframe: str = '1m', limit: int = 1000) -> pd.DataFrame:
+        """從真實區塊鏈數據源生成市場數據（傳統方法 - 已棄用）"""
         if not self.blockchain_connector:
             raise RuntimeError("❌ 區塊鏈數據連接器未初始化 - 此系統不使用合成數據")
         
@@ -961,12 +1097,26 @@ class BTCQuantumUltimateModel:
         alpha = spsa_settings['alpha']
         gamma = spsa_settings['gamma']
         
-        logger.info(f"開始真實量子 SPSA 訓練 ({self.config['SPSA_ITER']} 迭代)...")
+        logger.info("🔮 開始真實量子 SPSA 訓練 - 自動收斂模式")
+        logger.info("⚡ 量子系統將自動運行直到收斂，無人為限制！")
         
-        for k in tqdm(range(self.config['SPSA_ITER']), desc="真實量子訓練"):
+        # 自動收斂參數
+        convergence_threshold = 1e-6  # 收斂閾值
+        patience = 50  # 連續多少次無改善後停止
+        min_iterations = 20  # 最少迭代次數
+        max_iterations = 10000  # 防止無限循環的上限
+        
+        no_improvement_count = 0
+        previous_loss = float('inf')
+        iteration = 0
+        
+        logger.info("⏳ 訓練狀態: 量子參數自動優化中...")
+        
+        # 自動收斂循環
+        while True:
             # SPSA 參數更新
-            ak = a / (A + k + 1) ** alpha
-            ck = c / (k + 1) ** gamma
+            ak = a / (A + iteration + 1) ** alpha
+            ck = c / (iteration + 1) ** gamma
             
             # 使用量子隨機數生成器生成擾動
             delta = self._generate_quantum_bernoulli(len(self.theta))
@@ -987,25 +1137,60 @@ class BTCQuantumUltimateModel:
                 
                 # 記錄最佳參數
                 current_loss = objective_function(self.theta)
+                improvement = previous_loss - current_loss
+                
                 if current_loss < best_loss:
                     best_loss = current_loss
                     best_theta = self.theta.copy()
+                    no_improvement_count = 0  # 重置計數
+                else:
+                    no_improvement_count += 1
                 
                 self.training_history.append({
-                    'iteration': k,
+                    'iteration': iteration,
                     'loss': current_loss,
+                    'improvement': improvement,
                     'quantum_backend': getattr(self.quantum_backend, 'name', 'qasm_simulator'),
                     'quantum_advantage_score': quantum_advantage_score
                 })
                 
-                if verbose and k % 10 == 0:
-                    logger.info(f"迭代 {k}: 損失 = {current_loss:.4f}, 最佳損失 = {best_loss:.4f}")
+                # 收斂判斷
+                convergence_rate = abs(improvement) if previous_loss != float('inf') else float('inf')
+                
+                # 實時進度顯示
+                if verbose and iteration % 10 == 0:
+                    logger.info(f"🔮 迭代 {iteration}: 損失 = {current_loss:.8f}")
+                    logger.info(f"📈 最佳損失 = {best_loss:.8f}, 改善量 = {improvement:.8f}")
+                    logger.info(f"📊 收斂率: {convergence_rate:.10f}, 閾值: {convergence_threshold}")
+                    logger.info(f"⏱️ 無改善次數: {no_improvement_count}/{patience}")
+                
+                # 自動收斂條件檢查
+                if iteration >= min_iterations:
+                    if convergence_rate < convergence_threshold:
+                        logger.info(f"✅ 收斂達成！收斂率 {convergence_rate:.10f} < 閾值 {convergence_threshold}")
+                        logger.info(f"🎯 在第 {iteration} 次迭代達到收斂")
+                        break
                     
+                    if no_improvement_count >= patience:
+                        logger.info(f"⏸️ 早停觸發！連續 {patience} 次無改善")
+                        logger.info(f"🎯 在第 {iteration} 次迭代觸發早停")
+                        break
+                
+                if iteration >= max_iterations:
+                    logger.info(f"⏰ 達到最大迭代次數 {max_iterations}")
+                    logger.info(f"🎯 強制停止訓練")
+                    break
+                
+                previous_loss = current_loss
+                iteration += 1
+                
             except Exception as e:
-                logger.error(f"SPSA 迭代 {k} 失敗: {e}")
-                continue
-        
-        # 使用最佳參數
+                logger.error(f"❌ SPSA 迭代 {iteration} 失敗: {e}")
+                iteration += 1
+                if iteration >= max_iterations:
+                    logger.warning(f"⚠️ 達到最大迭代次數，停止訓練")
+                    break
+                continue        # 使用最佳參數
         self.theta = best_theta
         self.is_fitted = True
         
@@ -1367,7 +1552,7 @@ class BTCQuantumUltimateModel:
             logger.error(f"特徵提取失敗: {e}")
             return None
     
-    async def generate_trading_signal(self, symbol: str = 'BTCUSDT') -> Optional[TradingX信號]:
+    async def generate_trading_signal(self, symbol: str = 'BTCUSDT'):
         """生成交易信號（整合區塊鏈主池數據）"""
         try:
             # 優先使用區塊鏈主池數據

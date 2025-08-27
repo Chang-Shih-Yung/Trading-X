@@ -2,7 +2,7 @@
 enabled = false
 
 [tool.pyright]
-include = ["X", "app"]
+include = ["X", "app", "quantum_pro"]
 exclude = [
     "**/__pycache__",
     "**/venv",

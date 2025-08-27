@@ -29,12 +29,25 @@ install:
 	@echo "🐍 使用 Python 命令: $(PYTHON_CMD)"
 	$(PYTHON_CMD) -m venv venv
 	@bash -c "source venv/bin/activate && pip install -r requirements.txt"
+	@echo "🌌 驗證量子模組..."
+	@bash -c "source venv/bin/activate && python -c 'import qiskit; from qiskit_aer import Aer; print(\"✅ 量子模組安裝成功\")'"
 
 # ▶️ 運行主系統（統一虛擬環境路徑）
 run:
 	@echo "▶️ 啟動 Trading X 系統..."
 	@if [ ! -d "venv" ]; then echo "❌ 虛擬環境不存在，請先執行 make setup"; exit 1; fi
 	@bash -c "source venv/bin/activate && python X/production_launcher_phase2_enhanced.py"
+
+# 🌌 運行量子模組
+run-quantum:
+	@echo "🌌 啟動量子交易模組..."
+	@if [ ! -d "venv" ]; then echo "❌ 虛擬環境不存在，請先執行 make setup"; exit 1; fi
+	@bash -c "source venv/bin/activate && python quantum_pro/quantum_ultimate_launcher.py"
+
+# 🔮 量子模組測試
+test-quantum:
+	@echo "🔮 測試量子模組..."
+	@bash -c "source venv/bin/activate && python quantum_pro/test_quantum_dynamic_fusion.py"
 
 # 🧪 運行測試
 test:
@@ -89,17 +102,20 @@ docker-logs:
 # 📋 顯示幫助
 help:
 	@echo "Trading X 開發指令 (跨設備兼容):"
-	@echo "  make setup     - 設置開發環境 (自動檢測 python/python3)"
-	@echo "  make verify    - 驗證跨設備環境配置"
-	@echo "  make install   - 安裝依賴"
-	@echo "  make run       - 運行系統"
-	@echo "  make test      - 運行測試"
-	@echo "  make lint      - 代碼檢查"
-	@echo "  make format    - 代碼格式化"
-	@echo "  make clean     - 清理環境"
-	@echo "  make docker-*  - Docker 相關操作"
+	@echo "  make setup       - 設置開發環境 (自動檢測 python/python3)"
+	@echo "  make verify      - 驗證跨設備環境配置"
+	@echo "  make install     - 安裝依賴"
+	@echo "  make run         - 運行主系統"
+	@echo "  make run-quantum - 運行量子交易模組"
+	@echo "  make test        - 運行測試"
+	@echo "  make test-quantum- 測試量子模組"
+	@echo "  make lint        - 代碼檢查"
+	@echo "  make format      - 代碼格式化"
+	@echo "  make clean       - 清理環境"
+	@echo "  make docker-*    - Docker 相關操作"
 	@echo ""
 	@echo "🔧 跨設備使用："
 	@echo "  1. 在任何設備上執行: make setup"
 	@echo "  2. 驗證配置: make verify"
 	@echo "  3. 運行系統: make run"
+	@echo "  4. 運行量子模組: make run-quantum"

@@ -85,7 +85,7 @@ echo "📦 關鍵模組測試："
 if [ -d "venv" ]; then
     source venv/bin/activate
     
-    modules=("pandas" "numpy" "aiosqlite" "fastapi" "talib" "pandas_ta")
+    modules=("pandas" "numpy" "aiosqlite" "fastapi" "talib" "pandas_ta" "qiskit" "scipy" "ccxt" "websockets" "pydantic")
     for module in "${modules[@]}"; do
         if python -c "import $module" 2>/dev/null; then
             echo "  ✅ $module 可正常導入"
@@ -93,6 +93,69 @@ if [ -d "venv" ]; then
             echo "  ❌ $module 導入失敗"
         fi
     done
+    
+    # 🌌 量子計算模組專項檢查
+    echo ""
+    echo "🚀 量子計算模組檢查："
+    python -c "
+try:
+    import qiskit
+    from qiskit import QuantumCircuit
+    print('  ✅ Qiskit: 量子計算框架運作正常')
+    print(f'  📦 Qiskit 版本: {qiskit.__version__}')
+    
+    # 測試量子電路
+    qc = QuantumCircuit(2, 2)
+    qc.h(0)
+    qc.cx(0, 1)
+    qc.measure_all()
+    print('  🌌 量子電路創建: 成功')
+    
+    # 檢查 Aer 模擬器（quantum_pro 必需）
+    aer_available = False
+    try:
+        from qiskit_aer import Aer
+        import qiskit_aer
+        backend = Aer.get_backend('qasm_simulator')
+        print('  ✅ Aer 模擬器: 可用 (qiskit_aer)')
+        print(f'  📦 Aer 版本: {qiskit_aer.__version__}')
+        aer_available = True
+    except ImportError:
+        try:
+            from qiskit import Aer
+            backend = Aer.get_backend('qasm_simulator')
+            print('  ✅ Aer 模擬器: 可用 (qiskit 內建)')
+            aer_available = True
+        except ImportError:
+            print('  ❌ Aer 模擬器: 未安裝 (quantum_pro 必需)')
+            aer_available = False
+    
+    if not aer_available:
+        print('  ⚠️  警告: quantum_pro 模組需要 Aer 模擬器才能正常運作')
+        print('  💡 安裝指令: pip install qiskit[aer] 或 pip install qiskit-aer')
+    
+except ImportError as e:
+    print(f'  ❌ Qiskit 未安裝或有問題: {e}')
+except Exception as e:
+    print(f'  ⚠️  Qiskit 功能測試失敗: {e}')
+"
+    
+    # quantum_pro 模組檢查
+    echo ""
+    echo "🌌 quantum_pro 模組檢查："
+    python -c "
+try:
+    import sys
+    sys.path.append('.')
+    from quantum_pro.regime_hmm_quantum import QUANTUM_ENTANGLED_COINS, ENTANGLEMENT_PAIRS
+    print(f'  ✅ 七幣種糾纏池: {len(QUANTUM_ENTANGLED_COINS)} 幣種')
+    print(f'  ✅ 量子糾纏對: {len(ENTANGLEMENT_PAIRS)} 對')
+    print('  ✅ 量子糾纏系統: 運作正常')
+except ImportError as e:
+    print(f'  ❌ quantum_pro 模組導入失敗: {e}')
+except Exception as e:
+    print(f'  ⚠️  quantum_pro 模組功能測試失敗: {e}')
+"
 else
     echo "  ⚠️  無法測試（虛擬環境不存在）"
 fi
@@ -104,6 +167,7 @@ echo "  🖥️  設備: $(hostname)"
 echo "  🐍 Python 命令: $PYTHON_CMD"
 echo "  📂 專案路徑: $(pwd)"
 echo "  🔧 Pylance 狀態: $(grep -q '"python.analysis.typeCheckingMode": "off"' .vscode/settings.json 2>/dev/null && echo "已關閉" || echo "需要配置")"
+echo "  🌌 量子模組狀態: $([ -d "venv" ] && source venv/bin/activate && python -c "import qiskit; print('正常')" 2>/dev/null || echo "需要安裝")"
 
 echo ""
 echo "💡 如果有任何 ❌ 項目，請執行："

@@ -122,14 +122,14 @@ fi
 
 # 🌌 安裝量子計算依賴 (quantum_pro)
 echo "🚀 安裝 quantum_pro 量子計算依賴..."
-$VENV_PYTHON -m pip install numpy scipy pandas qiskit ccxt websockets asyncio-mqtt fastapi uvicorn pydantic
+$VENV_PYTHON -m pip install numpy scipy pandas qiskit qiskit-aer ccxt websockets asyncio-mqtt fastapi uvicorn pydantic
 
 # 驗證量子計算套件
 echo "🔬 驗證量子計算套件..."
 $VENV_PYTHON -c "
 try:
     import qiskit
-    from qiskit import Aer, QuantumCircuit
+    from qiskit import QuantumCircuit
     print('  ✅ Qiskit: 量子計算框架安裝成功')
     print(f'  📦 Qiskit 版本: {qiskit.__version__}')
     
@@ -138,8 +138,23 @@ try:
     qc.h(0)
     qc.cx(0, 1)
     qc.measure_all()
-    backend = Aer.get_backend('qasm_simulator')
     print('  🌌 量子電路測試: 成功')
+    
+    # 驗證 Aer 模擬器
+    try:
+        from qiskit_aer import Aer
+        import qiskit_aer
+        backend = Aer.get_backend('qasm_simulator')
+        print('  ✅ Aer 模擬器: 安裝成功 (qiskit_aer)')
+        print(f'  📦 Aer 版本: {qiskit_aer.__version__}')
+    except ImportError:
+        try:
+            from qiskit import Aer
+            backend = Aer.get_backend('qasm_simulator')
+            print('  ✅ Aer 模擬器: 安裝成功 (qiskit 內建)')
+        except ImportError:
+            print('  ❌ Aer 模擬器: 未安裝 (quantum_pro 需要)')
+            raise ImportError('請安裝 qiskit-aer: pip install qiskit-aer')
     
 except ImportError as e:
     print(f'  ❌ Qiskit 安裝失敗: {e}')
@@ -152,7 +167,7 @@ import sys
 packages_to_check = [
     'pandas', 'numpy', 'aiohttp', 'aiosqlite', 'fastapi', 
     'uvicorn', 'web3', 'talib', 'pandas_ta', 'websockets',
-    'qiskit', 'scipy', 'ccxt', 'pydantic'
+    'qiskit', 'qiskit_aer', 'scipy', 'ccxt', 'pydantic'
 ]
 
 print('📊 套件檢查結果:')
