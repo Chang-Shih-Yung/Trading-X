@@ -96,65 +96,182 @@ if [ -d "venv" ]; then
     
     # 🌌 量子計算模組專項檢查
     echo ""
-    echo "🚀 量子計算模組檢查："
+    echo "🚀 量子計算環境檢查："
     python -c "
+import warnings
+warnings.filterwarnings('ignore', category=DeprecationWarning)
+
 try:
     import qiskit
     from qiskit import QuantumCircuit
-    print('  ✅ Qiskit: 量子計算框架運作正常')
+    print('  ✅ Qiskit 核心: 量子計算框架運作正常')
     print(f'  📦 Qiskit 版本: {qiskit.__version__}')
     
-    # 測試量子電路
+    # 檢查版本是否為 1.x+ (推薦) 或 0.x (可用)
+    try:
+        major_version = int(qiskit.__version__.split('.')[0])
+        if major_version >= 1:
+            print(f'     🎯 Qiskit 版本狀態: 最新 v{major_version}.x (推薦)')
+        else:
+            print(f'     ⚠️ Qiskit 版本狀態: 舊版 v{major_version}.x (可用，建議升級)')
+    except:
+        print(f'     ⚠️ Qiskit 版本解析: 無法確定 ({qiskit.__version__})')
+    
+    # 測試量子電路創建
     qc = QuantumCircuit(2, 2)
     qc.h(0)
     qc.cx(0, 1)
     qc.measure_all()
     print('  🌌 量子電路創建: 成功')
     
-    # 檢查 Aer 模擬器（quantum_pro 必需）
+    # 檢查 Aer 模擬器（多重檢測機制）
     aer_available = False
+    aer_method = None
+    
+    # 方法1: 檢測 qiskit_aer (推薦)
     try:
-        from qiskit_aer import Aer
+        from qiskit_aer import AerSimulator
         import qiskit_aer
-        backend = Aer.get_backend('qasm_simulator')
-        print('  ✅ Aer 模擬器: 可用 (qiskit_aer)')
-        print(f'  📦 Aer 版本: {qiskit_aer.__version__}')
+        simulator = AerSimulator()
+        print(f'  ✅ Aer 模擬器 (qiskit_aer): {qiskit_aer.__version__}')
         aer_available = True
+        aer_method = 'qiskit_aer'
     except ImportError:
+        print('  ⚠️ qiskit_aer: 未安裝')
+    
+    # 方法2: 檢測內建 Aer (舊版本)
+    if not aer_available:
         try:
             from qiskit import Aer
             backend = Aer.get_backend('qasm_simulator')
-            print('  ✅ Aer 模擬器: 可用 (qiskit 內建)')
+            print('  ✅ Aer 模擬器 (內建): 可用')
             aer_available = True
+            aer_method = 'builtin'
         except ImportError:
-            print('  ❌ Aer 模擬器: 未安裝 (quantum_pro 必需)')
-            aer_available = False
+            print('  ⚠️ 內建 Aer: 不可用')
+    
+    # 方法3: 基礎模擬器
+    if not aer_available:
+        try:
+            from qiskit.providers.basic_provider import BasicSimulator
+            basic_sim = BasicSimulator()
+            print('  ✅ 基礎模擬器: 可用 (性能較低)')
+            aer_available = True
+            aer_method = 'basic'
+        except ImportError:
+            print('  ❌ 基礎模擬器: 不可用')
     
     if not aer_available:
-        print('  ⚠️  警告: quantum_pro 模組需要 Aer 模擬器才能正常運作')
-        print('  💡 安裝指令: pip install qiskit[aer] 或 pip install qiskit-aer')
+        print('  ❌ 嚴重問題: 無可用的量子模擬器!')
+        print('  💡 修復建議: pip install qiskit-aer')
+        print('  🚨 quantum_pro 模組將無法正常運作')
+    else:
+        print(f'  🎯 量子模擬器狀態: 可用 (使用 {aer_method})')
+        
+        # 執行量子電路測試
+        try:
+            from qiskit import transpile
+            if aer_method == 'qiskit_aer':
+                job = simulator.run(transpile(qc, simulator), shots=100)
+                result = job.result()
+                counts = result.get_counts(qc)
+                print(f'       ✅ 量子電路執行測試: 成功 ({len(counts)} 種結果)')
+            elif aer_method == 'builtin':
+                job = backend.run(transpile(qc, backend), shots=100)
+                result = job.result()
+                counts = result.get_counts(qc)
+                print(f'       ✅ 量子電路執行測試: 成功 ({len(counts)} 種結果)')
+            else:
+                print('       ⚠️ 基礎模擬器測試跳過 (功能有限)')
+        except Exception as e:
+            print(f'       ⚠️ 量子電路執行警告: {e}')
     
 except ImportError as e:
-    print(f'  ❌ Qiskit 未安裝或有問題: {e}')
+    print(f'  ❌ Qiskit 未安裝: {e}')
+    print('  💡 安裝指令: pip install qiskit qiskit-aer')
 except Exception as e:
-    print(f'  ⚠️  Qiskit 功能測試失敗: {e}')
+    print(f'  ⚠️ Qiskit 功能測試異常: {e}')
 "
     
     # quantum_pro 模組檢查
     echo ""
-    echo "🌌 quantum_pro 模組檢查："
+    echo "🌌 quantum_pro 模組結構檢查："
     python -c "
 try:
     import sys
+    import os
+    from pathlib import Path
+    
+    # 檢查 quantum_pro 目錄結構
+    quantum_pro_dir = Path('quantum_pro')
+    if not quantum_pro_dir.exists():
+        print('  ❌ quantum_pro 目錄不存在')
+        exit(1)
+    
+    required_files = [
+        'regime_hmm_quantum.py',
+        'btc_quantum_ultimate_model.py', 
+        '__init__.py',
+        'launcher/quantum_adaptive_trading_launcher.py',
+        'launcher/quantum_adaptive_signal_engine.py',
+        'launcher/quantum_model_trainer.py',
+        'launcher/一鍵啟動_量子自適應.sh',
+        'config/model_paths.py',
+        'check_quantum_environment.py'
+    ]
+    
+    missing_files = []
+    for file_path in required_files:
+        full_path = quantum_pro_dir / file_path
+        if full_path.exists():
+            print(f'  ✅ {file_path}')
+        else:
+            print(f'  ❌ {file_path}: 缺失')
+            missing_files.append(file_path)
+    
+    # 檢查模型目錄
+    models_dir = quantum_pro_dir / 'data' / 'models'
+    if models_dir.exists():
+        model_files = list(models_dir.glob('quantum_model_*.pkl'))
+        print(f'  📊 已訓練量子模型: {len(model_files)}/7')
+        
+        expected_coins = ['btc', 'eth', 'ada', 'sol', 'xrp', 'doge', 'bnb']
+        trained_coins = []
+        
+        for model_file in model_files:
+            coin = model_file.stem.replace('quantum_model_', '').lower()
+            trained_coins.append(coin)
+            print(f'     ✅ {coin.upper()} 模型已訓練')
+        
+        missing_coins = set(expected_coins) - set(trained_coins)
+        if missing_coins:
+            print(f'  ⚠️ 缺少模型: {list(missing_coins)}')
+            print('  💡 執行訓練: make train-quantum 或 cd quantum_pro/launcher && python quantum_model_trainer.py')
+        else:
+            print('  🎯 所有幣種模型完整')
+    else:
+        print(f'  ❌ 模型目錄不存在: {models_dir}')
+        print('  💡 首次使用需要執行: make train-quantum')
+    
+    # 測試核心模組導入
     sys.path.append('.')
-    from quantum_pro.regime_hmm_quantum import QUANTUM_ENTANGLED_COINS, ENTANGLEMENT_PAIRS
-    print(f'  ✅ 七幣種糾纏池: {len(QUANTUM_ENTANGLED_COINS)} 幣種')
-    print(f'  ✅ 量子糾纏對: {len(ENTANGLEMENT_PAIRS)} 對')
-    print('  ✅ 量子糾纏系統: 運作正常')
-except ImportError as e:
-    print(f'  ❌ quantum_pro 模組導入失敗: {e}')
+    try:
+        from quantum_pro.regime_hmm_quantum import QUANTUM_ENTANGLED_COINS, ENTANGLEMENT_PAIRS
+        print(f'  ✅ 核心模組: {len(QUANTUM_ENTANGLED_COINS)} 幣種糾纏池')
+        print(f'  ✅ 糾纏關係: {len(ENTANGLEMENT_PAIRS)} 對糾纏')
+        print('  ✅ 量子糾纏系統: 運作正常')
+    except ImportError as e:
+        print(f'  ❌ 核心模組導入失敗: {e}')
+    except Exception as e:
+        print(f'  ⚠️ 核心模組測試異常: {e}')
+    
+    if missing_files:
+        print(f'  🚨 結構完整性: 缺少 {len(missing_files)} 個必要檔案')
+    else:
+        print('  ✅ 結構完整性: 所有必要檔案齊全')
+        
 except Exception as e:
-    print(f'  ⚠️  quantum_pro 模組功能測試失敗: {e}')
+    print(f'  ❌ quantum_pro 結構檢查失敗: {e}')
 "
 else
     echo "  ⚠️  無法測試（虛擬環境不存在）"
@@ -167,8 +284,60 @@ echo "  🖥️  設備: $(hostname)"
 echo "  🐍 Python 命令: $PYTHON_CMD"
 echo "  📂 專案路徑: $(pwd)"
 echo "  🔧 Pylance 狀態: $(grep -q '"python.analysis.typeCheckingMode": "off"' .vscode/settings.json 2>/dev/null && echo "已關閉" || echo "需要配置")"
-echo "  🌌 量子模組狀態: $([ -d "venv" ] && source venv/bin/activate && python -c "import qiskit; print('正常')" 2>/dev/null || echo "需要安裝")"
+
+# 量子環境狀態檢查
+if [ -d "venv" ]; then
+    source venv/bin/activate
+    quantum_status=$(python -c "
+try:
+    import qiskit
+    try:
+        from qiskit_aer import AerSimulator
+        print('完整')
+    except ImportError:
+        try:
+            from qiskit import Aer
+            print('基礎')
+        except ImportError:
+            print('缺失模擬器')
+    except Exception:
+        print('異常')
+except ImportError:
+    print('未安裝')
+except Exception:
+    print('錯誤')
+" 2>/dev/null)
+    
+    model_count=$(find quantum_pro/data/models -name "quantum_model_*.pkl" 2>/dev/null | wc -l)
+    
+    echo "  🌌 量子環境: $quantum_status"
+    echo "  🎯 量子模型: $model_count/7 個已訓練"
+else
+    echo "  🌌 量子環境: 無法檢測 (虛擬環境未啟用)"
+    echo "  🎯 量子模型: 無法檢測"
+fi
 
 echo ""
-echo "💡 如果有任何 ❌ 項目，請執行："
-echo "   ./setup-dev-environment.sh"
+echo "💡 修復建議："
+if [ ! -d "venv" ] || ! grep -q '"python.analysis.typeCheckingMode": "off"' .vscode/settings.json 2>/dev/null; then
+    echo "   🔧 基礎環境: ./setup-dev-environment.sh"
+fi
+
+if [ -d "venv" ]; then
+    source venv/bin/activate
+    if ! python -c "import qiskit" 2>/dev/null; then
+        echo "   🔮 量子依賴: make setup (會自動安裝 Qiskit)"
+    fi
+    
+    model_count=$(find quantum_pro/data/models -name "quantum_model_*.pkl" 2>/dev/null | wc -l)
+    if [ "$model_count" -lt 7 ]; then
+        echo "   🎯 量子模型: make train-quantum (訓練量子模型)"
+    fi
+fi
+
+echo ""
+echo "🚀 快速啟動指令："
+echo "   make setup         # 完整環境設置"
+echo "   make verify        # 重新驗證環境"
+echo "   make check-quantum # 詳細量子環境檢查"
+echo "   make run-quantum   # 啟動量子交易系統"

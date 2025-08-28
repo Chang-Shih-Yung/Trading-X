@@ -35,9 +35,18 @@ scikit-learn>=1.3.0
 matplotlib>=3.7.0
 plotly>=5.17.0
 
-# ===== 量子計算 (quantum_pro) =====
-qiskit>=2.0.0
-qiskit-aer>=0.17.0
+# ===== 量子計算 (quantum_pro) - 增強兼容性 =====
+# Qiskit 2.x 核心套件 (跨平台兼容)
+qiskit>=1.0.0
+qiskit-aer>=0.13.0
+qiskit-ibm-runtime>=0.20.0
+
+# 量子計算依賴套件
+rustworkx-python>=0.14.0
+qiskit-terra>=0.25.0; python_version < "3.11"
+
+# 可選：量子機器學習 (實驗性功能)
+# qiskit-machine-learning>=0.7.0
 
 # ===== 測試框架 =====
 pytest>=7.4.0
@@ -63,3 +72,20 @@ passlib[bcrypt]>=1.7.4
 # ===== 配置管理 =====
 python-dotenv>=1.0.0
 pydantic-settings>=2.0.0
+
+# ===== 額外的跨平台兼容性套件 =====
+# 網路請求
+requests>=2.31.0
+urllib3>=2.0.0
+
+# 時間和日期處理
+python-dateutil>=2.8.0
+pytz>=2023.3
+
+# 數學和統計
+sympy>=1.12.0
+statsmodels>=0.14.0
+
+# 多處理和並發
+multiprocess>=0.70.0
+joblib>=1.3.0

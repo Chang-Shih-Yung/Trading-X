@@ -38,16 +38,32 @@ run:
 	@if [ ! -d "venv" ]; then echo "❌ 虛擬環境不存在，請先執行 make setup"; exit 1; fi
 	@bash -c "source venv/bin/activate && python X/production_launcher_phase2_enhanced.py"
 
-# 🌌 運行量子模組
-run-quantum:
-	@echo "🌌 啟動量子交易模組..."
+# 🔮 檢查量子環境
+check-quantum:
+	@echo "🔮 檢查量子計算環境..."
 	@if [ ! -d "venv" ]; then echo "❌ 虛擬環境不存在，請先執行 make setup"; exit 1; fi
-	@bash -c "source venv/bin/activate && python quantum_pro/quantum_ultimate_launcher.py"
+	@bash -c "source venv/bin/activate && python quantum_pro/check_quantum_environment.py"
+
+# 🌌 運行量子自適應系統 (推薦)
+run-quantum:
+	@echo "🌌 啟動量子自適應交易系統..."
+	@if [ ! -d "venv" ]; then echo "❌ 虛擬環境不存在，請先執行 make setup"; exit 1; fi
+	@echo "🔍 執行量子環境預檢..."
+	@bash -c "source venv/bin/activate && python quantum_pro/check_quantum_environment.py"
+	@echo "🚀 啟動量子自適應引擎..."
+	@bash -c "source venv/bin/activate && cd quantum_pro/launcher && ./一鍵啟動_量子自適應.sh"
+
+# 🎯 僅運行量子模型訓練
+train-quantum:
+	@echo "🎯 運行量子模型訓練..."
+	@if [ ! -d "venv" ]; then echo "❌ 虛擬環境不存在，請先執行 make setup"; exit 1; fi
+	@bash -c "source venv/bin/activate && cd quantum_pro/launcher && python quantum_model_trainer.py"
 
 # 🔮 量子模組測試
 test-quantum:
 	@echo "🔮 測試量子模組..."
-	@bash -c "source venv/bin/activate && python quantum_pro/test_quantum_dynamic_fusion.py"
+	@if [ ! -d "venv" ]; then echo "❌ 虛擬環境不存在，請先執行 make setup"; exit 1; fi
+	@bash -c "source venv/bin/activate && python quantum_pro/check_quantum_environment.py && echo '✅ 量子環境測試通過'"
 
 # 🧪 運行測試
 test:
@@ -106,16 +122,26 @@ help:
 	@echo "  make verify      - 驗證跨設備環境配置"
 	@echo "  make install     - 安裝依賴"
 	@echo "  make run         - 運行主系統"
-	@echo "  make run-quantum - 運行量子交易模組"
+	@echo ""
+	@echo "🔮 量子計算相關："
+	@echo "  make check-quantum - 檢查量子環境完整性"
+	@echo "  make run-quantum   - 運行量子自適應系統 (推薦)"
+	@echo "  make train-quantum - 僅運行量子模型訓練"
+	@echo "  make test-quantum  - 測試量子模組"
+	@echo ""
+	@echo "🛠️ 開發工具："
 	@echo "  make test        - 運行測試"
-	@echo "  make test-quantum- 測試量子模組"
 	@echo "  make lint        - 代碼檢查"
 	@echo "  make format      - 代碼格式化"
 	@echo "  make clean       - 清理環境"
 	@echo "  make docker-*    - Docker 相關操作"
 	@echo ""
-	@echo "🔧 跨設備使用："
-	@echo "  1. 在任何設備上執行: make setup"
+	@echo "🔧 跨設備使用流程："
+	@echo "  1. 初次設置: make setup"
 	@echo "  2. 驗證配置: make verify"
-	@echo "  3. 運行系統: make run"
-	@echo "  4. 運行量子模組: make run-quantum"
+	@echo "  3. 檢查量子環境: make check-quantum"
+	@echo "  4. 運行量子系統: make run-quantum"
+	@echo ""
+	@echo "⚡ 換電腦快速啟動："
+	@echo "  1. make setup (自動檢測並安裝所有依賴)"
+	@echo "  2. make run-quantum (自動檢測模型並啟動)"

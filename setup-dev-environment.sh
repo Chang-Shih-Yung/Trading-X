@@ -120,44 +120,113 @@ else
     $VENV_PYTHON -m pip install TA-Lib web3 pandas numpy fastapi uvicorn aiohttp websockets asyncio-mqtt
 fi
 
-# 🌌 安裝量子計算依賴 (quantum_pro)
+# 🌌 安裝量子計算依賴 (quantum_pro) - 多階段穩健安裝
 echo "🚀 安裝 quantum_pro 量子計算依賴..."
-$VENV_PYTHON -m pip install numpy scipy pandas qiskit qiskit-aer ccxt websockets asyncio-mqtt fastapi uvicorn pydantic
 
-# 驗證量子計算套件
+# 第一階段：核心科學計算依賴
+echo "📊 階段1: 安裝核心科學計算套件..."
+$VENV_PYTHON -m pip install --upgrade pip setuptools wheel
+$VENV_PYTHON -m pip install numpy scipy pandas scikit-learn
+
+# 第二階段：網路和API依賴
+echo "🌐 階段2: 安裝網路通訊套件..."
+$VENV_PYTHON -m pip install ccxt websockets asyncio-mqtt requests aiohttp aiofiles
+
+# 第三階段：Web框架依賴
+echo "🚀 階段3: 安裝Web框架..."
+$VENV_PYTHON -m pip install fastapi uvicorn pydantic python-multipart
+
+# 第四階段：量子計算依賴 (關鍵優化)
+echo "� 階段4: 安裝量子計算框架..."
+echo "   🎯 正在安裝 Qiskit 2.x + Aer 模擬器..."
+
+# 強制安裝最新穩定版 Qiskit
+$VENV_PYTHON -m pip install --upgrade qiskit qiskit-aer qiskit-ibm-runtime
+
+# 🔧 解決常見的 Qiskit 安裝問題
+echo "   🔧 修復可能的依賴衝突..."
+$VENV_PYTHON -m pip install --upgrade rustworkx-python qiskit-terra
+
+# 驗證量子計算套件 (增強版檢測)
 echo "🔬 驗證量子計算套件..."
 $VENV_PYTHON -c "
+import warnings
+warnings.filterwarnings('ignore', category=DeprecationWarning)
+
+print('🔍 量子計算環境檢測:')
+
+# 基礎檢測
 try:
     import qiskit
-    from qiskit import QuantumCircuit
-    print('  ✅ Qiskit: 量子計算框架安裝成功')
-    print(f'  📦 Qiskit 版本: {qiskit.__version__}')
+    print(f'  ✅ Qiskit 核心: {qiskit.__version__}')
     
     # 測試量子電路
+    from qiskit import QuantumCircuit, transpile
     qc = QuantumCircuit(2, 2)
     qc.h(0)
     qc.cx(0, 1)
     qc.measure_all()
-    print('  🌌 量子電路測試: 成功')
-    
-    # 驗證 Aer 模擬器
-    try:
-        from qiskit_aer import Aer
-        import qiskit_aer
-        backend = Aer.get_backend('qasm_simulator')
-        print('  ✅ Aer 模擬器: 安裝成功 (qiskit_aer)')
-        print(f'  📦 Aer 版本: {qiskit_aer.__version__}')
-    except ImportError:
-        try:
-            from qiskit import Aer
-            backend = Aer.get_backend('qasm_simulator')
-            print('  ✅ Aer 模擬器: 安裝成功 (qiskit 內建)')
-        except ImportError:
-            print('  ❌ Aer 模擬器: 未安裝 (quantum_pro 需要)')
-            raise ImportError('請安裝 qiskit-aer: pip install qiskit-aer')
+    print('  ✅ 量子電路構建: 成功')
     
 except ImportError as e:
-    print(f'  ❌ Qiskit 安裝失敗: {e}')
+    print(f'  ❌ Qiskit 核心安裝失敗: {e}')
+    exit(1)
+
+# Aer 模擬器檢測 (多重檢測機制)
+aer_detected = False
+
+# 方法1: 檢測 qiskit_aer
+try:
+    from qiskit_aer import AerSimulator
+    import qiskit_aer
+    simulator = AerSimulator()
+    print(f'  ✅ Aer 模擬器 (qiskit_aer): {qiskit_aer.__version__}')
+    aer_detected = True
+except ImportError:
+    print('  ⚠️ qiskit_aer 模組未安裝')
+
+# 方法2: 檢測內建 Aer (舊版本)
+if not aer_detected:
+    try:
+        from qiskit import Aer
+        backend = Aer.get_backend('qasm_simulator') 
+        print('  ✅ Aer 模擬器 (內建版本): 可用')
+        aer_detected = True
+    except ImportError:
+        print('  ⚠️ 內建 Aer 模組未找到')
+
+# 方法3: 嘗試基礎模擬器
+if not aer_detected:
+    try:
+        from qiskit.providers.basic_provider import BasicSimulator
+        basic_sim = BasicSimulator()
+        print('  ⚠️ 使用基礎模擬器 (性能較低)')
+        aer_detected = True
+    except ImportError:
+        print('  ⚠️ 基礎模擬器也無法使用')
+
+# 最終檢測結果
+if aer_detected:
+    print('  🎯 量子模擬器: 可用 (quantum_pro 可運行)')
+    
+    # 執行完整量子測試
+    try:
+        if 'AerSimulator' in locals():
+            job = simulator.run(transpile(qc, simulator), shots=100)
+            result = job.result()
+            counts = result.get_counts(qc)
+            print(f'  🌌 量子電路執行測試: 成功 {len(counts)} 種結果')
+        else:
+            print('  🌌 量子電路執行測試: 跳過 (基礎模擬器)')
+    except Exception as e:
+        print(f'  ⚠️ 量子電路執行警告: {e}')
+        
+else:
+    print('  ❌ 嚴重警告: 無可用的量子模擬器!')
+    print('  💡 建議執行: pip install qiskit-aer')
+    print('  🚨 quantum_pro 模組可能無法正常運行')
+
+print('  🔮 量子環境檢測完成')
 "
 
 # 驗證關鍵套件安裝
@@ -183,13 +252,60 @@ for package in packages_to_check:
 print('\\n🚀 quantum_pro 量子計算模組檢查:')
 try:
     import sys
+    from pathlib import Path
     sys.path.append('.')
-    from quantum_pro.regime_hmm_quantum import QUANTUM_ENTANGLED_COINS, ENTANGLEMENT_PAIRS
-    print(f'  ✅ 七幣種糾纏池: {len(QUANTUM_ENTANGLED_COINS)} 幣種')
-    print(f'  ✅ 量子糾纏對: {len(ENTANGLEMENT_PAIRS)} 對')
-    print('  ✅ 量子糾纏系統: 運作正常')
+    
+    # 檢查目錄結構
+    quantum_pro_dir = Path('quantum_pro')
+    if quantum_pro_dir.exists():
+        print('  ✅ quantum_pro 目錄: 存在')
+        
+        # 檢查關鍵檔案
+        key_files = [
+            'regime_hmm_quantum.py',
+            'launcher/quantum_adaptive_trading_launcher.py',
+            'launcher/一鍵啟動_量子自適應.sh',
+            'check_quantum_environment.py'
+        ]
+        
+        missing_files = []
+        for file_path in key_files:
+            if (quantum_pro_dir / file_path).exists():
+                print(f'  ✅ {file_path}: 存在')
+            else:
+                print(f'  ❌ {file_path}: 缺失')
+                missing_files.append(file_path)
+        
+        if missing_files:
+            print(f'  ⚠️ 缺少 {len(missing_files)} 個關鍵檔案')
+        
+        # 檢查模組導入
+        try:
+            from quantum_pro.regime_hmm_quantum import QUANTUM_ENTANGLED_COINS, ENTANGLEMENT_PAIRS
+            print(f'  ✅ 核心模組導入: 成功')
+            print(f'  📊 量子糾纏幣種: {len(QUANTUM_ENTANGLED_COINS)} 種')
+            print(f'  🔗 糾纏關係: {len(ENTANGLEMENT_PAIRS)} 對')
+        except ImportError as e:
+            print(f'  ⚠️ 核心模組導入: 失敗 ({e})')
+        
+        # 檢查模型目錄
+        models_dir = quantum_pro_dir / 'data' / 'models'
+        if models_dir.exists():
+            model_files = list(models_dir.glob('quantum_model_*.pkl'))
+            print(f'  📈 已訓練模型: {len(model_files)}/7')
+            if len(model_files) == 0:
+                print('  💡 首次使用請執行: make train-quantum')
+            elif len(model_files) < 7:
+                print('  💡 模型不完整，建議重新訓練: make train-quantum')
+        else:
+            print('  📁 模型目錄: 不存在 (將自動創建)')
+            models_dir.mkdir(parents=True, exist_ok=True)
+            print(f'  ✅ 已創建模型目錄: {models_dir}')
+    else:
+        print('  ❌ quantum_pro 目錄: 不存在')
+        
 except Exception as e:
-    print(f'  ❌ quantum_pro 模組錯誤: {e}')
+    print(f'  ❌ quantum_pro 模組檢查異常: {e}')
 "
 
 # 安裝 Node.js 依賴（如果存在）
@@ -329,15 +445,21 @@ echo "   📱 當前設備: $(hostname)"
 echo "   🐍 Python 命令: $PYTHON_CMD"
 echo "   📊 版本: $python_version"
 echo "   🔧 Pylance: 完全關閉"
+echo "   🌌 量子環境: 已配置"
 echo ""
-echo "🎯 下一步操作："
+echo "🚀 下一步操作："
 echo "   1. 重新啟動 VS Code"
 echo "   2. 確認 Python 解譯器指向: ./venv/bin/python"
-echo "   3. make run  # 或使用 Makefile 快捷指令"
-echo "   4. $VENV_PYTHON X/production_launcher_phase2_enhanced.py  # 運行系統"
+echo "   3. make verify       # 驗證完整環境"
+echo "   4. make check-quantum # 檢查量子環境"
+echo "   5. make run-quantum   # 啟動量子交易系統"
 echo ""
-echo "🔧 henry 電腦適配："
+echo "⚡ 量子系統快速啟動："
+echo "   make run-quantum  # 自動檢測模型狀態並啟動"
+echo ""
+echo "🔧 跨設備兼容性："
 echo "   ✅ 自動檢測 python vs python3 命令"
 echo "   ✅ 統一虛擬環境 Python 路徑: ./venv/bin/python"
-echo "   ✅ 強制覆蓋 VS Code 設定，確保無 Pylance 錯誤"
+echo "   ✅ 智能量子依賴安裝與驗證"
+echo "   ✅ 量子模型自動檢測與訓練提示"
 echo "   ✅ 所有設備行為完全一致"
