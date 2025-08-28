@@ -1,19 +1,26 @@
 #!/bin/bash
 
-# Trading X 統一開發環境配置腳本
-# 支援跨設備一致性開發，解決 Pylance 類型檢查問題
+# Trading X 統一開發環境配置腳本 v2.0
+# 支援跨設備一致性開發，自動虛擬環境管理
+# 完整量子交易系統依賴安裝 (2025-08-28)
 # 兼容不同 Python 命令環境 (python vs python3)
 
 set -e  # 發生錯誤時立即退出
 
-echo "🚀 Trading X 統一開發環境配置"
-echo "================================"
+echo "🚀 Trading X 統一開發環境配置 v2.0"
+echo "===================================="
+echo "🔧 自動檢測並配置：虛擬環境 + 量子依賴 + ML套件"
 
 # 取得腳本絕對路徑
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$SCRIPT_DIR"
 
 echo "📁 專案根目錄: $PROJECT_ROOT"
+
+# 全局變量
+VENV_NAME="trading-x-env"
+VENV_PATH="$PROJECT_ROOT/$VENV_NAME"
+USE_VENV=true
 
 # 函式：智能檢測 Python 命令
 detect_python_command() {
@@ -45,6 +52,83 @@ detect_python_command() {
     echo "$python_cmd"
 }
 
+# 函式：檢查是否需要虛擬環境
+check_venv_needed() {
+    echo "🔍 檢查虛擬環境需求..."
+    
+    # 檢查是否在 conda 環境中
+    if [[ -n "$CONDA_DEFAULT_ENV" ]]; then
+        echo "✅ 檢測到 Conda 環境: $CONDA_DEFAULT_ENV"
+        echo "❓ 是否要使用現有 Conda 環境而非創建虛擬環境？[y/N]"
+        read -r use_conda
+        if [[ "$use_conda" =~ ^[Yy]$ ]]; then
+            USE_VENV=false
+            echo "🐍 將使用 Conda 環境進行安裝"
+        fi
+    fi
+    
+    # 檢查是否已有虛擬環境
+    if [[ "$USE_VENV" == true ]] && [[ -d "$VENV_PATH" ]]; then
+        echo "✅ 發現現有虛擬環境: $VENV_PATH"
+        echo "❓ 是否要重新創建虛擬環境？[y/N]"
+        read -r recreate_venv
+        if [[ "$recreate_venv" =~ ^[Yy]$ ]]; then
+            echo "🗑️ 刪除現有虛擬環境..."
+            rm -rf "$VENV_PATH"
+        fi
+    fi
+}
+
+# 函式：設置虛擬環境
+setup_virtual_environment() {
+    if [[ "$USE_VENV" == true ]]; then
+        if [[ ! -d "$VENV_PATH" ]]; then
+            echo "🔨 創建 Python 虛擬環境..."
+            $PYTHON_CMD -m venv "$VENV_PATH"
+        fi
+        
+        echo "🔌 激活虛擬環境..."
+        source "$VENV_PATH/bin/activate"
+        PYTHON_CMD="$VENV_PATH/bin/python"
+        PIP_CMD="$VENV_PATH/bin/pip"
+    else
+        echo "🐍 使用系統/Conda Python 環境"
+        PIP_CMD="pip"
+    fi
+}
+
+# 函式：安裝量子依賴
+install_quantum_dependencies() {
+    echo "⚛️ 安裝量子計算依賴..."
+    
+    # 升級 pip
+    $PIP_CMD install --upgrade pip
+    
+    # 安裝核心量子依賴 (固定版本以確保相容性)
+    echo "📦 安裝 Qiskit 1.2.4 (相容版本)..."
+    $PIP_CMD install qiskit==1.2.4 qiskit-algorithms==0.3.1
+    
+    # 檢查是否需要重新安裝 rustworkx
+    if ! $PYTHON_CMD -c "import rustworkx" 2>/dev/null; then
+        echo "🦀 安裝 rustworkx..."
+        $PIP_CMD install rustworkx
+    fi
+}
+
+# 函式：安裝機器學習依賴
+install_ml_dependencies() {
+    echo "🤖 安裝機器學習依賴..."
+    
+    # 安裝 XGBoost
+    $PIP_CMD install xgboost
+    
+    # 安裝相容版本的 LightGBM 和 Dask
+    $PIP_CMD install "lightgbm>=4.4.0,<4.5.0"
+    $PIP_CMD install "dask>=2023.1.0"
+    
+    echo "✅ 機器學習套件安裝完成"
+}
+
 # 檢測並設定 Python 命令
 PYTHON_CMD=$(detect_python_command)
 echo "🐍 檢測到 Python 命令: $PYTHON_CMD"
@@ -67,6 +151,9 @@ if [[ "$version_check" != "OK" ]]; then
     echo "⚠️  警告: Python 版本 $python_version < 3.9，可能有相容性問題"
 fi
 
+# 檢查虛擬環境需求
+check_venv_needed
+
 # 檢查 macOS 版本
 if [[ "$OSTYPE" != "darwin"* ]]; then
     echo "❌ 此腳本僅支援 macOS"
@@ -87,10 +174,18 @@ fi
 echo "🔧 安裝系統依賴..."
 brew install ta-lib python@3.9 node postgresql
 
-# 創建虛擬環境
-cd "$PROJECT_ROOT"
-if [ ! -d "venv" ]; then
-    echo "🔨 創建 Python 虛擬環境..."
+# 安裝 OpenMP (XGBoost 需要)
+echo "🔧 安裝 OpenMP (XGBoost 依賴)..."
+brew install libomp
+
+# 設置虛擬環境
+setup_virtual_environment
+
+# 安裝量子依賴
+install_quantum_dependencies
+
+# 安裝機器學習依賴
+install_ml_dependencies
     $PYTHON_CMD -m venv venv
 else
     echo "✅ 虛擬環境已存在"
@@ -145,7 +240,7 @@ $VENV_PYTHON -m pip install --upgrade qiskit qiskit-aer qiskit-ibm-runtime
 
 # 🔧 解決常見的 Qiskit 安裝問題
 echo "   🔧 修復可能的依賴衝突..."
-$VENV_PYTHON -m pip install --upgrade rustworkx-python qiskit-terra
+$VENV_PYTHON -m pip install --upgrade rustworkx qiskit-terra
 
 # 驗證量子計算套件 (增強版檢測)
 echo "🔬 驗證量子計算套件..."

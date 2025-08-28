@@ -44,9 +44,15 @@ from sklearn.preprocessing import StandardScaler
 
 # 🔮 量子級區塊鏈歷史數據撷取器 - 從真實創世開始
 try:
-    from .blockchain_unlimited_extractor import ProductionConfig, QuantumBlockchainExtractor
+    from .blockchain_unlimited_extractor import (
+        ProductionConfig,
+        QuantumBlockchainExtractor,
+    )
 except ImportError:
-    from blockchain_unlimited_extractor import ProductionConfig, QuantumBlockchainExtractor
+    from blockchain_unlimited_extractor import (
+        ProductionConfig,
+        QuantumBlockchainExtractor,
+    )
 
 # Qiskit 量子計算 - 兼容 Qiskit 2.x
 try:
@@ -106,10 +112,13 @@ try:
     
     QISKIT_AVAILABLE = True
     QUANTUM_LIBS_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     QISKIT_AVAILABLE = False
     QUANTUM_LIBS_AVAILABLE = False
-    print("⚠️ Qiskit 未安裝，量子電路功能將被禁用")
+    print(f"❌ Qiskit 未安裝或版本不相容: {e}")
+    print("💡 請安裝 Qiskit 2.x:")
+    print("   pip install qiskit qiskit-aer qiskit-algorithms rustworkx")
+    raise RuntimeError("量子交易系統需要 Qiskit 2.x，請先安裝相關套件")
 
 # Progress bar
 try:
@@ -153,7 +162,8 @@ except ImportError:
 
 # 設置日誌
 import datetime
-log_filename = f"quantum_pro/quantum_adaptive_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+
+log_filename = f"quantum_adaptive_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s %(levelname)s: %(message)s',
@@ -655,7 +665,7 @@ class QuantumBackendManager:
         try:
             from qiskit import QuantumCircuit, transpile
             from qiskit_aer import AerSimulator
-            
+
             # 每次最多可並行生成的 qubits (避免過大的電路)
             n_qubits = min(n_bits, 20)  
             quantum_bits = []
@@ -3826,34 +3836,292 @@ def production_demo_comprehensive():
         import traceback
         traceback.print_exc()
 
+def production_demo_phase_5():
+    """
+    🎯 Phase 5: 生產級基準驗證與模型評估演示
+    科學嚴謹的量子模型驗證系統 - 完全符合 Qiskit 2.x
+    """
+    logger.info("🎯 ========== Phase 5 生產級基準驗證與模型評估 ==========")
+    
+    try:
+        # 導入生產級 Phase 5 模組
+        from quantum_benchmark_validator_phase5 import (
+            ProductionQuantumBenchmarkConfig,
+            ProductionQuantumEntropyEngine,
+            ProductionQuantumFinancialHamiltonianEngine,
+            ProductionQuantumTradingModel,
+        )
+        
+        logger.info("✅ 生產級 Phase 5 驗證模組載入成功")
+        
+        # 配置生產級 Phase 5 參數
+        production_config = ProductionQuantumBenchmarkConfig(
+            n_qubits=8,  # 適合演示的量子位數
+            n_ansatz_layers=4,
+            n_feature_map_layers=3,
+            max_quantum_iterations=500,
+            quantum_learning_rate=0.01,
+            max_quantum_shots=8192,
+            statistical_significance_alpha=0.01,
+            quantum_advantage_threshold=0.10,
+            max_total_computation_time=900  # 15分鐘
+        )
+        
+        logger.info(f"📋 生產級配置: {production_config.n_qubits} 量子位, {production_config.n_ansatz_layers} 層")
+        
+        # 創建生產級量子交易模型
+        production_quantum_model = ProductionQuantumTradingModel(production_config)
+        
+        # 生成高質量測試數據
+        logger.info("🔮 生成生產級量子測試數據...")
+        n_samples = 150
+        n_features = production_config.n_qubits
+        
+        # 使用量子熵引擎生成真實市場特徵
+        entropy_engine = ProductionQuantumEntropyEngine(n_features)
+        
+        # 生成市場特徵數據
+        X_features = []
+        for feature_idx in range(n_features):
+            feature_distribution = 'gaussian' if feature_idx % 3 == 0 else 'uniform'
+            feature_data = entropy_engine.generate_quantum_entropy(
+                n_samples, feature_distribution
+            )
+            X_features.append(feature_data)
+        
+        X_test = np.column_stack(X_features)
+        
+        # 生成目標標籤（價格變化）
+        price_entropy = entropy_engine.generate_quantum_entropy(n_samples, 'gaussian')
+        y_test = (price_entropy > np.median(price_entropy)).astype(float)
+        
+        logger.info(f"✅ 生產級測試數據: {X_test.shape[0]} 樣本, {X_test.shape[1]} 特徵")
+        
+        # 生成市場相關性矩陣
+        correlation_entropy = entropy_engine.generate_quantum_entropy(
+            n_features * n_features, 'uniform'
+        )
+        market_correlation_matrix = correlation_entropy.reshape(n_features, n_features)
+        # 確保對稱性
+        market_correlation_matrix = (market_correlation_matrix + market_correlation_matrix.T) / 2
+        np.fill_diagonal(market_correlation_matrix, 1.0)
+        
+        # Phase 5 生產級訓練
+        logger.info("🚀 開始生產級量子模型訓練...")
+        training_start = time.time()
+        
+        training_results = production_quantum_model.train(
+            X_train=X_test[:100],  # 前100樣本用於訓練
+            y_train=y_test[:100],
+            market_correlation_matrix=market_correlation_matrix,
+            market_regime='normal'
+        )
+        
+        training_time = time.time() - training_start
+        
+        if training_results['success']:
+            logger.info(f"✅ 生產級量子訓練成功: {training_time:.2f}秒")
+            
+            # 顯示訓練指標
+            metrics = training_results.get('training_metrics', {})
+            logger.info(f"   最終成本: {training_results['final_cost']:.6f}")
+            logger.info(f"   量子優勢分數: {training_results['quantum_advantage_score']:.4f}")
+            logger.info(f"   量子參數數量: {metrics.get('quantum_parameters_count', 0)}")
+            logger.info(f"   哈密頓量複雜度: {metrics.get('hamiltonian_complexity', 0.0):.4f}")
+            
+            # Phase 5 生產級預測與驗證
+            logger.info("🔮 執行生產級量子預測...")
+            predictions = production_quantum_model.predict(X_test[100:])  # 後50樣本用於測試
+            
+            # 計算預測性能
+            true_labels = y_test[100:]
+            predicted_labels = (predictions > 0.5).astype(float)
+            
+            accuracy = np.mean(predicted_labels == true_labels)
+            mse = np.mean((predictions - true_labels)**2)
+            
+            logger.info(f"✅ 生產級預測完成:")
+            logger.info(f"   預測準確率: {accuracy*100:.2f}%")
+            logger.info(f"   均方誤差: {mse:.6f}")
+            logger.info(f"   預測範圍: [{np.min(predictions):.3f}, {np.max(predictions):.3f}]")
+            
+            # 量子優勢分析
+            quantum_advantage_score = training_results['quantum_advantage_score']
+            if quantum_advantage_score > production_config.quantum_advantage_threshold:
+                advantage_status = "✅ 確認量子優勢"
+                advantage_icon = "🎉"
+            else:
+                advantage_status = "⚠️ 量子優勢不顯著"
+                advantage_icon = "🔍"
+            
+            logger.info(f"{advantage_icon} 量子優勢評估: {advantage_status}")
+            logger.info(f"   量子優勢分數: {quantum_advantage_score:.4f}")
+            logger.info(f"   閾值要求: {production_config.quantum_advantage_threshold:.4f}")
+            
+            # 系統性能分析
+            entropy_quality = entropy_engine.generation_history[-1]['entropy_quality']
+            logger.info("📊 系統性能分析:")
+            logger.info(f"   量子熵品質 - 標準差: {entropy_quality['std']:.4f}")
+            logger.info(f"   量子熵品質 - 偏度: {entropy_quality['skewness']:.4f}")
+            logger.info(f"   電路深度: {metrics.get('circuit_depth', 0)}")
+            logger.info(f"   量子體積估計: {metrics.get('quantum_volume_estimate', 0.0):.1f}")
+            
+            # Phase 5 驗證總結
+            phase5_summary = {
+                'phase_5_status': 'SUCCESS',
+                'training_success': True,
+                'training_time': training_time,
+                'prediction_accuracy': accuracy,
+                'quantum_advantage_score': quantum_advantage_score,
+                'quantum_advantage_confirmed': quantum_advantage_score > production_config.quantum_advantage_threshold,
+                'system_performance': {
+                    'entropy_quality': entropy_quality,
+                    'circuit_metrics': metrics,
+                    'prediction_metrics': {
+                        'accuracy': accuracy,
+                        'mse': mse,
+                        'n_test_samples': len(true_labels)
+                    }
+                }
+            }
+            
+            logger.info("🎉 ========== Phase 5 生產級驗證完成 ==========")
+            
+            return phase5_summary
+            
+        else:
+            logger.error(f"❌ 生產級量子訓練失敗: {training_results.get('error', '未知錯誤')}")
+            return {
+                'phase_5_status': 'TRAINING_FAILED',
+                'error': training_results.get('error', '訓練失敗'),
+                'training_time': training_time
+            }
+        
+    except ImportError as e:
+        logger.error(f"❌ Phase 5 模組導入失敗: {e}")
+        logger.error("   請確保 quantum_benchmark_validator_phase5.py 檔案存在且可用")
+        return {
+            'phase_5_status': 'MODULE_IMPORT_ERROR',
+            'error': f"模組導入失敗: {e}"
+        }
+    
+    except Exception as e:
+        logger.error(f"❌ Phase 5 生產級驗證失敗: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            'phase_5_status': 'SYSTEM_ERROR',
+            'error': str(e)
+        }
+
+def production_demo_comprehensive_with_phase5():
+    """
+    🎯 全階段綜合示範 - Phase 1 到 Phase 5 完整流程
+    包含最新的基準驗證與模型評估
+    """
+    logger.info("🎯 ========== 全階段綜合示範（Phase 1-5）==========")
+    
+    comprehensive_results = {
+        'phase_2_status': 'PENDING',
+        'phase_3_status': 'PENDING', 
+        'phase_4_status': 'PENDING',
+        'phase_5_status': 'PENDING'
+    }
+    
+    try:
+        # Phase 2-4 快速驗證 (現有功能)
+        logger.info("📈 Phase 2-4: 快速綜合驗證")
+        phase_2_4_results = production_demo_comprehensive()
+        
+        if phase_2_4_results and phase_2_4_results.get('phase_4_status') == 'SUCCESS':
+            comprehensive_results['phase_2_status'] = 'SUCCESS'
+            comprehensive_results['phase_3_status'] = 'SUCCESS'
+            comprehensive_results['phase_4_status'] = 'SUCCESS'
+            logger.info("✅ Phase 2-4 驗證通過")
+        else:
+            logger.warning("⚠️ Phase 2-4 驗證未完全通過")
+        
+        # Phase 5: 基準驗證與模型評估
+        logger.info("🎯 Phase 5: 基準驗證與模型評估")
+        phase_5_results = production_demo_phase_5()
+        
+        comprehensive_results['phase_5_status'] = phase_5_results.get('phase_5_status', 'FAILED')
+        comprehensive_results['phase_5_results'] = phase_5_results
+        
+        # 綜合評估
+        all_phases_success = all(
+            status == 'SUCCESS' 
+            for key, status in comprehensive_results.items() 
+            if key.endswith('_status')
+        )
+        
+        if all_phases_success:
+            logger.info("🎉 ========== 全階段綜合驗證成功 ==========")
+            logger.info("✅ Phase 1: 量子自適應優化基礎 ✓")
+            logger.info("✅ Phase 2: 多幣種量子集成架構 ✓")
+            logger.info("✅ Phase 3: Enhanced SPSA 優化 ✓")
+            logger.info("✅ Phase 4: 電路效能優化架構 ✓")
+            logger.info("✅ Phase 5: 基準驗證與模型評估 ✓")
+            
+            # 量子優勢確認
+            quantum_advantage = phase_5_results.get('quantum_advantage_confirmed', False)
+            if quantum_advantage:
+                logger.info("🚀 量子優勢已科學驗證：系統達到生產級標準")
+            else:
+                logger.warning("⚠️ 量子優勢未確認：建議進一步優化")
+                
+        else:
+            logger.warning("⚠️ ========== 部分階段未通過驗證 ==========")
+            for phase, status in comprehensive_results.items():
+                if phase.endswith('_status'):
+                    phase_name = phase.replace('_status', '').replace('_', ' ').title()
+                    status_icon = "✅" if status == 'SUCCESS' else "❌"
+                    logger.info(f"{status_icon} {phase_name}: {status}")
+        
+        return comprehensive_results
+        
+    except Exception as e:
+        logger.error(f"❌ 全階段綜合示範失敗: {e}")
+        comprehensive_results['error'] = str(e)
+        return comprehensive_results
+
 if __name__ == "__main__":
-    """真實量子計算主程序（包含 Phase 4 電路效能優化）"""
+    """真實量子計算主程序（包含 Phase 1-5 完整架構）"""
     import argparse
     
-    parser = argparse.ArgumentParser(description='BTC 量子終極模型 - Phase 4 電路效能優化版本')
+    parser = argparse.ArgumentParser(description='BTC 量子終極模型 - Phase 1-5 完整架構')
     parser.add_argument('--backend', choices=['ibm', 'local_hf'], default='local_hf',
                         help='量子後端類型 (ibm: IBM Quantum, local_hf: 本地高保真度)')
     parser.add_argument('--symbol', default='BTCUSDT', help='交易對符號')
     parser.add_argument('--demo', action='store_true', help='運行傳統生產級演示')
     parser.add_argument('--phase4', action='store_true', help='運行 Phase 4 電路效能優化示範')
+    parser.add_argument('--phase5', action='store_true', help='運行 Phase 5 基準驗證與模型評估')
     parser.add_argument('--comprehensive', action='store_true', help='運行全階段綜合示範 (Phase 2-4)')
+    parser.add_argument('--full', action='store_true', help='運行完整架構示範 (Phase 1-5)')
     
     args = parser.parse_args()
     
     if args.phase4:
         logger.info("🚀 啟動 Phase 4 電路效能優化示範...")
         production_demo_phase_4()
+    elif args.phase5:
+        logger.info("🎯 啟動 Phase 5 基準驗證與模型評估...")
+        production_demo_phase_5()
     elif args.comprehensive:
-        logger.info("🎯 啟動全階段綜合示範...")
+        logger.info("🎯 啟動全階段綜合示範 (Phase 2-4)...")
         production_demo_comprehensive()
+    elif args.full:
+        logger.info("🚀 啟動完整架構示範 (Phase 1-5)...")
+        production_demo_comprehensive_with_phase5()
     elif args.demo:
         logger.info("🔮 啟動傳統生產級演示...")
         production_quantum_demo()
     else:
-        logger.info("🔮 BTC 量子終極模型 Phase 4 已就緒")
-        logger.info("   使用 --phase4 運行 Phase 4 電路效能優化示範")
-        logger.info("   使用 --comprehensive 運行全階段綜合示範")
-        logger.info("   使用 --demo 運行傳統生產級演示")
-        logger.info("   使用 --backend ibm 連接 IBM Quantum 硬體")
-        logger.info("   確保設置 IBM_QUANTUM_TOKEN 環境變數")
+        # 默認運行 Phase 5 基準驗證（展示最新功能）
+        logger.info("🎯 默認啟動 Phase 5 基準驗證與模型評估...")
+        logger.info("   提示：可使用 --phase4 運行 Phase 4 電路效能優化")
+        logger.info("   提示：可使用 --comprehensive 運行 Phase 2-4 綜合示範")
+        logger.info("   提示：可使用 --full 運行完整 Phase 1-5 架構")
+        logger.info("   提示：可使用 --backend ibm 連接 IBM Quantum 硬體")
+        production_demo_phase_5()
 

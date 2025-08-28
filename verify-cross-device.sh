@@ -1,10 +1,11 @@
 #!/bin/bash
 
-# Trading X 跨設備環境驗證腳本
-# 檢查 Pylance 設定是否正確應用
+# Trading X 跨設備環境驗證腳本 v2.0
+# 檢查量子交易系統完整性 + 依賴相容性
+# 2025-08-28 Updated
 
-echo "🔍 Trading X 跨設備環境驗證"
-echo "=============================="
+echo "🔍 Trading X 跨設備環境驗證 v2.0"
+echo "================================="
 
 # 檢查 Python 命令
 echo "🐍 Python 環境檢查："
@@ -25,18 +26,96 @@ else
     exit 1
 fi
 
-# 檢查虛擬環境
+# 檢查環境類型
 echo ""
-echo "🔧 虛擬環境檢查："
-if [ -d "venv" ]; then
-    echo "  ✅ 虛擬環境存在"
-    if [ -f "venv/bin/python" ]; then
-        echo "  ✅ Python 執行檔: $(./venv/bin/python --version)"
+echo "🏠 環境類型檢查："
+if [[ -n "$CONDA_DEFAULT_ENV" ]]; then
+    echo "  ✅ Conda 環境: $CONDA_DEFAULT_ENV"
+    ENV_TYPE="conda"
+elif [[ -n "$VIRTUAL_ENV" ]]; then
+    echo "  ✅ 虛擬環境: $VIRTUAL_ENV"
+    ENV_TYPE="venv"
+elif [ -d "venv" ]; then
+    echo "  ⚠️ 虛擬環境存在但未激活"
+    ENV_TYPE="venv-inactive"
+elif [ -d "trading-x-env" ]; then
+    echo "  ⚠️ trading-x-env 存在但未激活"
+    ENV_TYPE="venv-inactive"
+else
+    echo "  ⚠️ 系統環境"
+    ENV_TYPE="system"
+fi
+
+# 檢查核心依賴
+echo ""
+echo "📦 核心依賴檢查："
+
+# 量子計算依賴
+echo "  ⚛️ 量子計算："
+if $PYTHON_CMD -c "import qiskit; print(f'    ✅ Qiskit: {qiskit.__version__}')" 2>/dev/null; then
+    # 檢查 Qiskit 版本相容性
+    qiskit_version=$($PYTHON_CMD -c "import qiskit; print(qiskit.__version__)" 2>/dev/null)
+    if [[ "$qiskit_version" == "1.2.4" ]]; then
+        echo "    ✅ Qiskit 版本相容"
     else
-        echo "  ❌ 虛擬環境 Python 執行檔不存在"
+        echo "    ⚠️ Qiskit 版本: $qiskit_version (建議: 1.2.4)"
     fi
 else
-    echo "  ❌ 虛擬環境不存在"
+    echo "    ❌ Qiskit 未安裝"
+fi
+
+if $PYTHON_CMD -c "import rustworkx" 2>/dev/null; then
+    echo "    ✅ Rustworkx 可用"
+else
+    echo "    ❌ Rustworkx 未安裝"
+fi
+
+# 機器學習依賴
+echo "  🤖 機器學習："
+if $PYTHON_CMD -c "import xgboost; print(f'    ✅ XGBoost: {xgboost.__version__}')" 2>/dev/null; then
+    true
+else
+    echo "    ❌ XGBoost 未安裝"
+fi
+
+if $PYTHON_CMD -c "import lightgbm; print(f'    ✅ LightGBM: {lightgbm.__version__}')" 2>/dev/null; then
+    true
+else
+    echo "    ❌ LightGBM 未安裝"
+fi
+
+if $PYTHON_CMD -c "import dask; print(f'    ✅ Dask: {dask.__version__}')" 2>/dev/null; then
+    true
+else
+    echo "    ❌ Dask 未安裝"
+fi
+
+# 檢查量子系統
+echo ""
+echo "⚛️ 量子系統檢查："
+if [ -f "quantum_pro/btc_quantum_ultimate_model.py" ]; then
+    echo "  ✅ 量子交易模型存在"
+    
+    # 測試模型導入
+    if $PYTHON_CMD -c "
+import sys
+import os
+sys.path.append('quantum_pro')
+from btc_quantum_ultimate_model import BTCQuantumUltimateModel
+print('  ✅ 量子模型導入成功')
+" 2>/dev/null; then
+        true
+    else
+        echo "  ❌ 量子模型導入失敗"
+    fi
+else
+    echo "  ❌ 量子交易模型不存在"
+fi
+
+if [ -f "quantum_pro/quantum_benchmark_validator_phase5.py" ]; then
+    echo "  ✅ Phase 5 基準驗證存在"
+else
+    echo "  ❌ Phase 5 基準驗證不存在"
 fi
 
 # 檢查 VS Code 設定

@@ -1,4 +1,4 @@
-.PHONY: setup install run test clean docker-build docker-run lint format help verify
+.PHONY: setup install run test clean docker-build docker-run lint format help verify quick-setup quantum-test
 
 # 函數：檢測 Python 命令
 PYTHON_CMD := $(shell \
@@ -10,9 +10,20 @@ PYTHON_CMD := $(shell \
 		echo "python3"; \
 	fi)
 
-# 🚀 設置開發環境（支援跨設備）
+# 🚀 一鍵快速設置（推薦）
+quick-setup:
+	@echo "🚀 Trading X 一鍵環境配置..."
+ifeq ($(OS),Windows_NT)
+	@echo "🪟 檢測到 Windows 系統"
+	setup-windows.bat
+else
+	chmod +x quick-setup.sh
+	./quick-setup.sh
+endif
+
+# 🔧 完整設置開發環境（進階）
 setup:
-	@echo "🚀 設置 Trading X 開發環境..."
+	@echo "� 設置 Trading X 完整開發環境..."
 	@echo "🐍 檢測到 Python 命令: $(PYTHON_CMD)"
 	chmod +x setup-dev-environment.sh
 	chmod +x verify-cross-device.sh
@@ -23,11 +34,23 @@ verify:
 	@echo "🔍 驗證跨設備環境配置..."
 	./verify-cross-device.sh
 
+# 🌐 跨平台環境檢查
+check-env:
+	@echo "🌐 跨平台環境檢查..."
+	chmod +x check-environment.sh
+	./check-environment.sh
+
+# ⚛️ 測試量子系統
+quantum-test:
+	@echo "⚛️ 測試量子交易系統..."
+	cd quantum_pro && $(PYTHON_CMD) btc_quantum_ultimate_model.py --demo
+
 # 📦 僅安裝依賴（支援跨設備）
 install:
 	@echo "📦 安裝依賴..."
 	@echo "🐍 使用 Python 命令: $(PYTHON_CMD)"
-	$(PYTHON_CMD) -m venv venv
+	$(PYTHON_CMD) -m pip install --upgrade pip
+	$(PYTHON_CMD) -m pip install -r requirements.txt
 	@bash -c "source venv/bin/activate && pip install -r requirements.txt"
 	@echo "🌌 驗證量子模組..."
 	@bash -c "source venv/bin/activate && python -c 'import qiskit; from qiskit_aer import Aer; print(\"✅ 量子模組安裝成功\")'"
