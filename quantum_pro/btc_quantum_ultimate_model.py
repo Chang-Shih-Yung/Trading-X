@@ -3273,11 +3273,14 @@ class BTCQuantumUltimateModel:
                         # 動態電路深度控制 (單幣種允許深電路)
                         optimal_depth = self._adaptive_circuit_depth_control(0.5, 1)
                         
-                        # 構建專用量子電路
+                        # 構建專用量子電路 - 使用量子隨機數
                         qc = QuantumCircuit(self.n_features)
                         for i in range(optimal_depth):
                             for qubit in range(self.n_features):
-                                qc.ry(np.random.uniform(0, 2*np.pi), qubit)
+                                # 使用量子隨機數替代 np.random.uniform
+                                quantum_bits = self.quantum_backend_manager.generate_quantum_random_bits(16)
+                                angle = sum(bit * (2**j) for j, bit in enumerate(quantum_bits)) / (2**16 - 1) * 2 * np.pi
+                                qc.ry(angle, qubit)
                             for qubit in range(self.n_features - 1):
                                 qc.cx(qubit, qubit + 1)
                         qc.measure_all()
@@ -3489,7 +3492,10 @@ class BTCQuantumUltimateModel:
             baseline_circuit = QuantumCircuit(self.n_features)
             for i in range(optimal_depth):
                 for qubit in range(self.n_features):
-                    baseline_circuit.ry(np.random.uniform(0, 2*np.pi), qubit)
+                    # 使用量子隨機數替代 np.random.uniform
+                    quantum_bits = self.quantum_backend_manager.generate_quantum_random_bits(16)
+                    angle = sum(bit * (2**j) for j, bit in enumerate(quantum_bits)) / (2**16 - 1) * 2 * np.pi
+                    baseline_circuit.ry(angle, qubit)
                 for qubit in range(self.n_features - 1):
                     baseline_circuit.cx(qubit, qubit + 1)
             baseline_circuit.measure_all()
@@ -3797,7 +3803,14 @@ def production_demo_comprehensive():
         # Phase 3 Enhanced SPSA 測試
         logger.info("🔧 Phase 3: Enhanced SPSA 優化測試")
         try:
-            initial_params = np.random.uniform(0, 2*np.pi, 10)
+            # 使用量子隨機數初始化參數
+            param_bits = model.quantum_backend_manager.generate_quantum_random_bits(10 * 16)
+            initial_params = []
+            for i in range(10):
+                bit_slice = param_bits[i*16:(i+1)*16]
+                param_value = sum(bit * (2**j) for j, bit in enumerate(bit_slice)) / (2**16 - 1) * 2 * np.pi
+                initial_params.append(param_value)
+            initial_params = np.array(initial_params)
             spsa_result = model.enhanced_spsa_optimization(
                 initial_params=initial_params,
                 max_iterations=3,  # 快速測試

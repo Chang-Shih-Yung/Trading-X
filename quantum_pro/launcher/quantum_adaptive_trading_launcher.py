@@ -36,8 +36,15 @@ logger = logging.getLogger(__name__)
 
 # 導入量子系統
 try:
-    from ..regime_hmm_quantum import QUANTUM_ENTANGLED_COINS, 即時幣安數據收集器
-    from .quantum_adaptive_signal_engine import QuantumAdaptiveSignalEngine
+    import sys
+    from pathlib import Path
+    
+    # 添加項目根目錄到路徑
+    project_root = Path(__file__).parent.parent.parent
+    sys.path.insert(0, str(project_root))
+    
+    from quantum_pro.regime_hmm_quantum import QUANTUM_ENTANGLED_COINS, 即時幣安數據收集器
+    from quantum_pro.launcher.quantum_adaptive_signal_engine import QuantumAdaptiveSignalEngine
     logger.info("✅ 量子自適應系統導入成功")
 except ImportError as e:
     logger.error(f"❌ 量子系統導入失敗: {e}")
@@ -112,11 +119,15 @@ class QuantumAdaptiveTradingLauncher:
         logger.info(f"   已訓練模型: {len(model_files)}/7")
         
         if len(model_files) == 0:
-            logger.warning("⚠️ 未發現任何已訓練的量子模型")
-            logger.warning("💡 建議先運行 quantum_model_trainer.py 進行訓練")
+            logger.error("❌ 未發現任何已訓練的量子模型")
+            logger.error("💡 必須先運行 quantum_model_trainer.py 進行訓練")
+            logger.error("❌ 量子自適應系統禁止使用未訓練的模型")
+            raise FileNotFoundError("缺少必要的量子模型檔案，請先執行模型訓練")
         elif len(model_files) < 7:
-            logger.warning(f"⚠️ 部分量子模型缺失 ({len(model_files)}/7)")
-            logger.warning("💡 建議重新訓練所有模型以確保一致性")
+            logger.error(f"❌ 部分量子模型缺失 ({len(model_files)}/7)")
+            logger.error("💡 必須重新訓練所有模型以確保一致性")
+            logger.error("❌ 量子自適應系統要求完整的模型集合")
+            raise FileNotFoundError(f"模型集合不完整，缺少 {7 - len(model_files)} 個模型")
         else:
             logger.info("✅ 所有量子模型已就緒！")
         
@@ -146,15 +157,16 @@ class QuantumAdaptiveTradingLauncher:
         
         try:
             # 導入現有的量子計算系統
-            from regime_hmm_quantum import QuantumRegimeDetector, 即時市場觀測
+            from quantum_pro.regime_hmm_quantum import QuantumUltimateFusionEngine, 即時市場觀測
             
             class RealQuantumSignalProcessor:
                 """真正的量子信號處理器 - 使用已有的量子計算系統"""
                 
                 def __init__(self):
-                    # 初始化量子制度檢測器
-                    self.quantum_detector = QuantumRegimeDetector()
-                    logger.info("✅ 量子制度檢測器初始化完成")
+                    # 初始化量子融合引擎
+                    symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT', 'ADAUSDT']
+                    self.quantum_fusion_engine = QuantumUltimateFusionEngine(symbols)
+                    logger.info("✅ 量子融合引擎初始化完成")
                 
                 async def generate_signal(self, symbol, market_data):
                     """使用真正的量子計算生成信號"""
@@ -164,7 +176,7 @@ class QuantumAdaptiveTradingLauncher:
                         observation = self._convert_to_observation(symbol, market_data)
                         
                         # 🔮 使用真正的量子計算
-                        quantum_result = self.quantum_detector.calculate_quantum_signal(observation)
+                        quantum_result = self.quantum_fusion_engine.calculate_quantum_signal(observation)
                         
                         # 轉換為統一的信號格式
                         signal = self._convert_quantum_result_to_signal(symbol, quantum_result)
@@ -174,7 +186,12 @@ class QuantumAdaptiveTradingLauncher:
                         
                     except Exception as e:
                         logger.error(f"❌ {symbol} 量子計算失敗: {e}")
-                        return self._fallback_quantum_signal(symbol)
+                        logger.error("❌ 量子自適應系統必須使用訓練好的模型，無fallback模式")
+                        raise RuntimeError(f"量子計算失敗，系統不允許降級運行: {e}")
+                
+                def _fallback_quantum_signal(self, symbol):
+                    """已禁用：不允許fallback模式"""
+                    raise NotImplementedError("量子自適應系統禁用fallback模式，必須使用訓練好的模型")
                 
                 def _convert_to_observation(self, symbol, market_data):
                     """將市場數據轉換為即時市場觀測"""
@@ -263,64 +280,12 @@ class QuantumAdaptiveTradingLauncher:
             
         except ImportError as e:
             logger.error(f"❌ 量子系統導入失敗: {e}")
-            return await self._fallback_quantum_processor()
+            logger.error("❌ 無法載入必要的量子計算模組，系統無法運行")
+            raise ImportError("量子自適應系統需要完整的量子計算環境")
         except Exception as e:
             logger.error(f"❌ 真正量子信號處理器初始化失敗: {e}")
-            return await self._fallback_quantum_processor()
-    
-    async def _fallback_quantum_processor(self):
-        """備用簡化量子處理器"""
-        
-        logger.warning("⚠️ 使用備用簡化量子處理器")
-        
-        class SimplifiedQuantumProcessor:
-            async def generate_signal(self, symbol, market_data):
-                """使用簡化量子計算生成信號"""
-                
-                try:
-                    # 基於量子原理的簡化計算
-                    import os
-
-                    import numpy as np
-
-                    # 從市場數據提取關鍵指標
-                    volatility = market_data.get('volatility', 0.02)
-                    momentum = market_data.get('momentum', 0.0)
-                    trend_strength = market_data.get('trend_strength', 0.5)
-                    
-                    # 使用量子隨機數而非偽隨機數
-                    entropy_bytes = os.urandom(12)
-                    quantum_random = [b / 255.0 for b in entropy_bytes]
-                    
-                    # 基於量子疊加態原理計算機率
-                    bear_prob = 0.33 + (quantum_random[0] - 0.5) * 0.2 - momentum * 0.3
-                    bull_prob = 0.33 + (quantum_random[1] - 0.5) * 0.2 + momentum * 0.3  
-                    side_prob = 1.0 - bear_prob - bull_prob
-                    
-                    # 正規化
-                    total = bear_prob + side_prob + bull_prob
-                    probs = np.array([bear_prob, side_prob, bull_prob]) / total
-                    
-                    pred = np.argmax(probs)
-                    signal_map = {0: 'BEAR', 1: 'SIDE', 2: 'BULL'}
-                    
-                    return {
-                        'symbol': symbol,
-                        'signal': signal_map[pred],
-                        'confidence': float(np.max(probs)),
-                        'quantum_state': 'simplified_quantum_computation',
-                        'probabilities': {
-                            'bear': float(probs[0]),
-                            'side': float(probs[1]),
-                            'bull': float(probs[2])
-                        }
-                    }
-                    
-                except Exception as e:
-                    logger.error(f"簡化量子計算失敗: {e}")
-                    return None
-        
-        return SimplifiedQuantumProcessor()
+            logger.error("❌ 量子信號處理器必須使用訓練好的模型，不允許fallback模式")
+            raise RuntimeError("量子自適應系統必須使用經過訓練的模型")
     
     async def run(self):
         """運行量子自適應交易系統"""
