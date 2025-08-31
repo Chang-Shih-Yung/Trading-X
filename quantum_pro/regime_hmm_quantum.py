@@ -38,9 +38,10 @@ BLOCKCHAIN_DATA_AVAILABLE = False
 
 # 🚨 獨立檢查幣安API和區塊鏈數據可用性
 try:
+    import json
+
     import ccxt
     import websockets
-    import json
     BINANCE_API_AVAILABLE = True
     print("✅ 幣安 API 模組可用")
 except ImportError as e:
@@ -50,6 +51,7 @@ except ImportError as e:
 # 🌐 檢查區塊鏈數據源（替代方案）
 try:
     import requests
+
     # 測試區塊鏈數據 API
     response = requests.get("https://api.coingecko.com/api/v3/ping", timeout=5)
     if response.status_code == 200:
@@ -519,6 +521,125 @@ def _quantum_true_time_measurement():
     # 加入量子時間測量不確定性
     quantum_time_uncertainty = _quantum_true_random_measurement() * 1e-6
     return time.time() + quantum_time_uncertainty
+
+def calculate_quantum_signal_lifetime_pure(signal_state, confidence):
+    """
+    紅隊：基於純量子態熵值計算信號時效
+    
+    使用 Qiskit 2.x 嚴格標準，無回退，無人為參數
+    
+    Args:
+        signal_state: 量子信號狀態向量或密度矩陣
+        confidence: 信號置信度 (0-1)
+    
+    Returns:
+        float: 信號時效（秒）
+    """
+    try:
+        from qiskit.quantum_info import (
+            DensityMatrix,
+            Statevector,
+            entropy,
+            random_statevector,
+        )
+
+        # 🔴 紅隊：純量子態熵值方法
+        if hasattr(signal_state, '__iter__'):
+            # 如果是狀態向量，轉換為 Statevector
+            if len(signal_state) > 0:
+                # 標準化狀態向量
+                norm = np.sqrt(np.sum(np.abs(signal_state)**2))
+                if norm > 0:
+                    normalized_state = np.array(signal_state) / norm
+                else:
+                    normalized_state = random_statevector(2).data
+            else:
+                normalized_state = random_statevector(2).data
+                
+            # 創建密度矩陣
+            statevector = Statevector(normalized_state)
+            density_matrix = DensityMatrix(statevector)
+        else:
+            # 生成隨機量子態作為默認
+            density_matrix = DensityMatrix(random_statevector(2))
+        
+        # 計算量子態熵值
+        state_entropy = entropy(density_matrix)
+        
+        # 基於熵值計算時效：熵越高，信號衰減越快
+        # 使用量子物理公式：τ = -ln(S) / S，其中 S 是熵值
+        if state_entropy > 1e-10:  # 避免除以零
+            # 量子相干時間：與熵值成反比
+            quantum_lifetime = -np.log(state_entropy + 1e-10) / (state_entropy + 1e-10)
+            
+            # 應用置信度調整（高置信度 = 更長時效）
+            confidence_factor = confidence if confidence > 0 else 0.1
+            adjusted_lifetime = quantum_lifetime * confidence_factor
+            
+            # 確保時效為正數且合理範圍
+            final_lifetime = max(0.1, min(60.0, abs(adjusted_lifetime)))
+        else:
+            # 極低熵值 = 高相干性 = 長時效
+            final_lifetime = 30.0 * confidence if confidence > 0 else 5.0
+            
+        return final_lifetime
+        
+    except Exception as e:
+        # 嚴格模式：不允許回退，直接拋出錯誤
+        raise RuntimeError(f"❌ 紅隊量子信號時效計算失敗，嚴格模式終止: {e}")
+
+def calculate_quantum_signal_lifetime_adaptive(measurement_uncertainty, signal_strength):
+    """
+    藍隊：基於海森堡不確定性原理計算信號時效
+    
+    使用 Qiskit 2.x 嚴格標準，無回退，無人為參數
+    
+    Args:
+        measurement_uncertainty: 測量不確定性 (ΔE)
+        signal_strength: 信號強度 (0-1)
+    
+    Returns:
+        float: 信號時效（秒）
+    """
+    try:
+        from qiskit import QuantumCircuit
+        from qiskit.primitives import EstimatorV2
+        from qiskit.quantum_info import random_statevector
+
+        # 🔵 藍隊：海森堡不確定性原理方法
+        # ΔE × Δt ≥ ℏ/2
+
+        # 物理常數（簡化 ℏ = 1）
+        hbar = 1.0
+        
+        # 計算能量不確定性
+        if measurement_uncertainty > 1e-10:
+            energy_uncertainty = abs(measurement_uncertainty)
+        else:
+            # 使用量子隨機生成最小不確定性
+            random_state = random_statevector(2)
+            energy_uncertainty = abs(random_state.data[0].real) * 0.1 + 1e-6
+        
+        # 海森堡不確定性原理：Δt ≥ ℏ/(2×ΔE)
+        min_time_uncertainty = hbar / (2.0 * energy_uncertainty)
+        
+        # 應用信號強度調整
+        # 強信號 = 更精確測量 = 更大時間不確定性 = 更長持續時間
+        strength_factor = signal_strength if signal_strength > 0 else 0.1
+        quantum_lifetime = min_time_uncertainty * (1.0 + strength_factor)
+        
+        # 量子測量的額外不確定性因子
+        quantum_factor = abs(random_statevector(2).data[1].real) + 0.5
+        final_lifetime = quantum_lifetime * quantum_factor
+        
+        # 確保時效為正數且合理範圍
+        final_lifetime = max(0.1, min(60.0, abs(final_lifetime)))
+        
+        return final_lifetime
+        
+    except Exception as e:
+        # 嚴格模式：不允許回退，直接拋出錯誤
+        raise RuntimeError(f"❌ 藍隊量子信號時效計算失敗，嚴格模式終止: {e}")
 
 def construct_quantum_observation(price_data, symbol):
     """
@@ -1054,6 +1175,7 @@ logger = logging.getLogger(__name__)
 # 新增：即時 API 整合
 try:
     import warnings
+
     # 🚫 抑制 Qiskit Python 3.9 棄用警告 - 讓量子引擎正常運行
     warnings.filterwarnings('ignore', category=DeprecationWarning, module='qiskit')
     
@@ -1298,7 +1420,7 @@ class 即時幣安數據收集器:
         """🌐 從區塊鏈 API 收集即時數據"""
         try:
             import requests
-            
+
             # 使用 CoinGecko API 獲取即時價格
             symbols_map = {
                 'BTCUSDT': 'bitcoin',

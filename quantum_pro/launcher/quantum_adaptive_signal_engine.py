@@ -22,14 +22,26 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-# Qiskit 2.x 核心導入
+# Qiskit 2.x 核心導入 - 嚴格符合 2.x 標準
 try:
     import qiskit
     from qiskit import QuantumCircuit, transpile
     from qiskit.circuit import Parameter
     from qiskit_aer import AerSimulator
-    logger = logging.getLogger(__name__)
-    logger.info("✅ Qiskit 2.x 量子計算環境已載入")
+
+    # Qiskit 2.x Primitives V2 - 嚴格要求
+    try:
+        from qiskit.primitives import StatevectorEstimator, StatevectorSampler
+        from qiskit_aer.primitives import EstimatorV2, SamplerV2
+        PRIMITIVES_V2_AVAILABLE = True
+        logger = logging.getLogger(__name__)
+        logger.info("✅ Qiskit 2.x 量子計算環境已載入")
+        logger.info("✅ Qiskit 2.x Primitives V2 可用")
+    except ImportError as primitives_error:
+        logger = logging.getLogger(__name__)
+        logger.error(f"❌ Qiskit 2.x Primitives V2 導入失敗: {primitives_error}")
+        raise ImportError("量子自適應引擎嚴格要求 Qiskit 2.x Primitives V2")
+        
 except ImportError as e:
     logger = logging.getLogger(__name__)
     logger.error(f"❌ Qiskit 2.x 導入失敗: {e}")
@@ -48,8 +60,11 @@ class QuantumAdaptiveSignalEngine:
     """🔮 真正的量子自適應信號引擎 - 基於Qiskit 2.x"""
     
     def __init__(self):
-        # 量子計算核心
+        # Qiskit 2.x 量子計算核心 - 使用 Primitives V2
         self.quantum_simulator = AerSimulator()
+        self.sampler = SamplerV2()  # Qiskit 2.x V2 Sampler
+        self.estimator = EstimatorV2()  # Qiskit 2.x V2 Estimator
+        
         self.trained_models = {}
         self.quantum_circuits = {}
         self.quantum_states = {}  # 添加量子狀態管理
@@ -58,7 +73,7 @@ class QuantumAdaptiveSignalEngine:
         self.running = False
         self.models_loaded = False
         
-        logger.info("🔮 初始化真正的量子自適應信號引擎...")
+        logger.info("🔮 初始化真正的量子自適應信號引擎（Qiskit 2.x V2 Primitives）...")
     
     def load_trained_quantum_models(self, models_dir: Path):
         """載入訓練好的量子模型 - 必須先訓練"""
@@ -99,15 +114,41 @@ class QuantumAdaptiveSignalEngine:
             # 創建量子狀態容器
             quantum_state = QuantumState(symbol)
             
-            # 使用真正的量子隨機數初始化
+            # 使用 Qiskit 2.x SamplerV2 進行真正的量子測量
             qc = QuantumCircuit(2, 2)
             qc.h(0)  # 創建疊加態
             qc.h(1)
             qc.measure_all()
             
-            job = self.quantum_simulator.run(transpile(qc, self.quantum_simulator), shots=100)
-            result = job.result()
-            counts = result.get_counts(qc)
+            # Qiskit 2.x V2 PUB 格式調用
+            try:
+                job = self.sampler.run([(qc,)], shots=100)
+                result = job.result()
+                
+                # 處理 SamplerV2 結果
+                pub_result = result[0]
+                counts = {}
+                
+                if hasattr(pub_result, 'data') and hasattr(pub_result.data, 'meas'):
+                    measurement_data = pub_result.data.meas
+                    if hasattr(measurement_data, 'get_counts'):
+                        counts = measurement_data.get_counts()
+                    elif hasattr(measurement_data, '__iter__'):
+                        # 從測量數據構建計數字典
+                        for measurement in measurement_data:
+                            if hasattr(measurement, '__iter__'):
+                                bitstring = ''.join(str(int(bit)) for bit in measurement)
+                            else:
+                                bitstring = str(measurement)
+                            
+                            if bitstring and all(c in '01' for c in bitstring):
+                                counts[bitstring] = counts.get(bitstring, 0) + 1
+                
+                if not counts:
+                    raise RuntimeError("❌ 無法從 SamplerV2 獲取測量結果，嚴格禁止使用任何回退邏輯")
+                
+            except Exception as sampler_error:
+                raise RuntimeError(f"❌ Qiskit 2.x SamplerV2 執行失敗: {sampler_error}。嚴格禁止回退到舊版本。")
             
             # 根據量子測量初始化狀態
             total_shots = sum(counts.values())
@@ -143,9 +184,35 @@ class QuantumAdaptiveSignalEngine:
         qc.cx(0, 1)
         qc.measure_all()
         
-        job = self.quantum_simulator.run(transpile(qc, self.quantum_simulator), shots=100)
-        result = job.result()
-        counts = result.get_counts(qc)
+        # 使用 Qiskit 2.x SamplerV2 更新量子狀態
+        try:
+            job = self.sampler.run([(qc,)], shots=100)
+            result = job.result()
+            
+            # 處理 SamplerV2 結果
+            pub_result = result[0]
+            counts = {}
+            
+            if hasattr(pub_result, 'data') and hasattr(pub_result.data, 'meas'):
+                measurement_data = pub_result.data.meas
+                if hasattr(measurement_data, 'get_counts'):
+                    counts = measurement_data.get_counts()
+                elif hasattr(measurement_data, '__iter__'):
+                    # 從測量數據構建計數字典
+                    for measurement in measurement_data:
+                        if hasattr(measurement, '__iter__'):
+                            bitstring = ''.join(str(int(bit)) for bit in measurement)
+                        else:
+                            bitstring = str(measurement)
+                        
+                        if bitstring and all(c in '01' for c in bitstring):
+                            counts[bitstring] = counts.get(bitstring, 0) + 1
+            
+            if not counts:
+                raise RuntimeError("❌ 無法從 SamplerV2 獲取測量結果進行狀態更新")
+                
+        except Exception as sampler_error:
+            raise RuntimeError(f"❌ Qiskit 2.x SamplerV2 狀態更新失敗: {sampler_error}")
         
         # 更新量子狀態
         total_shots = sum(counts.values())
@@ -250,10 +317,35 @@ class QuantumAdaptiveSignalEngine:
             # 根據市場數據調整量子電路參數
             adjusted_qc = self._adjust_quantum_circuit_parameters(qc, market_data)
             
-            # 執行量子計算
-            job = self.quantum_simulator.run(transpile(adjusted_qc, self.quantum_simulator), shots=1000)
-            result = job.result()
-            counts = result.get_counts(adjusted_qc)
+            # 執行 Qiskit 2.x V2 量子計算
+            try:
+                job = self.sampler.run([(adjusted_qc,)], shots=1000)
+                result = job.result()
+                
+                # 處理 SamplerV2 結果
+                pub_result = result[0]
+                counts = {}
+                
+                if hasattr(pub_result, 'data') and hasattr(pub_result.data, 'meas'):
+                    measurement_data = pub_result.data.meas
+                    if hasattr(measurement_data, 'get_counts'):
+                        counts = measurement_data.get_counts()
+                    elif hasattr(measurement_data, '__iter__'):
+                        # 從測量數據構建計數字典
+                        for measurement in measurement_data:
+                            if hasattr(measurement, '__iter__'):
+                                bitstring = ''.join(str(int(bit)) for bit in measurement)
+                            else:
+                                bitstring = str(measurement)
+                            
+                            if bitstring and all(c in '01' for c in bitstring):
+                                counts[bitstring] = counts.get(bitstring, 0) + 1
+                
+                if not counts:
+                    raise RuntimeError("❌ 無法從 SamplerV2 獲取量子信號測量結果")
+                    
+            except Exception as sampler_error:
+                raise RuntimeError(f"❌ Qiskit 2.x SamplerV2 量子信號生成失敗: {sampler_error}")
             
             # 使用訓練好的模型解釋量子測量結果
             signal = self._interpret_quantum_measurement(symbol, counts, market_data)

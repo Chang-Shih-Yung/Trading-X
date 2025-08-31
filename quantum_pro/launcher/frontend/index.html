@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🥊 量子對戰監控面板</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 100%);
+      color: #ffffff;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 20px;
+      border-radius: 15px;
+      backdrop-filter: blur(10px);
+    }
+
+    .title {
+      font-size: 2.5rem;
+      font-weight: 700;
+      background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 10px;
+    }
+
+    .status {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      margin-top: 20px;
+    }
+
+    .team-status {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 15px 25px;
+      border-radius: 10px;
+      border: 2px solid;
+    }
+
+    .red-team {
+      border-color: #ff6b6b;
+    }
+
+    .blue-team {
+      border-color: #4ecdc4;
+    }
+
+    .portfolio-value {
+      font-size: 1.5rem;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .team-name {
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+
+    .main-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      margin-bottom: 30px;
+    }
+
+    .panel {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 15px;
+      padding: 20px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .panel-title {
+      font-size: 1.3rem;
+      font-weight: 600;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .signals-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 15px;
+    }
+
+    .signal-card {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 15px;
+      border-radius: 10px;
+      border-left: 4px solid;
+    }
+
+    .signal-bull {
+      border-left-color: #4caf50;
+    }
+
+    .signal-bear {
+      border-left-color: #f44336;
+    }
+
+    .signal-hold {
+      border-left-color: #ffc107;
+    }
+
+    .symbol {
+      font-weight: bold;
+      font-size: 1.1rem;
+      margin-bottom: 5px;
+    }
+
+    .signal-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+
+    .confidence {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.8rem;
+    }
+
+    .price {
+      font-family: 'SF Mono', monospace;
+      color: #4ecdc4;
+    }
+
+    .trades-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    .trades-table th,
+    .trades-table td {
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .trades-table th {
+      background: rgba(255, 255, 255, 0.1);
+      font-weight: 600;
+    }
+
+    .action-buy {
+      color: #4caf50;
+    }
+
+    .action-sell {
+      color: #f44336;
+    }
+
+    .action-hold {
+      color: #ffc107;
+    }
+
+    .full-width {
+      grid-column: 1 / -1;
+    }
+
+    .loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 200px;
+      font-size: 1.2rem;
+      opacity: 0.7;
+    }
+
+    .error {
+      color: #f44336;
+      text-align: center;
+      padding: 20px;
+      background: rgba(244, 67, 54, 0.1);
+      border-radius: 10px;
+      border: 1px solid #f44336;
+    }
+
+    @keyframes pulse {
+      0% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.5;
+      }
+
+      100% {
+        opacity: 1;
+      }
+    }
+
+    .live-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      background: #4caf50;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+      margin-right: 8px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <div class="container">
+      <div class="header">
+        <h1 class="title">🥊 量子對戰監控面板</h1>
+        <div class="status">
+          <div class="team-status red-team">
+            <div class="portfolio-value">🔴 ${{ redTeamValue.toFixed(2) }}</div>
+            <div class="team-name">Pure Quantum</div>
+          </div>
+          <div class="team-status blue-team">
+            <div class="portfolio-value">🔵 ${{ blueTeamValue.toFixed(2) }}</div>
+            <div class="team-name">Adaptive Quantum</div>
+          </div>
+        </div>
+        <div style="margin-top: 15px;">
+          <span class="live-indicator"></span>
+          <span>即時更新</span>
+        </div>
+      </div>
+
+      <div class="main-content">
+        <div class="panel">
+          <h2 class="panel-title">📡 最新交易信號</h2>
+          <div v-if="loading" class="loading">載入中...</div>
+          <div v-else-if="error" class="error">{{ error }}</div>
+          <div v-else class="signals-grid">
+            <div v-for="signal in latestSignals" :key="signal.id" class="signal-card"
+              :class="'signal-' + signal.signal_type.toLowerCase()">
+              <div class="symbol">{{ signal.symbol }}</div>
+              <div class="signal-info">
+                <span>{{ signal.team_name === 'Pure Quantum' ? '🔴' : '🔵' }} {{ signal.signal_type }}</span>
+                <span class="confidence">{{ (signal.signal_strength * 100).toFixed(1) }}%</span>
+              </div>
+              <div class="price">${{ signal.price.toFixed(4) }}</div>
+              <div style="font-size: 0.8rem; opacity: 0.7; margin-top: 5px;">
+                {{ formatTime(signal.timestamp) }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2 class="panel-title">📊 投資組合狀態</h2>
+          <div v-if="loading" class="loading">載入中...</div>
+          <div v-else-if="portfolios.length === 0" class="loading">暫無數據</div>
+          <div v-else>
+            <div v-for="portfolio in latestPortfolios" :key="portfolio.id"
+              style="margin-bottom: 15px; padding: 15px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: bold;">
+                  {{ portfolio.team_name === 'Pure Quantum' ? '🔴' : '🔵' }} {{ portfolio.team_name }}
+                </span>
+                <span style="font-size: 1.2rem; font-weight: bold;">
+                  ${{ portfolio.total_value.toFixed(2) }}
+                </span>
+              </div>
+              <div style="margin-top: 5px; font-size: 0.9rem; opacity: 0.8;">
+                現金: ${{ portfolio.cash.toFixed(2) }} |
+                未實現: ${{ portfolio.unrealized_pnl.toFixed(2) }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel full-width">
+        <h2 class="panel-title">📈 最新交易記錄</h2>
+        <div v-if="loading" class="loading">載入中...</div>
+        <div v-else-if="trades.length === 0" class="loading">暫無交易記錄</div>
+        <table v-else class="trades-table">
+          <thead>
+            <tr>
+              <th>時間</th>
+              <th>隊伍</th>
+              <th>交易對</th>
+              <th>動作</th>
+              <th>數量</th>
+              <th>價格</th>
+              <th>損益</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="trade in recentTrades" :key="trade.id">
+              <td>{{ formatTime(trade.timestamp) }}</td>
+              <td>{{ trade.team_name === 'Pure Quantum' ? '🔴' : '🔵' }} {{ trade.team_name }}</td>
+              <td>{{ trade.symbol }}</td>
+              <td :class="'action-' + trade.action.toLowerCase()">{{ trade.action }}</td>
+              <td>{{ trade.size.toFixed(6) }}</td>
+              <td>${{ trade.price.toFixed(4) }}</td>
+              <td :style="{ color: trade.pnl > 0 ? '#4caf50' : trade.pnl < 0 ? '#f44336' : '#ffc107' }">
+                {{ trade.pnl ? '$' + trade.pnl.toFixed(2) : '-' }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { createApp } = Vue;
+
+    createApp({
+      data() {
+        return {
+          signals: [],
+          portfolios: [],
+          trades: [],
+          results: [],
+          loading: true,
+          error: null,
+          updateInterval: null
+        }
+      },
+      computed: {
+        latestSignals() {
+          return this.signals.slice(0, 8);
+        },
+        latestPortfolios() {
+          const latest = {};
+          for (const portfolio of this.portfolios) {
+            if (!latest[portfolio.team_name] ||
+              new Date(portfolio.timestamp) > new Date(latest[portfolio.team_name].timestamp)) {
+              latest[portfolio.team_name] = portfolio;
+            }
+          }
+          return Object.values(latest);
+        },
+        recentTrades() {
+          return this.trades.slice(0, 20);
+        },
+        redTeamValue() {
+          const portfolio = this.latestPortfolios.find(p => p.team_name === 'Pure Quantum');
+          return portfolio ? portfolio.total_value : 10.0;
+        },
+        blueTeamValue() {
+          const portfolio = this.latestPortfolios.find(p => p.team_name === 'Adaptive Quantum');
+          return portfolio ? portfolio.total_value : 10.0;
+        }
+      },
+      methods: {
+        async fetchData() {
+          try {
+            this.loading = true;
+            this.error = null;
+
+            const response = await axios.get('http://localhost:8888/api/data');
+            const data = response.data;
+
+            this.signals = data.signals || [];
+            this.portfolios = data.portfolios || [];
+            this.trades = data.trades || [];
+            this.results = data.results || [];
+
+          } catch (error) {
+            console.error('獲取數據失敗:', error);
+            this.error = '無法連接到量子對戰系統，請確保系統正在運行';
+          } finally {
+            this.loading = false;
+          }
+        },
+        formatTime(timestamp) {
+          const date = new Date(timestamp);
+          return date.toLocaleTimeString('zh-TW', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+          });
+        },
+        startAutoUpdate() {
+          this.updateInterval = setInterval(() => {
+            this.fetchData();
+          }, 5000); // 每5秒更新一次
+        }
+      },
+      mounted() {
+        this.fetchData();
+        this.startAutoUpdate();
+      },
+      beforeUnmount() {
+        if (this.updateInterval) {
+          clearInterval(this.updateInterval);
+        }
+      }
+    }).mount('#app');
+  </script>
+</body>
+
+</html>

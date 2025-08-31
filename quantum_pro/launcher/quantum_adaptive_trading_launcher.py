@@ -23,28 +23,40 @@ from pathlib import Path
 
 import numpy as np
 
-# 設置日誌
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler(f'quantum_adaptive_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
-    ]
-)
+# 設置日誌 - 只在直接運行時創建日誌檔案
+if __name__ == '__main__':
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler('quantum_adaptive_launcher.log', encoding='utf-8')
+        ]
+    )
+else:
+    # 當被導入時，只使用控制台輸出
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
 logger = logging.getLogger(__name__)
 
 # 導入量子系統
 try:
     import sys
     from pathlib import Path
-    
+
     # 添加項目根目錄到路徑
     project_root = Path(__file__).parent.parent.parent
     sys.path.insert(0, str(project_root))
     
+    from quantum_pro.launcher.quantum_adaptive_signal_engine import (
+        QuantumAdaptiveSignalEngine,
+    )
     from quantum_pro.regime_hmm_quantum import QUANTUM_ENTANGLED_COINS, 即時幣安數據收集器
-    from quantum_pro.launcher.quantum_adaptive_signal_engine import QuantumAdaptiveSignalEngine
     logger.info("✅ 量子自適應系統導入成功")
 except ImportError as e:
     logger.error(f"❌ 量子系統導入失敗: {e}")
@@ -157,7 +169,10 @@ class QuantumAdaptiveTradingLauncher:
         
         try:
             # 導入現有的量子計算系統
-            from quantum_pro.regime_hmm_quantum import QuantumUltimateFusionEngine, 即時市場觀測
+            from quantum_pro.regime_hmm_quantum import (
+                QuantumUltimateFusionEngine,
+                即時市場觀測,
+            )
             
             class RealQuantumSignalProcessor:
                 """真正的量子信號處理器 - 使用已有的量子計算系統"""
@@ -186,28 +201,29 @@ class QuantumAdaptiveTradingLauncher:
                         
                     except Exception as e:
                         logger.error(f"❌ {symbol} 量子計算失敗: {e}")
-                        logger.error("❌ 量子自適應系統必須使用訓練好的模型，無fallback模式")
+                        logger.error("❌ 量子自適應系統必須使用訓練好的模型，嚴格禁止任何降級模式")
                         raise RuntimeError(f"量子計算失敗，系統不允許降級運行: {e}")
-                
-                def _fallback_quantum_signal(self, symbol):
-                    """已禁用：不允許fallback模式"""
-                    raise NotImplementedError("量子自適應系統禁用fallback模式，必須使用訓練好的模型")
                 
                 def _convert_to_observation(self, symbol, market_data):
                     """將市場數據轉換為即時市場觀測"""
                     
-                    # 創建即時市場觀測對象
+                    # 創建即時市場觀測對象 - 使用正確的中文參數名
                     observation = 即時市場觀測(
+                        時間戳=datetime.now(),
                         交易對=symbol,
-                        當前價格=market_data.get('current_price', 0.0),
+                        價格=market_data.get('current_price', 0.0),
+                        成交量=market_data.get('volume', 0.0),
                         收益率=market_data.get('price_change_percent', 0.0) / 100.0,
                         已實現波動率=market_data.get('volatility', 0.02),
                         動量斜率=market_data.get('momentum', 0.0),
+                        最佳買價=market_data.get('current_price', 0.0) * 0.9995,  # 模擬買價
+                        最佳賣價=market_data.get('current_price', 0.0) * 1.0005,  # 模擬賣價
+                        買賣價差=market_data.get('current_price', 0.0) * 0.001,  # 模擬價差
+                        訂單簿壓力=0.0,  # 預設值
+                        主動買入比率=0.5,  # 預設值
+                        大單流入率=0.0,  # 預設值
                         RSI_14=market_data.get('rsi', 50.0),
-                        布林帶位置=market_data.get('bb_position', 0.5),
-                        成交量=market_data.get('volume', 0.0),
-                        成交量變化率=market_data.get('volume_change_percent', 0.0) / 100.0,
-                        時間戳=datetime.now()
+                        布林帶位置=market_data.get('bb_position', 0.5)
                     )
                     
                     return observation
@@ -247,34 +263,6 @@ class QuantumAdaptiveTradingLauncher:
                     }
                     
                     return signal
-                
-                def _fallback_quantum_signal(self, symbol):
-                    """備用量子信號（當主要計算失敗時）"""
-                    
-                    logger.warning(f"⚠️ {symbol} 使用備用量子信號")
-                    
-                    # 使用量子隨機性生成備用信號
-                    import os
-                    entropy_bytes = os.urandom(3)
-                    probs = np.array([b for b in entropy_bytes], dtype=float)
-                    probs = probs / np.sum(probs)
-                    
-                    pred = np.argmax(probs)
-                    signal_map = {0: 'BEAR', 1: 'NEUTRAL', 2: 'BULL'}
-                    
-                    return {
-                        'symbol': symbol,
-                        'signal': signal_map[pred],
-                        'confidence': float(np.max(probs)),
-                        'quantum_state': 'quantum_fallback',
-                        'probabilities': {
-                            'bear': float(probs[0]),
-                            'side': float(probs[1]),
-                            'bull': float(probs[2])
-                        },
-                        'quantum_backend': 'quantum_entropy_fallback',
-                        'model_status': 'fallback_mode'
-                    }
             
             return RealQuantumSignalProcessor()
             
@@ -284,7 +272,7 @@ class QuantumAdaptiveTradingLauncher:
             raise ImportError("量子自適應系統需要完整的量子計算環境")
         except Exception as e:
             logger.error(f"❌ 真正量子信號處理器初始化失敗: {e}")
-            logger.error("❌ 量子信號處理器必須使用訓練好的模型，不允許fallback模式")
+            logger.error("❌ 量子信號處理器必須使用訓練好的模型，嚴格禁止任何降級模式")
             raise RuntimeError("量子自適應系統必須使用經過訓練的模型")
     
     async def run(self):
